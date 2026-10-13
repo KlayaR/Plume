@@ -8,6 +8,9 @@ import type { ActionId, Effort, Model } from '../lib/types'
 import { useT } from '../i18n'
 import ManuscriptOptions from './ManuscriptOptions'
 import VoiceSettings from './VoiceSettings'
+import { open as openDialog } from '@tauri-apps/plugin-dialog'
+import { useEffect } from 'react'
+import { backupNow, joinSeries, listBackups, seriesName } from '../library'
 
 const ACTIONS: [ActionId, string][] = [['continue', 'Continue'], ['rewrite', 'Rewrite selection'], ['beats', 'Beats to prose']]
 type Tab = 'appearance' | 'manuscript' | 'writing' | 'voice' | 'claude' | 'book' | 'about'
@@ -135,8 +138,20 @@ function BookTab() {
   const ai = book.meta.ai
   const setAi = (patch: Partial<typeof ai>) => useStore.getState().updateMeta({ ai: { ...book.meta.ai, ...patch } })
   const num = (v: string, min: number, max: number) => Math.max(min, Math.min(max, Math.round(Number(v) || min)))
+  const goal = book.meta.goal
+  const setGoal = (patch: Partial<typeof goal>) => useStore.getState().updateMeta({ goal: { ...goal, ...patch } })
   return (
     <>
+    <SettingsSection title={t('Goals')}>
+      <SettingRow label={t('Words for the whole book')}>
+        <input className="sk-input pl-num" type="number" min={0} step={5000} value={goal.book} onChange={e => setGoal({ book: Math.max(0, Number(e.target.value) || 0) })} />
+      </SettingRow>
+      <SettingRow label={t('Words a day')}>
+        <input className="sk-input pl-num" type="number" min={0} step={100} value={goal.daily} onChange={e => setGoal({ daily: Math.max(0, Number(e.target.value) || 0) })} />
+      </SettingRow>
+    </SettingsSection>
+    <SeriesSection />
+    <BackupSection />
     <SettingsSection title={t('This book')} description={t("Saved in the book's plume.json.")}>
       <SettingRow label={t('Language of the book')} description={t('Chapter headings, typography (« » and spaces in French), the spellcheck dictionary and the language Claude writes in')}>
         <div className="sk-segmented" role="group" aria-label={t('Language of the book')}>
@@ -172,5 +187,53 @@ function BookTab() {
       </SettingRow>
     </SettingsSection>
     </>
+  )
+}
+
+/** A series: books that share a bible folder; facts can be dated per book ([b2 ch 3+]). */
+function SeriesSection() {
+  const book = useStore(s => s.book)!
+  const t = useT()
+  const s = book.meta.series
+  const choose = async () => {
+    const dir = await openDialog({ directory: true, title: t('Choose or create the series folder') })
+    if (typeof dir === 'string') await joinSeries(book, dir, s?.index ?? 1)
+  }
+  return (
+    <SettingsSection title={t('Series')} description={t('Books of a series share a bible folder. Facts can be dated per book: [b2 ch 3+].')}>
+      <SettingRow label={t('Series folder')} description={s ? seriesName(book) : t('Not in a series')}>
+        <div className="pl-row">
+          <button type="button" className="sk-btn sk-btn-sm" onClick={choose}>{s ? t('Change…') : t('Choose…')}</button>
+          {s && <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm" onClick={() => useStore.getState().updateMeta({ series: null })}>{t('Leave the series')}</button>}
+        </div>
+      </SettingRow>
+      {s && (
+        <SettingRow label={t('Book number in the series')}>
+          <input className="sk-input pl-num" type="number" min={1} value={s.index} onChange={e => useStore.getState().updateMeta({ series: { ...s, index: Math.max(1, Number(e.target.value) || 1) } })} />
+        </SettingRow>
+      )}
+    </SettingsSection>
+  )
+}
+
+/** Daily zips of the book, kept two weeks, on top of autosave. */
+function BackupSection() {
+  const book = useStore(s => s.book)!
+  const t = useT()
+  const [list, setList] = useState<string[]>([])
+  const [busy, setBusy] = useState(false)
+  useEffect(() => { listBackups(book).then(setList).catch(() => setList([])) }, [book])
+  const now = async () => {
+    setBusy(true)
+    try { const p = await backupNow(book); setList(await listBackups(book)); useStore.getState().notify('ok', t('Backed up: {path}', { path: p })) } catch (e) { useStore.getState().notify('error', String(e)) }
+    setBusy(false)
+  }
+  return (
+    <SettingsSection title={t('Backups')} description={t('A zip of the whole book once a day when you open it, kept two weeks, in Plume’s own folder on this computer.')}>
+      <SettingRow label={t('Back up now')} description={list[0] ?? t('No backup yet')}>
+        <button type="button" className="sk-btn sk-btn-sm" disabled={busy} onClick={now}>{busy ? t('Backing up…') : t('Back up now')}</button>
+      </SettingRow>
+      {list.length > 1 && <p className="sk-hint">{t('{n} backups kept.', { n: list.length })}</p>}
+    </SettingsSection>
   )
 }

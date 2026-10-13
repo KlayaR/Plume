@@ -4,7 +4,8 @@ import type { Book, Chapter, Entry, EntryType, Scene } from './lib/types'
 import type { Limits, Usage } from './lib/claude'
 import { findClaude, setLimitsListener } from './lib/claude'
 import { chapterLabels } from './lib/chapters'
-import { loadBook, makeChapter, makeEntry, makeScene, saveChapter, saveEntry, saveMeta, saveScene, trash } from './lib/project'
+import { Conflict, loadBook, makeChapter, makeEntry, makeScene, reread, saveChapter, saveEntry, saveMeta, saveScene, seriesRootOf, trash } from './lib/project'
+import { parseEntry, parseScene } from './lib/bible'
 import { t } from './i18n'
 
 export type View = 'bible' | 'plan' | 'manuscript'
@@ -151,6 +152,8 @@ interface State {
   updateEntry: (slug: string, patch: Partial<Entry>) => void
   removeEntry: (slug: string) => Promise<void>
   updateMeta: (patch: Partial<Book['meta']>) => void
+  /** Moves an entry between the book and its series' shared bible. */
+  shareEntry: (slug: string, shared: boolean) => Promise<void>
   setSettings: (s: Partial<Settings>) => void
   setPrefs: (p: Partial<Prefs>) => void
   detectClaude: () => Promise<void>
@@ -186,6 +189,13 @@ export const findScene = (book: Book | null, id: string | null) => {
 
 export const useStore = create<State>((set, get) => {
   const mutate = (f: (b: Book) => Book) => { const b = get().book; if (b) set({ book: f(b) }) }
+  // Today's words for the goals, at most every half minute.
+  let progressAt = 0
+  const progressLater = () => {
+    if (Date.now() - progressAt < 30_000) return
+    progressAt = Date.now()
+    import('./library').then(m => { const b = get().book; if (b) { m.recordProgress(b); m.noteOnShelf(b) } })
+  }
   const metaLater = () => later('plume.json', () => saveMeta(get().book!))
   const fail = (err: unknown) => get().notify('error', t('Could not save: {e}', { e: String(err) }))
 
@@ -219,8 +229,15 @@ export const useStore = create<State>((set, get) => {
       set({ book, recent, view: 'manuscript', sceneId: book.chapters[0]?.scenes[0]?.id ?? null, entrySlug: null, freshSceneId: null, bibleTab: 'entry', planTab: 'board' })
       import('./chat').then(m => m.loadChat(book))
       import('./writing').then(m => m.loadNotes(book))
+      // Library and safety: the lock for synced folders, today's backup, progress, the shelf card.
+      import('./library').then(m => { m.takeLock(book); m.autoBackup(book); m.recordProgress(get().book!); m.noteOnShelf(get().book!) })
     },
-    close: () => { get().flush(); set({ book: null, sceneId: null, entrySlug: null }) },
+    close: () => {
+      const b = get().book
+      get().flush()
+      if (b) import('./library').then(m => { m.noteOnShelf(b); m.releaseLock(b) })
+      set({ book: null, sceneId: null, entrySlug: null })
+    },
     setView: view => set({ view }),
     selectScene: id => set({ sceneId: id, view: 'manuscript', freshSceneId: get().freshSceneId === id ? id : null }),
     selectEntry: slug => set({ entrySlug: slug, bibleTab: 'entry' }),
@@ -232,9 +249,18 @@ export const useStore = create<State>((set, get) => {
       if (found) later(found.scene.path, async () => {
         const f = findScene(get().book, id)
         if (!f) return
-        await saveScene(get().book!.root, f.scene)
-        // Version history: a copy now and then, in .plume/history.
-        import('./writing').then(m => m.snapshot(get().book!.root, f.scene))
+        const root = get().book!.root
+        try { await saveScene(root, f.scene) } catch (e) {
+          if (!(e instanceof Conflict)) throw e
+          // Changed on another computer: theirs is shown, ours is kept as a .conflict copy.
+          const theirs = parseScene(f.scene.path, await reread(root, f.scene.path))
+          mutate(b => ({ ...b, chapters: b.chapters.map(c => ({ ...c, scenes: c.scenes.map(s => s.id === id ? { ...theirs, id } : s) })) }))
+          get().notify('warn', t('“{name}” was changed on another computer. That version is shown; yours is saved as {copy}.', { name: f.scene.title, copy: e.copy }))
+          return
+        }
+        // Version history: a copy now and then, in .plume/history; and today's progress.
+        import('./writing').then(m => m.snapshot(root, f.scene))
+        progressLater()
       })
       // A scene marked done gets its summary (Haiku), unless it already has an up-to-date one.
       if (patch.status === 'done' && get().claudeExe) import('./writing').then(m => { if (m.staleScenes(get().book!).some(s => s.id === id)) m.summarizeScene(id).catch(() => {}) })
@@ -363,17 +389,40 @@ export const useStore = create<State>((set, get) => {
     updateEntry: (slug, patch) => {
       mutate(b => ({ ...b, entries: b.entries.map(e => e.slug === slug ? { ...e, ...patch } : e) }))
       const e = get().book!.entries.find(x => x.slug === slug)!
-      later(e.path, async () => { const x = get().book!.entries.find(y => y.slug === slug); if (x) await saveEntry(get().book!.root, x) })
+      later(e.path, async () => {
+        const b = get().book!
+        const x = b.entries.find(y => y.slug === slug)
+        if (!x) return
+        // Shared entries live in the series folder.
+        const root = x.shared ? seriesRootOf(b.root, b.meta.series) ?? b.root : b.root
+        try { await saveEntry(root, x) } catch (err) {
+          if (!(err instanceof Conflict)) throw err
+          const theirs = { ...parseEntry(x.path, await reread(root, x.path)), shared: x.shared }
+          mutate(bk => ({ ...bk, entries: bk.entries.map(y => y.slug === slug ? theirs : y) }))
+          get().notify('warn', t('“{name}” was changed on another computer. That version is shown; yours is saved as {copy}.', { name: x.name, copy: err.copy }))
+        }
+      })
     },
     removeEntry: async slug => {
       const b = get().book!
       const e = b.entries.find(x => x.slug === slug)
       if (!e) return
       cancelLater(e.path)
-      await trash(b.root, e.path)
+      await trash(e.shared ? seriesRootOf(b.root, b.meta.series) ?? b.root : b.root, e.path)
       set({ book: { ...b, entries: b.entries.filter(x => x.slug !== slug) }, entrySlug: null })
     },
     updateMeta: patch => { mutate(b => ({ ...b, meta: { ...b.meta, ...patch } })); metaLater() },
+    shareEntry: async (slug, shared) => {
+      const b = get().book!
+      const e = b.entries.find(x => x.slug === slug)
+      const sroot = seriesRootOf(b.root, b.meta.series)
+      if (!e || !sroot || !!e.shared === shared) return
+      cancelLater(e.path)
+      const next = { ...e, shared: shared || undefined }
+      await saveEntry(shared ? sroot : b.root, next)
+      await trash(shared ? b.root : sroot, e.path)
+      mutate(bk => ({ ...bk, entries: bk.entries.map(x => x.slug === slug ? next : x) }))
+    },
 
     setSettings: s => {
       const settings = { ...get().settings, ...s }

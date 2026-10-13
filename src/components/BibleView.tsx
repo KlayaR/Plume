@@ -81,6 +81,7 @@ export default function BibleView() {
                     {e.include === 'always' && ty.type !== 'style' && <span className="sk-badge sk-badge-accent">{t('always')}</span>}
                     {e.include === 'never' && <span className="sk-badge">{t('never')}</span>}
                     {e.include === 'secret' && <span className="sk-badge">{t('secret')}</span>}
+                    {e.shared && <span className="sk-badge" title={t('Shared with every book of the series')}>{t('series')}</span>}
                   </button>
                 ))}
               </div>
@@ -146,6 +147,13 @@ export function EntryEditor({ entry }: { entry: Entry }) {
       </div>
 
       {!plain && <Portrait entry={entry} update={update} />}
+
+      {book.meta.series && !isStyle && (
+        <label className="pl-row pl-check-label">
+          <input type="checkbox" className="sk-check" checked={!!entry.shared} onChange={e => useStore.getState().shareEntry(entry.slug, e.target.checked)} />
+          {t('Shared with every book of the series')}
+        </label>
+      )}
 
       {!plain && (
         <div className="pl-grid2">

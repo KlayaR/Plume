@@ -555,3 +555,23 @@ html[data-theme="light"] .pl-shelf-books { box-shadow: 0 10px 14px -12px rgba(0,
 .cm-change ins { text-decoration: none; background: rgba(90, 170, 100, 0.25); color: inherit; padding: 0 1px; }
 .cm-change-btn { font: 11px var(--font); line-height: 1; margin-left: 2px; padding: 1px 4px; border-radius: 4px; border: 1px solid var(--border-strong); background: var(--surface-1); color: var(--text); cursor: pointer; vertical-align: 2px; }
 .cm-change-yes:hover { background: #6aa56a; color: #fff; } .cm-change-no:hover { background: #d0533f; color: #fff; }
+
+/* 0.8.0 Library: covers, progress on the shelf, goals popover. */
+.pl-book { overflow: hidden; padding: 0; display: block; text-align: left; color: #fff; }
+.pl-cover { position: absolute; inset: 0; width: 100%; height: 100%; }
+.pl-book .pl-book-title { position: absolute; left: 10px; right: 8px; top: 14px; font-family: var(--pl-display); font-size: 15px; line-height: 1.15; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6); }
+.pl-book-author { position: absolute; left: 10px; right: 8px; bottom: 16px; font-size: 10px; letter-spacing: 1px; text-transform: uppercase; opacity: 0.8; }
+.pl-book-progress { position: absolute; left: 10px; right: 10px; bottom: 7px; height: 3px; border-radius: 2px; background: rgba(255, 255, 255, 0.25); }
+.pl-book-progress i { display: block; height: 100%; border-radius: 2px; background: var(--accent); }
+.pl-book-num { position: absolute; top: 6px; right: 7px; font-size: 11px; font-weight: 600; opacity: 0.85; }
+.pl-outline-btn svg { vertical-align: -2px; }
+.pl-goalbtn { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.pl-goal-done { color: var(--accent); }
+.pl-goals { right: 0; left: auto; width: 20rem; display: flex; flex-direction: column; gap: 8px; }
+.pl-goalbar { height: 6px; border-radius: 3px; background: var(--surface-3); overflow: hidden; }
+.pl-goalbar i { display: block; height: 100%; background: var(--accent); }
+.pl-flame { color: #e0803a; }
+.pl-days { width: 100%; height: 60px; }
+.pl-days rect { fill: var(--text-muted); opacity: 0.6; }
+.pl-days rect.pl-days-hit { fill: var(--accent); opacity: 1; }
+.pl-days-goal { stroke: var(--accent); stroke-dasharray: 3 3; stroke-width: 1; }

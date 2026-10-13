@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { ChevronLeft, Columns2, Settings } from 'lucide-react'
 import ManuscriptOptions from './ManuscriptOptions'
+import GoalsPanel from './GoalsPanel'
 import { findScene, useStore, type Scope, type View } from '../store'
 import { useAI } from '../editor/actions'
 import { countWords } from '../lib/text'
@@ -93,6 +94,7 @@ export default function BottomBar() {
             <b>{n(countWords(scene.text))}</b> {t('words')} · <b>{n(countSigns(scene.text))}</b> {t('signs')}
           </span>
         )}
+        <GoalsPanel />
         <span className="pl-count" title={t('A feuillet is 1,500 signs')}>
           {t('Book')} <b>{n(words)}</b> · <b>{n(feuillets(signs), 1)}</b> {t('feuillets')}
         </span>
