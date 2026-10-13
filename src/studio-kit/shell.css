@@ -1,0 +1,255 @@
+/* StudioKit v2.1.0, generated copy: edit in audio/StudioKit, then run npm run sync-kit */
+/* ---- StudioKit shell ----------------------------------------------------
+   The frame every app shares, so the same things sit in the same places:
+
+   .sk-app
+     .sk-sidebar        brand, nav, app sections, then Settings + version
+     .sk-main
+       .sk-header       title (or a search), app controls, actions on the right
+       .sk-content      the page
+       .sk-statusbar    small status text, numbers in mono
+
+   Settings always open in a dialog (Ctrl+,): Appearance first, About last. */
+
+/* ---- Typography helpers ------------------------------------------------ */
+.sk-label {
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.sk-hint { font-size: var(--fs-sm); color: var(--text-muted); }
+.sk-hint-warn { color: var(--warn); }
+.sk-num { font-family: var(--mono); font-size: 0.95em; font-variant-numeric: tabular-nums; }
+
+/* Icons: one weight everywhere. Lucide icons keep a stroke width set on purpose. */
+svg.lucide[stroke-width="2"] { stroke-width: 1.75; }
+svg.lucide { flex: none; }
+
+@keyframes sk-spin { to { transform: rotate(360deg); } }
+.sk-spin { animation: sk-spin 0.9s linear infinite; }
+
+/* ---- Frame ------------------------------------------------------------- */
+.sk-app { display: flex; height: 100%; overflow: hidden; }
+.sk-main { position: relative; flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
+.sk-content { flex: 1; min-height: 0; overflow: auto; }
+
+/* ---- Sidebar ----------------------------------------------------------- */
+.sk-sidebar {
+  display: flex; flex-direction: column; flex: none;
+  width: var(--sidebar-w);
+  background: var(--surface-1);
+  border-right: 1px solid var(--border);
+  transition: width var(--dur);
+}
+.sk-sidebar[data-collapsed="true"] { width: var(--rail-w); }
+
+.sk-brand {
+  display: flex; align-items: center; gap: 10px; flex: none;
+  height: var(--header-h); padding: 0 14px;
+}
+.sk-brand-icon { display: flex; flex: none; width: 28px; height: 28px; }
+.sk-brand-icon > img, .sk-brand-icon > svg { width: 100%; height: 100%; }
+.sk-brand-text { min-width: 0; }
+.sk-brand-name { font-size: var(--fs-lg); font-weight: 600; line-height: 1.2; }
+.sk-brand-sub {
+  font-size: var(--fs-xs); color: var(--text-muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.sk-sidebar-scroll { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 2px 8px 12px; }
+.sk-sidebar-section { padding: 6px 0; }
+.sk-sidebar-section + .sk-sidebar-section,
+.sk-sidebar-extra > .sk-sidebar-section { border-top: 1px solid var(--border); margin-top: 6px; padding-top: 10px; }
+.sk-sidebar-title {
+  display: flex; align-items: center; justify-content: space-between;
+  height: 24px; padding: 0 10px 2px;
+}
+.sk-sidebar-hint { padding: 2px 10px 4px; font-size: var(--fs-sm); color: var(--text-muted); }
+
+.sk-nav { display: flex; flex-direction: column; gap: 1px; }
+.sk-nav-item {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; height: 30px; padding: 0 10px;
+  border-radius: var(--radius);
+  color: var(--text-dim);
+  text-align: left;
+  white-space: nowrap;
+  transition: background var(--dur), color var(--dur);
+}
+.sk-nav-item.sk-nav-sm { height: 26px; font-size: var(--fs-sm); }
+.sk-nav-item:hover { background: var(--surface-2); color: var(--text); }
+.sk-nav-item[aria-current="page"], .sk-nav-item[aria-pressed="true"] { background: var(--accent-tint); color: var(--accent); }
+.sk-nav-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.sk-nav-count { font-size: var(--fs-xs); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.sk-nav-item[aria-current="page"] .sk-nav-count, .sk-nav-item[aria-pressed="true"] .sk-nav-count { color: var(--accent); }
+
+.sk-sidebar-foot {
+  display: flex; flex-direction: column; gap: 2px; flex: none;
+  padding: 8px;
+  border-top: 1px solid var(--border);
+}
+.sk-sidebar-meta {
+  display: flex; align-items: center; gap: 6px;
+  min-height: 24px; padding-left: 10px;
+  font-size: var(--fs-xs); color: var(--text-muted);
+}
+.sk-sidebar-version { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sk-sidebar-update { color: var(--accent); font-weight: 600; }
+.sk-sidebar-update:hover { text-decoration: underline; }
+
+/* Collapsed: an icon rail. App sections and text hide; titles become tooltips. */
+.sk-sidebar[data-collapsed="true"] .sk-brand { justify-content: center; padding: 0; }
+.sk-sidebar[data-collapsed="true"] :is(.sk-brand-text, .sk-nav-label, .sk-nav-count, .sk-sidebar-extra, .sk-sidebar-version) { display: none; }
+.sk-sidebar[data-collapsed="true"] .sk-nav-item { justify-content: center; padding: 0; height: 36px; }
+.sk-sidebar[data-collapsed="true"] .sk-sidebar-meta { flex-direction: column; padding: 0; }
+
+/* ---- Header (top of the main column) ----------------------------------- */
+.sk-header {
+  display: flex; align-items: center; gap: var(--space-4); flex: none;
+  height: var(--header-h); padding: 0 var(--space-4);
+  border-bottom: 1px solid var(--border);
+  container-type: inline-size;
+}
+.sk-header-title { min-width: 0; flex: none; max-width: 45%; }
+.sk-header-title h1 { font-size: var(--fs-lg); font-weight: 600; line-height: 1.25; }
+.sk-header-title p {
+  font-size: var(--fs-sm); color: var(--text-muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.sk-header-body { flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--space-3); }
+/* Actions sit on the right; the main action is the last one. */
+.sk-header-actions { display: flex; align-items: center; gap: 2px; flex: none; margin-left: auto; }
+.sk-header-actions > .sk-btn:not(.sk-btn-ghost) { margin-left: 6px; }
+
+/* ---- Status bar -------------------------------------------------------- */
+.sk-statusbar {
+  display: flex; align-items: center; gap: 10px; flex: none;
+  height: var(--statusbar-h); padding: 0 var(--space-4);
+  border-top: 1px solid var(--border);
+  background: var(--surface-1);
+  font-size: var(--fs-sm); color: var(--text-dim);
+  white-space: nowrap; overflow: hidden;
+}
+.sk-status-item { display: inline-flex; align-items: center; gap: 5px; }
+.sk-status-sep { flex: none; width: 1px; height: 12px; background: var(--border-strong); }
+.sk-status-end { margin-left: auto; }
+.sk-status-ok { color: var(--ok); }
+.sk-status-warn { color: var(--warn); }
+.sk-status-danger { color: var(--danger); }
+.sk-status-accent { color: var(--accent); }
+.sk-statusbar button { display: inline-flex; align-items: center; gap: 5px; padding: 1px 6px; border-radius: var(--radius-sm); color: var(--text-muted); }
+.sk-statusbar button:hover { color: var(--text); background: var(--surface-2); }
+.sk-dot { display: inline-block; flex: none; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+/* ---- Panel ------------------------------------------------------------- */
+.sk-panel {
+  display: flex; flex-direction: column; min-width: 0;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+.sk-panel-head {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-2);
+  min-height: 36px; padding: 8px 14px 0;
+}
+.sk-panel-body { display: flex; flex-direction: column; gap: var(--space-3); padding: 10px 14px 14px; }
+
+/* ---- Field: label, control, hint --------------------------------------- */
+.sk-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.sk-field > label, .sk-field-label { font-size: var(--fs-sm); font-weight: 500; color: var(--text-dim); }
+
+/* ---- Banner ------------------------------------------------------------ */
+.sk-banner {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  background: var(--accent-tint);
+  color: var(--text);
+  font-size: var(--fs-sm);
+}
+.sk-banner > svg { flex: none; color: var(--accent); }
+.sk-banner-text { flex: 1; min-width: 0; }
+.sk-banner .sk-btn { flex: none; }
+.sk-banner-warn { background: var(--warn-tint); }
+.sk-banner-warn > svg { color: var(--warn); }
+.sk-banner-danger { background: var(--danger-tint); }
+.sk-banner-danger > svg { color: var(--danger); }
+
+/* ---- Empty state ------------------------------------------------------- */
+.sk-empty {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-2);
+  padding: var(--space-5);
+  color: var(--text-muted);
+  text-align: center;
+}
+.sk-empty-row { flex-direction: row; }
+
+/* ---- List: bordered rows (folders, paths, programs) -------------------- */
+.sk-list { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.sk-list-row {
+  display: flex; align-items: center; gap: 10px;
+  min-height: 34px; padding: 4px 6px 4px 12px;
+  background: var(--bg);
+}
+.sk-list-row + .sk-list-row { border-top: 1px solid var(--border); }
+.sk-list-row > .sk-grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+
+/* ---- Dialog extras ----------------------------------------------------- */
+.sk-dialog-wide { width: min(760px, 100%); }
+.sk-dialog-head > div { min-width: 0; }
+.sk-dialog-close { margin-left: auto; }
+.sk-dialog-icon {
+  display: flex; align-items: center; justify-content: center; flex: none;
+  width: 32px; height: 32px; border-radius: var(--radius);
+  background: var(--accent-tint); color: var(--accent);
+}
+.sk-dialog-note { flex: 1; min-width: 0; font-size: var(--fs-sm); color: var(--text-muted); }
+
+/* ---- Settings ---------------------------------------------------------- */
+.sk-settings-section { padding: 14px 0 16px; }
+.sk-settings-section + .sk-settings-section { border-top: 1px solid var(--border); }
+.sk-settings-head { display: flex; align-items: flex-start; gap: var(--space-4); margin-bottom: 10px; }
+.sk-settings-head > div:first-child { flex: 1; min-width: 0; }
+.sk-settings-head h3 { font-size: var(--fs-base); font-weight: 600; }
+.sk-settings-head p { font-size: var(--fs-sm); color: var(--text-dim); line-height: 1.5; }
+.sk-settings-actions { display: flex; gap: 6px; flex: none; }
+.sk-settings-section > p { font-size: var(--fs-sm); color: var(--text-dim); line-height: 1.55; }
+
+.sk-setting-row {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-4);
+  padding: 8px 0;
+}
+.sk-setting-row + .sk-setting-row { border-top: 1px solid var(--border); }
+.sk-setting-row > div:first-child { min-width: 0; }
+.sk-setting-label { font-weight: 500; }
+.sk-setting-desc { font-size: var(--fs-sm); color: var(--text-muted); }
+
+.sk-about { display: grid; grid-template-columns: max-content 1fr; gap: 4px 24px; font-size: var(--fs-sm); }
+.sk-about dt { color: var(--text-muted); }
+.sk-about dd { color: var(--text-dim); font-family: var(--mono); user-select: text; }
+
+/* ---- Toasts ------------------------------------------------------------ */
+.sk-toasts {
+  position: fixed; right: 16px; bottom: calc(var(--statusbar-h) + 12px); z-index: 150;
+  display: flex; flex-direction: column; gap: 8px; align-items: flex-end;
+  pointer-events: none;
+}
+.sk-toast {
+  display: flex; align-items: center; gap: 10px;
+  max-width: 460px; padding: 10px 12px 10px 14px;
+  background: var(--surface-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  pointer-events: auto;
+  animation: sk-pop var(--dur) ease-out;
+}
+.sk-toast > svg { color: var(--accent); }
+.sk-toast-ok > svg { color: var(--ok); }
+.sk-toast-warn > svg { color: var(--warn); }
+.sk-toast-error > svg { color: var(--danger); }
+.sk-toast-text { flex: 1; min-width: 0; }
+.sk-toast-action { flex: none; padding: 3px 9px; border-radius: var(--radius-sm); color: var(--accent); font-weight: 600; }
+.sk-toast-action:hover { background: var(--accent-tint); }

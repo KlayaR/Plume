@@ -1,0 +1,14 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Capabilities for the Plume main window",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "core:event:default",
+    "core:window:allow-set-theme",
+    "core:window:allow-destroy",
+    "dialog:allow-open",
+    "dialog:allow-ask"
+  ]
+}

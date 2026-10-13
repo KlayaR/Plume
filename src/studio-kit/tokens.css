@@ -1,0 +1,104 @@
+/* StudioKit v2.1.0, generated copy: edit in audio/StudioKit, then run npm run sync-kit */
+/* ---- StudioKit tokens: "Ardoise" ----------------------------------------
+   One block per theme. theme.js (or the inline boot script) sets
+   data-theme on <html>; without it the dark values apply. */
+
+:root {
+  --font: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
+  --mono: 'Cascadia Mono', Consolas, monospace;
+
+  --fs-xs: 11px;
+  --fs-sm: 12px;
+  --fs-base: 13px;
+  --fs-lg: 15px;
+  --fs-xl: 18px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  --radius-sm: 4px;
+  --radius: 6px;
+  --radius-lg: 10px;
+
+  --dur: 150ms;
+
+  /* Shell sizes (shell.css) */
+  --sidebar-w: 224px;
+  --rail-w: 56px;
+  --header-h: 52px;
+  --statusbar-h: 26px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --dur: 0ms; }
+}
+
+:root, [data-theme="dark"] {
+  --bg: #121416;
+  --surface-1: #191c1f;
+  --surface-2: #22262a;
+  --surface-3: #2b3035;
+  --border: #2b3035;
+  --border-strong: #3c434a;
+
+  --text: #e2e5e8;
+  --text-dim: #a2aab2;
+  --text-muted: #868f98;
+
+  --accent: #8aa4bf;
+  --accent-hover: #a0b6cd;
+  --on-accent: #0f1820;
+  --accent-tint: rgba(138, 164, 191, 0.12);
+
+  --ok: #79a88a;
+  --ok-tint: rgba(121, 168, 138, 0.12);
+  --warn: #c4a462;
+  --warn-tint: rgba(196, 164, 98, 0.12);
+  --danger: #d0726e;
+  --danger-tint: rgba(208, 114, 110, 0.12);
+
+  --viz-1: #8aa4bf;
+  --viz-2: #b59c80;
+
+  --focus-ring: 0 0 0 2px rgba(138, 164, 191, 0.55);
+  --shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+  --overlay: rgba(6, 7, 8, 0.6);
+  color-scheme: dark;
+}
+
+[data-theme="light"] {
+  --bg: #eef1f4;
+  --surface-1: #f8f9fb;
+  --surface-2: #ffffff;
+  --surface-3: #e2e7ec;
+  --border: #d6dce2;
+  --border-strong: #b8c1ca;
+
+  --text: #1b2025;
+  --text-dim: #4a545e;
+  --text-muted: #5f6973;
+
+  --accent: #4f6f8f;
+  --accent-hover: #43607d;
+  --on-accent: #ffffff;
+  --accent-tint: rgba(79, 111, 143, 0.12);
+
+  --ok: #3c7550;
+  --ok-tint: rgba(60, 117, 80, 0.12);
+  --warn: #8a6a1c;
+  --warn-tint: rgba(138, 106, 28, 0.12);
+  --danger: #a8423d;
+  --danger-tint: rgba(168, 66, 61, 0.1);
+
+  --viz-1: #4f6f8f;
+  --viz-2: #8a6c4c;
+
+  --focus-ring: 0 0 0 2px rgba(79, 111, 143, 0.5);
+  --shadow: 0 12px 40px rgba(20, 30, 40, 0.18);
+  --overlay: rgba(30, 38, 46, 0.35);
+  color-scheme: light;
+}

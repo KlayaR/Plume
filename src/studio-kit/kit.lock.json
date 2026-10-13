@@ -1,0 +1,15 @@
+{
+  "version": "2.1.0",
+  "files": {
+    "base.css": "d6fb584ad954c5c9e305564d41d0dc0513e1afffdb3d8483a9cf687d5eb8cc45",
+    "components.css": "d45d82dda457737055b87eb0ee90716595ab1f09d0c05b0d8aa64cc13e39a93f",
+    "index.css": "fbee1663f73462149ff134d3a915900fd3c6b094cfad4329fae2b680cb77b279",
+    "shell.css": "29ee0f72fa513b064a6b61e996d4f9ca9561f9d5cdba48007429a354224b3929",
+    "shell.d.ts": "6dc18e9661d21dfcbca21e5503ba00d2b946344c456cf17ac342ee953a6ed2be",
+    "shell.js": "3c24cbc8564bdef6b6a3eb81afad04d07e35869faf6a3b236cde689a85824ab1",
+    "theme-boot.js": "f9908e30dfc07409a6f6f9f11ea3a0d647812ae08fb18d2a1603aaed1390f58e",
+    "theme.d.ts": "495f4235e49ee6a11f69803687a8fa50a61162b230b8ee2f31bb10fad6b74b01",
+    "theme.js": "6a4a0cab13dcd36889256f3c966353914717d96ed60b32ce5c7b78c10b41c18c",
+    "tokens.css": "5d756d4bfa24fb47553bfe4d9ea709563a988f86caf241fd55a5dbe87dd7f45d"
+  }
+}

@@ -1,0 +1,225 @@
+// Manuscript: the scene on a sheet of paper in the middle of the room. The
+// chapters slide in from the left edge and the AI panel (or Review) from the
+// right, on hover, or stay open when pinned.
+import { useState } from 'react'
+import { ask } from '@tauri-apps/plugin-dialog'
+import { ChevronLeft, FilePlus2, FolderPlus, GripVertical, Pin, PinOff, Trash2 } from 'lucide-react'
+import { findScene, useStore } from '../store'
+import type { Chapter, Entry, Scene, SceneStatus } from '../lib/types'
+import { countWords } from '../lib/text'
+import { allowedKinds, chapterLabels } from '../lib/chapters'
+import Editor from '../editor/Editor'
+import { useAI } from '../editor/actions'
+import ContextPanel from './ContextPanel'
+import ReviewPanel from './ReviewPanel'
+import BookView from './BookView'
+import { useT } from '../i18n'
+
+export default function WritingView() {
+  const book = useStore(s => s.book)!
+  const sceneId = useStore(s => s.sceneId)
+  const prefs = useStore(s => s.prefs)
+  const hasProposal = useAI(s => s.hasProposal)
+  const running = useAI(s => s.running)
+  const [hoverL, setHoverL] = useState(false)
+  const [hoverR, setHoverR] = useState(false)
+  const t = useT()
+  const found = findScene(book, sceneId)
+  const openL = prefs.pinLeft || hoverL
+  // The AI panel also comes out on its own while a reply streams or waits for a decision.
+  const openR = prefs.pinRight || hoverR || hasProposal || !!running
+  const setPrefs = useStore.getState().setPrefs
+  // A new view only when what's shown changes: in the whole book, moving between chapters keeps it.
+  const viewKey = !found ? '' : prefs.scope === 'book' ? 'book' : prefs.scope === 'scene' ? found.scene.id : found.chapter.id
+
+  return (
+    <div className="pl-manuscript" data-pin-left={prefs.pinLeft} data-pin-right={prefs.pinRight}>
+      <div className="pl-scroll">
+        {found ? (prefs.page ? <BookView key={viewKey} /> : <Sheet key={viewKey} />) :<div className="sk-empty" style={{ paddingTop: 80 }}>{t('Pick or add a scene on the left.')}</div>}
+      </div>
+
+      {!prefs.pinLeft && <div className="pl-hotzone pl-hotzone-left" onMouseEnter={() => setHoverL(true)} />}
+      <aside className="pl-pane pl-pane-left" data-open={openL} data-pinned={prefs.pinLeft} onMouseLeave={() => setHoverL(false)} aria-label={t('Chapters and scenes')}>
+        <div className="pl-pane-head pl-pane-book">
+          <button type="button" className="pl-quiet pl-backshelf" onClick={() => useStore.getState().close()} title={t('Switch book')}>
+            <ChevronLeft size={15} /><span className="pl-pane-booktitle">{book.meta.title}</span>
+          </button>
+          <button type="button" className="pl-quiet pl-pin" aria-pressed={prefs.pinLeft} onClick={() => setPrefs({ pinLeft: !prefs.pinLeft })} title={t(prefs.pinLeft ? 'Unpin' : 'Pin open')}>
+            {prefs.pinLeft ? <PinOff size={14} /> : <Pin size={14} />}
+          </button>
+        </div>
+        <div className="pl-pane-body"><SceneTree /></div>
+      </aside>
+
+      {found && (
+        <>
+          {!prefs.pinRight && <div className="pl-hotzone pl-hotzone-right" onMouseEnter={() => setHoverR(true)} />}
+          <aside className="pl-pane pl-pane-right" data-open={openR} data-pinned={prefs.pinRight} onMouseLeave={() => setHoverR(false)}>
+            <PaneHead title={prefs.mode === 'review' ? t('Review') : 'Claude'} pinned={prefs.pinRight} onPin={() => setPrefs({ pinRight: !prefs.pinRight })} />
+            <div className="pl-pane-body">
+              {prefs.mode === 'review' ? <ReviewPanel /> : <ContextPanel key={found.scene.id} />}
+            </div>
+          </aside>
+        </>
+      )}
+    </div>
+  )
+}
+
+function PaneHead({ title, pinned, onPin }: { title: string; pinned: boolean; onPin: () => void }) {
+  const t = useT()
+  return (
+    <div className="pl-pane-head">
+      <span className="pl-label">{title}</span>
+      <button type="button" className="pl-quiet pl-pin" aria-pressed={pinned} onClick={onPin} title={t(pinned ? 'Unpin' : 'Pin open')}>
+        {pinned ? <PinOff size={14} /> : <Pin size={14} />}
+      </button>
+    </div>
+  )
+}
+
+/** On NEO's sheet: the scene, the chapter or the whole book, every scene editable, separated by * * *. */
+function Sheet() {
+  const book = useStore(s => s.book)!
+  const sceneId = useStore(s => s.sceneId)
+  const prefs = useStore(s => s.prefs)
+  const update = useStore(s => s.updateScene)
+  const t = useT()
+  const { chapter, scene: current } = findScene(book, sceneId)!
+  const labels = chapterLabels(book.chapters, book.meta.language)
+  const characters = book.entries.filter(e => e.type === 'character').sort((a, b) => a.name.localeCompare(b.name))
+  const chapters = prefs.scope === 'book' ? book.chapters : [chapter]
+
+  return (
+    <div className={`pl-desk pl-paper-${prefs.paper}`}>
+      <div className={`pl-sheet pl-sheet-free ${prefs.justify ? 'pl-justify' : ''}`}>
+        {chapters.map(c => {
+          const label = labels[book.chapters.indexOf(c)].label
+          const scenes = prefs.scope === 'scene' ? [current] : c.scenes
+          return (
+            <div key={c.id} className="pl-sheet-chapter">
+              <div className="pl-head">
+                <div className="pl-head-chapter">{label}{c.title && c.title !== label ? ` · ${c.title}` : ''}</div>
+              </div>
+              {scenes.map(scene => <SheetScene key={scene.id} scene={scene} first={c.scenes[0]?.id === scene.id} solo={scenes.length === 1} characters={characters} update={update} t={t} active={scene.id === sceneId} />)}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function SheetScene({ scene, first, solo, active, characters, update, t }: {
+  scene: Scene; first: boolean; solo: boolean; active: boolean; characters: Entry[]
+  update: (id: string, patch: Partial<Scene>) => void; t: ReturnType<typeof useT>
+}) {
+  const prefs = useStore(s => s.prefs)
+  return (
+          <section className={`pl-scene-block ${first ? 'pl-dropcap' : ''} ${active ? 'pl-scene-active' : ''}`}>
+            {!first && !solo && <div className="pl-break" aria-label={t('Scene break')}>* * *</div>}
+            {(prefs.showSceneTitle || prefs.showPov || prefs.showStatus) && (
+              <div className="pl-scene-head">
+                {prefs.showSceneTitle && <input className="pl-head-scene" value={scene.title} onChange={e => update(scene.id, { title: e.target.value })} aria-label={t('Scene title')} />}
+                {(prefs.showPov || prefs.showStatus) && (
+                  <div className="pl-head-meta">
+                    {prefs.showPov && (
+                      <select value={scene.pov ?? ''} onChange={e => update(scene.id, { pov: e.target.value || null })} aria-label={t('POV')} title={t('POV')}>
+                        <option value="">{t('POV')} : {t('None')}</option>
+                        {characters.map(c => <option key={c.slug} value={c.slug}>{t('POV')} : {c.name}</option>)}
+                      </select>
+                    )}
+                    {prefs.showStatus && (
+                      <select value={scene.status} onChange={e => update(scene.id, { status: e.target.value as SceneStatus })} aria-label={t('Status')} title={t('Status')}>
+                        <option value="draft">{t('Draft')}</option><option value="revised">{t('Revised')}</option><option value="done">{t('Done')}</option>
+                      </select>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+            <Editor scene={scene} />
+          </section>
+  )
+}
+
+const KIND_NAMES = { chapter: 'Numbered chapter', prologue: 'Prologue', epilogue: 'Epilogue' }
+
+function SceneTree() {
+  const book = useStore(s => s.book)!
+  const sceneId = useStore(s => s.sceneId)
+  const st = useStore.getState
+  const [drag, setDrag] = useState<string | null>(null)
+  const [over, setOver] = useState<string | null>(null)
+  const t = useT()
+  const fr = book.meta.language === 'fr'
+  const labels = chapterLabels(book.chapters, book.meta.language)
+
+  const drop = (chapter: Chapter, index: number) => {
+    if (drag) st().moveScene(drag, chapter.id, index)
+    setDrag(null); setOver(null)
+  }
+  const remove = async (id: string, title: string) => {
+    if (await ask(t('Move "{title}" to the book\'s trash folder?', { title }), { title: t('Remove scene'), kind: 'warning' })) st().removeScene(id)
+  }
+  const cycleKind = (c: Chapter, i: number) => {
+    const kinds = allowedKinds(i, book.chapters.length)
+    if (kinds.length < 2) return
+    st().updateChapter(c.id, { kind: kinds[(kinds.indexOf(c.kind) + 1) % kinds.length] })
+  }
+
+  return (
+    <nav className="pl-tree">
+      {book.chapters.map((c, ci) => {
+        const kinds = allowedKinds(ci, book.chapters.length)
+        return (
+          <div key={c.id} className="pl-chapter">
+            <div
+              className={`pl-chapter-head ${over === c.id ? 'pl-over' : ''}`}
+              onDragOver={e => { e.preventDefault(); setOver(c.id) }}
+              onDragLeave={() => setOver(null)}
+              onDrop={() => drop(c, c.scenes.length)}
+            >
+              <button type="button" className={`pl-chapter-num ${c.kind !== 'chapter' ? 'pl-kind' : ''}`} disabled={kinds.length < 2}
+                title={kinds.length < 2 ? labels[ci].label : t('{kind}: click to switch ({kinds})', { kind: t(KIND_NAMES[c.kind]), kinds: kinds.map(k => t(KIND_NAMES[k])).join(' / ') })}
+                onClick={() => cycleKind(c, ci)}>
+                {c.kind === 'chapter' ? labels[ci].number : c.kind === 'prologue' ? 'P' : 'É'}
+              </button>
+              <input className="pl-chapter-title" value={c.title} placeholder={t('Untitled')} onChange={e => st().updateChapter(c.id, { title: e.target.value })} aria-label={t('Chapter title')} />
+              <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm sk-btn-icon" title={t('New scene')}
+                onClick={() => st().addScene(c.id, fr ? `Scène ${c.scenes.length + 1}` : `Scene ${c.scenes.length + 1}`)}>
+                <FilePlus2 size={14} />
+              </button>
+            </div>
+            {c.scenes.map((s, si) => (
+              <div
+                key={s.id}
+                className={`pl-scene ${s.id === sceneId ? 'pl-active' : ''} ${over === s.id ? 'pl-over' : ''}`}
+                draggable
+                onDragStart={() => setDrag(s.id)}
+                onDragEnd={() => { setDrag(null); setOver(null) }}
+                onDragOver={e => { e.preventDefault(); setOver(s.id) }}
+                onDragLeave={() => setOver(null)}
+                onDrop={() => drop(c, si)}
+                onClick={() => st().selectScene(s.id)}
+              >
+                <GripVertical size={12} className="pl-grip" />
+                <span className={`pl-status pl-status-${s.status}`} title={t(s.status === 'draft' ? 'Draft' : s.status === 'revised' ? 'Revised' : 'Done')} />
+                <span className="pl-scene-title">{s.title}</span>
+                <span className="pl-scene-words">{countWords(s.text)}</span>
+                <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm sk-btn-icon pl-hover" title={t('Remove scene')}
+                  onClick={e => { e.stopPropagation(); remove(s.id, s.title) }}>
+                  <Trash2 size={13} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )
+      })}
+      <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm pl-addchapter"
+        onClick={() => st().addChapter(`${fr ? 'Chapitre' : 'Chapter'} ${book.chapters.filter(c => c.kind === 'chapter').length + 1}`)}>
+        <FolderPlus size={14} /> {t('New chapter')}
+      </button>
+    </nav>
+  )
+}

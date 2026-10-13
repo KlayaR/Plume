@@ -1,0 +1,203 @@
+// The context engine: finds which bible entries a request needs and builds
+// the prompt. Runs locally, costs no tokens. Stable parts go in the system
+// prompt (cached by the CLI for an hour); story text and the task in the message.
+import type { ActionId, Book, Entry, Lang } from './types'
+import { factApplies } from './bible'
+import { estimateTokens, fold, lastWords, firstWords } from './text'
+import { taskMessage, systemRules } from './prompts'
+
+export interface Mention { from: number; to: number; slug: string }
+
+interface Alias { folded: string; exact: string | null; slug: string }
+
+export interface Matcher { re: RegExp | null; aliases: Alias[] }
+
+const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+/** Every name and alias of every entry, longest first so "Maison Varenne" wins over "Varenne". */
+export function buildMatcher(entries: Entry[]): Matcher {
+  const aliases: Alias[] = []
+  for (const e of entries) {
+    if (e.type === 'style') continue
+    const mine: Alias[] = []
+    for (const raw of [e.name, ...e.aliases]) {
+      const exact = raw.endsWith('!') ? raw.slice(0, -1).trim() : null
+      const name = (exact ?? raw).trim()
+      const folded = fold(name).text
+      if (folded.length < 2) continue
+      mine.push({ folded, exact, slug: e.slug })
+    }
+    // "Rose!" also makes the plain name "Rose" exact-case.
+    aliases.push(...mine.filter(a => a.exact !== null || !mine.some(b => b.exact !== null && b.folded === a.folded)))
+  }
+  aliases.sort((a, b) => b.folded.length - a.folded.length)
+  if (!aliases.length) return { re: null, aliases }
+  const alt = [...new Set(aliases.map(a => escape(a.folded)))].join('|')
+  return { re: new RegExp(`(?<![\\p{L}\\p{N}])(?:${alt})(?![\\p{L}\\p{N}])`, 'gu'), aliases }
+}
+
+/** Mentions of bible names in `text`, with positions in the original text. */
+export function findMentions(text: string, m: Matcher): Mention[] {
+  if (!m.re) return []
+  const { text: f, map } = fold(text)
+  const out: Mention[] = []
+  m.re.lastIndex = 0
+  let r: RegExpExecArray | null
+  while ((r = m.re.exec(f))) {
+    const from = map[r.index]
+    const to = map[r.index + r[0].length]
+    const original = text.slice(from, to)
+    // Several entries may share an alias; take the first that accepts this spelling.
+    const hit = m.aliases.find(a => a.folded === r![0] && (a.exact === null || a.exact === original))
+    if (hit) out.push({ from, to, slug: hit.slug })
+  }
+  return out
+}
+
+export type Mode = 'short' | 'full'
+export type Override = 'drop' | Mode
+
+export interface Picked {
+  slug: string
+  name: string
+  type: Entry['type']
+  mode: Mode
+  reasons: string[]
+  mentions: number
+  linked: boolean
+  tokens: number
+  dropped: boolean
+  budgetCut: boolean
+}
+
+export interface ContextInput {
+  book: Book
+  chapter: number
+  pov: string | null
+  action: ActionId
+  instruction: string
+  before: string
+  selection: string
+  after: string
+  overrides: Record<string, Override>
+}
+
+export interface Built {
+  system: string
+  message: string
+  picked: Picked[]
+  parts: { rules: number; bible: number; story: number; task: number }
+  total: number
+  budget: number
+}
+
+function renderEntry(e: Entry, mode: Mode, chapter: number, lang: Lang): string {
+  const aka = e.aliases.filter(a => a !== e.name).map(a => a.replace(/!$/, ''))
+  const head = `<entry type="${e.type}" name="${e.name}"${aka.length ? ` aka="${aka.join(', ')}"` : ''}>`
+  const body = mode === 'full' && e.full.trim() ? [e.short, e.full].filter(s => s.trim()).join('\n\n') : (e.short.trim() || e.full.trim().split('\n\n')[0])
+  const facts = e.facts.filter(f => factApplies(f, chapter)).map(f => `- ${f.text}`)
+  const label = lang === 'fr' ? 'Faits à ce stade de l’histoire :' : 'Facts at this point of the story:'
+  return [head, body.trim(), facts.length ? `${label}\n${facts.join('\n')}` : '', '</entry>'].filter(Boolean).join('\n')
+}
+
+export function storyParts(input: Pick<ContextInput, 'action' | 'before' | 'selection' | 'after'>, windowWords: number) {
+  if (input.action === 'rewrite') {
+    return { before: lastWords(input.before, Math.min(400, windowWords)), selection: input.selection, after: firstWords(input.after, 150) }
+  }
+  return { before: lastWords(input.before, windowWords), selection: '', after: '' }
+}
+
+export function buildContext(input: ContextInput): Built {
+  const { book, chapter, overrides } = input
+  const lang: Lang = book.meta.language
+  const ai = book.meta.ai
+  const story = storyParts(input, ai.storyWindow)
+  const bySlug = new Map(book.entries.map(e => [e.slug, e]))
+  const matcher = buildMatcher(book.entries)
+
+  const scan = [input.instruction, story.selection, story.before].join('\n')
+  const counts = new Map<string, number>()
+  for (const m of findMentions(scan, matcher)) counts.set(m.slug, (counts.get(m.slug) ?? 0) + 1)
+  const atFull = new Set(findMentions(input.instruction, matcher).filter(m => input.instruction[m.from - 1] === '@').map(m => m.slug))
+
+  const picked = new Map<string, Picked>()
+  const add = (e: Entry, mode: Mode, reason: string, linked = false) => {
+    const p = picked.get(e.slug)
+    if (p) {
+      if (mode === 'full') p.mode = 'full'
+      if (!p.reasons.includes(reason)) p.reasons.push(reason)
+      if (!linked) p.linked = false
+      return
+    }
+    picked.set(e.slug, { slug: e.slug, name: e.name, type: e.type, mode, reasons: [reason], mentions: counts.get(e.slug) ?? 0, linked, tokens: 0, dropped: false, budgetCut: false })
+  }
+
+  for (const e of book.entries) {
+    if (e.type === 'style') continue
+    if (e.include === 'always') add(e, 'full', 'always')
+  }
+  const pov = input.pov ? bySlug.get(input.pov) : undefined
+  if (pov) add(pov, 'full', 'POV')
+  for (const [slug, n] of counts) {
+    const e = bySlug.get(slug)
+    if (!e || (e.include === 'never' && !atFull.has(slug))) continue
+    add(e, atFull.has(slug) ? 'full' : 'short', atFull.has(slug) ? '@-mentioned' : `mentioned ${n}×`)
+  }
+  for (const p of [...picked.values()]) {
+    for (const l of bySlug.get(p.slug)?.links ?? []) {
+      const e = bySlug.get(l)
+      if (e && e.type !== 'style' && e.include !== 'never') add(e, 'short', `linked from ${p.name}`, true)
+    }
+  }
+
+  // Budget: drop linked entries first, then switch full versions to short, least-mentioned first.
+  const list = [...picked.values()]
+  const size = (p: Picked) => estimateTokens(renderEntry(bySlug.get(p.slug)!, p.mode, chapter, lang))
+  const forced = (p: Picked) => p.slug in overrides
+  for (const p of list) {
+    const o = overrides[p.slug]
+    if (o === 'drop') p.dropped = true
+    else if (o) p.mode = o
+    p.tokens = size(p)
+  }
+  const used = () => list.filter(p => !p.dropped).reduce((s, p) => s + p.tokens, 0)
+  const byFewest = (a: Picked, b: Picked) => a.mentions - b.mentions
+  for (const p of list.filter(p => p.linked && !forced(p)).sort(byFewest)) {
+    if (used() <= ai.bibleBudget) break
+    p.dropped = true
+    p.budgetCut = true
+  }
+  for (const p of list.filter(p => p.mode === 'full' && !forced(p)).sort((a, b) => (a.reasons.includes('POV') ? 1 : 0) - (b.reasons.includes('POV') ? 1 : 0) || byFewest(a, b))) {
+    if (used() <= ai.bibleBudget) break
+    p.mode = 'short'
+    p.budgetCut = true
+    p.tokens = size(p)
+  }
+
+  const style = book.entries.find(e => e.type === 'style')
+  const styleText = style ? [style.short, style.full].filter(s => s.trim()).join('\n\n').trim() : ''
+  const kept = list.filter(p => !p.dropped).sort((a, b) => a.slug.localeCompare(b.slug))
+  const bible = kept.map(p => renderEntry(bySlug.get(p.slug)!, p.mode, chapter, lang)).join('\n\n')
+  const rules = systemRules(lang, book.meta.title)
+  const system = [
+    rules,
+    styleText ? `<style_guide>\n${styleText}\n</style_guide>` : '',
+    bible ? `<bible>\n${bible}\n</bible>` : '',
+  ].filter(Boolean).join('\n\n')
+
+  const message = taskMessage(lang, input.action, input.instruction, story, ai)
+  const parts = {
+    rules: estimateTokens(rules) + 830, // + the CLI's own minimum, measured
+    bible: estimateTokens(system) - estimateTokens(rules),
+    story: estimateTokens(story.before + story.selection + story.after),
+    task: estimateTokens(message) - estimateTokens(story.before + story.selection + story.after),
+  }
+  return {
+    system,
+    message,
+    picked: list.sort((a, b) => Number(a.dropped) - Number(b.dropped) || b.mentions - a.mentions || a.name.localeCompare(b.name)),
+    parts,
+    total: parts.rules + parts.bible + parts.story + parts.task,
+    budget: ai.bibleBudget,
+  }
+}

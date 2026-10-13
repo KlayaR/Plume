@@ -1,0 +1,42 @@
+{
+  "name": "plume",
+  "version": "0.2.6",
+  "description": "Novel writing app with a story bible, on the Claude command line",
+  "type": "module",
+  "scripts": {
+    "sync-kit": "node ../../audio/StudioKit/scripts/sync.mjs .",
+    "prebuild:renderer": "node scripts/check-kit.mjs",
+    "dev:vite": "vite",
+    "build:renderer": "tsc --noEmit && vite build",
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "tauri": "tauri",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@codemirror/commands": "^6.8.0",
+    "@codemirror/state": "^6.5.0",
+    "@codemirror/view": "^6.36.0",
+    "@fontsource-variable/bodoni-moda": "^5.3.0",
+    "@fontsource-variable/crimson-pro": "^5.3.0",
+    "@fontsource-variable/eb-garamond": "^5.3.0",
+    "@fontsource-variable/literata": "^5.3.0",
+    "@fontsource/courier-prime": "^5.3.0",
+    "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-dialog": "^2",
+    "lucide-react": "^1.55.0",
+    "yaml": "^2.6.0",
+    "zustand": "^4.5.2"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2",
+    "@types/react": "^18.3.1",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.2.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "typescript": "^5.4.5",
+    "vite": "^5.2.11",
+    "vitest": "^2.1.0"
+  }
+}

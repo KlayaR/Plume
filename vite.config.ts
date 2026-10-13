@@ -1,0 +1,15 @@
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+
+// Tauri expects a fixed dev server and must not watch the Rust build output.
+export default defineConfig({
+  plugins: [react()],
+  base: './',
+  clearScreen: false,
+  server: {
+    port: 5178,
+    strictPort: true,
+    watch: { ignored: ['**/src-tauri/**'] },
+  },
+  build: { outDir: 'dist', emptyOutDir: true },
+})

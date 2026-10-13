@@ -1,0 +1,6 @@
+/* StudioKit v2.1.0, generated copy: edit in audio/StudioKit, then run npm run sync-kit */
+/* StudioKit entry point: import this once, before the app's own CSS. */
+@import './tokens.css';
+@import './base.css';
+@import './components.css';
+@import './shell.css';
