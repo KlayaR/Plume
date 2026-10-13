@@ -146,6 +146,8 @@ function SheetScene({ scene, first, solo, active, characters, update, t }: {
                 )}
               </div>
             )}
+            {/* The plan card's note, in grey, above a scene that already has text (an empty scene shows it in place of the text). */}
+            {scene.note?.trim() && scene.text.trim() && <div className="pl-scene-note" title={t('Card note (Plan)')}>{scene.note.trim()}</div>}
             <Editor scene={scene} />
           </section>
   )

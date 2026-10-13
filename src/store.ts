@@ -139,8 +139,10 @@ interface State {
   selectEntry: (slug: string | null) => void
   updateScene: (id: string, patch: Partial<Scene>) => void
   updateChapter: (id: string, patch: Partial<Chapter>) => void
-  addChapter: (title: string) => void
-  addScene: (chapterId: string, title: string) => void
+  addChapter: (title: string, opts?: { stay?: boolean }) => string
+  /** Adds a scene at the end of a chapter; `stay` keeps the current view (the Plan board). */
+  addScene: (chapterId: string, title: string, opts?: { stay?: boolean; note?: string }) => string
+  moveChapter: (id: string, toIndex: number) => void
   splitScene: (id: string, text: string) => void
   promoteScene: (id: string) => void
   moveScene: (sceneId: string, toChapterId: string, toIndex: number) => void
@@ -232,7 +234,7 @@ export const useStore = create<State>((set, get) => {
       mutate(b => ({ ...b, chapters: b.chapters.map(c => c.id === id ? { ...c, ...patch } : c) }))
       later(`ch:${id}`, async () => { const c = get().book!.chapters.find(x => x.id === id); if (c) await saveChapter(get().book!.root, c) })
     },
-    addChapter: title => {
+    addChapter: (title, opts) => {
       const b = get().book!
       const ch = makeChapter(b, title)
       const sc = makeScene(ch, b.meta.language === 'fr' ? 'Scène 1' : 'Scene 1')
@@ -241,17 +243,31 @@ export const useStore = create<State>((set, get) => {
       const chapters = [...b.chapters]
       const at = chapters[chapters.length - 1]?.kind === 'epilogue' ? chapters.length - 1 : chapters.length
       chapters.splice(at, 0, ch)
-      set({ book: { ...b, chapters }, sceneId: sc.id, view: 'manuscript' })
+      set({ book: { ...b, chapters }, ...(opts?.stay ? {} : { sceneId: sc.id, view: 'manuscript' as View }) })
       const root = b.root
       saveChapter(root, ch).then(() => saveScene(root, sc)).then(() => saveMeta(get().book!)).catch(fail)
+      return ch.id
     },
-    addScene: (chapterId, title) => {
+    addScene: (chapterId, title, opts) => {
       const b = get().book!
       const ch = b.chapters.find(c => c.id === chapterId)!
-      const sc = makeScene(ch, title)
+      const sc = { ...makeScene(ch, title), ...(opts?.note ? { note: opts.note } : {}) }
       mutate(bk => ({ ...bk, chapters: bk.chapters.map(c => c.id === chapterId ? { ...c, scenes: [...c.scenes, sc] } : c) }))
-      set({ sceneId: sc.id, view: 'manuscript' })
+      if (!opts?.stay) set({ sceneId: sc.id, view: 'manuscript' })
       saveScene(b.root, sc).then(() => saveMeta(get().book!)).catch(fail)
+      return sc.id
+    },
+    moveChapter: (id, toIndex) => {
+      const b = get().book!
+      const chapters = b.chapters.filter(c => c.id !== id)
+      const ch = b.chapters.find(c => c.id === id)
+      if (!ch) return
+      chapters.splice(Math.max(0, Math.min(toIndex, chapters.length)), 0, ch)
+      // Only the first chapter can stay a prologue, only the last an epilogue.
+      const fixed = chapters.map((c, i) => (c.kind === 'prologue' && i !== 0) || (c.kind === 'epilogue' && i !== chapters.length - 1) ? { ...c, kind: 'chapter' as const } : c)
+      set({ book: { ...b, chapters: fixed } })
+      fixed.filter((c, i) => c.kind !== chapters[i].kind).forEach(c => saveChapter(b.root, c).catch(fail))
+      metaLater()
     },
     splitScene: (id, text) => {
       const found = findScene(get().book, id)
