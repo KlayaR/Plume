@@ -1,6 +1,6 @@
 [package]
 name = "plume"
-version = "0.2.6"
+version = "0.2.7"
 description = "Novel writing app with a story bible, on the Claude command line"
 authors = ["Plume"]
 edition = "2021"
