@@ -5,7 +5,8 @@ import type { EditorView } from '@codemirror/view'
 import type { ActionId } from '../lib/types'
 import { buildContext, type Built, type Override } from '../lib/context'
 import { checkRules, fixDirection, type Check } from '../lib/voice'
-import { effective, isCheap } from '../ai'
+import { ask, effective, isCheap } from '../ai'
+import { noteTaste } from '../writing'
 import { cancelClaude, runClaude } from '../lib/claude'
 import { findScene, useStore } from '../store'
 import { t } from '../i18n'
@@ -104,16 +105,23 @@ export function stopAction() {
   if (id && id !== 'starting') cancelClaude(id)
 }
 
+const proposalText = () => (view?.state.field(proposalField, false) as { text?: string } | null | undefined)?.text ?? ''
+
 export function accept(): boolean {
   const book = useStore.getState().book
   if (!view || !book) return false
+  const last = useAI.getState().last
+  const text = proposalText()
   const ok = acceptProposal(view, book.meta.language)
+  if (ok && last) noteTaste(last.action, true, text)
   syncProposalState()
   return ok
 }
 
 export function discard() {
   if (!view) return
+  const last = useAI.getState().last
+  if (last && !useAI.getState().running) noteTaste(last.action, false, proposalText())
   if (useAI.getState().running) stopAction()
   discardProposal(view)
   syncProposalState()
@@ -128,6 +136,34 @@ export async function retry(extra = '') {
   // Put the selection back as it was, so a rewrite targets the same passage.
   if (p) view.dispatch({ selection: { anchor: p.from, head: p.to } })
   await runAction(last.action, [last.instruction, extra].filter(s => s.trim()).join('\n'), last.overrides)
+}
+
+/**
+ * Alternatives: the same request three times at once. Each comes back as text
+ * to compare; the one you pick becomes the proposal (then Accept as usual).
+ */
+export async function alternatives(action: ActionId, instruction: string, overrides: Record<string, Override>, n = 3): Promise<{ texts: string[]; from: number; to: number } | null> {
+  const st = useStore.getState()
+  if (!view || !st.book) return null
+  if (action === 'rewrite' && view.state.selection.main.empty) { st.notify('warn', t('Select the passage to rewrite first.')); return null }
+  const ctx = currentContext(action, instruction, overrides)
+  if (!ctx) return null
+  const s = st.book.meta.ai.actions[action]
+  useAI.setState({ running: 'alternatives', last: { action, instruction, overrides } })
+  try {
+    const texts = await Promise.all(Array.from({ length: n }, () => ask({ model: s.model, effort: s.effort, system: ctx.system, message: ctx.message }).catch(() => '')))
+    return { texts: texts.map(x => x.trim()).filter(Boolean), from: ctx.from, to: ctx.to }
+  } finally { useAI.setState({ running: null }) }
+}
+
+/** Puts the chosen alternative on the page as the proposal. */
+export function pickAlternative(text: string, from: number, to: number) {
+  if (!view) return
+  if (view.state.field(proposalField)) discardProposal(view)
+  view.dispatch({ effects: setProposal.of({ from, to, text, streaming: false }) })
+  syncProposalState()
+  const b = useStore.getState().book
+  if (b) useAI.setState({ checks: checkRules(text, b) })
 }
 
 /** Retry with the failed rules of the scorecard as extra direction. */

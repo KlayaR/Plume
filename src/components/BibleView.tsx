@@ -108,7 +108,7 @@ export default function BibleView() {
   )
 }
 
-function EntryEditor({ entry }: { entry: Entry }) {
+export function EntryEditor({ entry }: { entry: Entry }) {
   const book = useStore(s => s.book)!
   const update = (patch: Partial<Entry>) => useStore.getState().updateEntry(entry.slug, patch)
   const isStyle = entry.type === 'style'

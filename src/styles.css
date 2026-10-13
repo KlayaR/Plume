@@ -497,3 +497,29 @@ html[data-theme="light"] .pl-shelf-books { box-shadow: 0 10px 14px -12px rgba(0,
 .pl-tl-row:hover { background: var(--surface-2); }
 .pl-tl-bad { box-shadow: inset 3px 0 0 var(--warning, #d39b3a); }
 .pl-tl-time { width: 7rem; flex: none; font-variant-numeric: tabular-nums; color: var(--text-dim); }
+
+/* 0.6.0 Writing tools: notes tab, darlings, history diff, split view, alternatives, placeholders. */
+.pl-notes { display: flex; flex-direction: column; gap: 18px; }
+.pl-notes section { display: flex; flex-direction: column; gap: 6px; }
+.pl-notes .sk-btn { align-self: flex-start; }
+.pl-comment { padding: 6px 8px; border-left: 3px solid #d9b45c; background: var(--surface-2); border-radius: 0 6px 6px 0; font-size: var(--fs-sm); }
+.pl-comment-quote { font-style: italic; color: var(--text-dim); text-align: left; }
+.pl-darling { padding: 6px 8px; border-radius: 6px; background: var(--surface-2); font-size: var(--fs-sm); }
+.pl-darling-text { font-family: var(--pl-serif); white-space: pre-wrap; margin-bottom: 4px; }
+.pl-summary { font-size: var(--fs-sm); line-height: 1.5; margin: 0; }
+.pl-diff { max-height: 55vh; overflow-y: auto; white-space: pre-wrap; font-family: var(--pl-serif); line-height: 1.6; padding: 12px; border: 1px solid var(--border); border-radius: 8px; }
+.pl-diff ins { background: rgba(90, 170, 100, 0.28); text-decoration: none; }
+.pl-diff del { background: rgba(200, 80, 70, 0.25); }
+.pl-scroll-split { display: grid; grid-template-columns: minmax(18rem, 34%) 1fr; }
+.pl-scroll-split > .pl-splitpane { position: sticky; top: 0; height: 100%; max-height: 100vh; overflow-y: auto; padding: 18px; border-right: 1px solid var(--border); background: var(--surface-1); display: flex; flex-direction: column; gap: 12px; }
+.pl-splittext { font-family: var(--pl-serif); line-height: 1.6; }
+.pl-splittext p { margin: 0 0 0.6em; text-indent: 1.5em; }
+.pl-splitentry .pl-entryedit { max-width: none; }
+.pl-splitbtn[aria-pressed="true"] { color: var(--accent); }
+.pl-alts { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: 12px; }
+.pl-alt { display: flex; flex-direction: column; gap: 6px; }
+.pl-alt textarea { min-height: 18rem; font-family: var(--pl-serif); line-height: 1.55; }
+.pl-learn { align-self: flex-start; }
+.pl-redot { width: 7px; height: 7px; border-radius: 50%; background: #d0533f; flex: none; }
+.cm-placeholder-mark { background: rgba(208, 83, 63, 0.14); border-bottom: 1px dashed #d0533f; color: #b04432; border-radius: 2px; }
+.cm-comment { background: rgba(217, 180, 92, 0.25); border-bottom: 2px solid #d9b45c; }

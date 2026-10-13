@@ -13,6 +13,7 @@ import { proposalField, sceneExtensions, setNames } from './cm'
 import { accept, discard, fillPlaceholder, getEditorView, runAction, setEditorView, syncProposalState, useAI } from './actions'
 import { marksExt, placeholderExt, setHighlights, trackedChangesExt, unknownNamesExt, type Highlight } from './marks'
 import type { Comment, EntryType } from '../lib/types'
+import { cutToDarlings } from '../writing'
 
 // The bible matcher for unknown-name detection, rebuilt only when the entries change.
 let matcherCache: { entries: Entry[] | null; matcher: ReturnType<typeof buildMatcher> } = { entries: null, matcher: buildMatcher([]) }
@@ -79,6 +80,8 @@ function makeState(s: Scene, lang: Lang) {
       keymap.of([
         { key: 'Enter', run: breakKey(s.id) },
         { key: 'Mod-Enter', run: () => { runAction('continue', '', {}); return true } },
+        // Cut the selection into the darlings drawer instead of deleting it.
+        { key: 'Mod-Shift-d', run: v => cutToDarlings(v, s.id) },
         ...defaultKeymap,
         ...historyKeymap,
       ]),

@@ -1,12 +1,13 @@
 // Right panel: the three AI actions, the size meter, and the bible entries
 // that will be sent, each droppable or switchable between short and full.
 import { useMemo, useState } from 'react'
-import { Check, CircleCheck, CircleX, Eye, RotateCcw, Send, Square, Wand2, X } from 'lucide-react'
+import { Check, CircleCheck, CircleX, Copy, Eye, GraduationCap, RotateCcw, Send, Square, Wand2, X } from 'lucide-react'
 import { Dialog } from '../studio-kit/shell.js'
 import { useStore } from '../store'
 import type { ActionId, Effort, Model } from '../lib/types'
 import type { Override } from '../lib/context'
-import { accept, currentContext, discard, retry, retryFixing, runAction, stopAction, useAI } from '../editor/actions'
+import { accept, alternatives, currentContext, discard, pickAlternative, retry, retryFixing, runAction, stopAction, useAI } from '../editor/actions'
+import { learnTaste, useNotes } from '../writing'
 import { allPrompts } from '../lib/voice'
 import { isCheap } from '../ai'
 import { numLocale, useT } from '../i18n'
@@ -38,6 +39,9 @@ export default function ContextPanel() {
   const [text, setText] = useState<Record<Tab, string>>({ continue: '', rewrite: '', beats: '' })
   const [overrides, setOverrides] = useState<Record<string, Override>>({})
   const [preview, setPreview] = useState(false)
+  const [alts, setAlts] = useState<{ texts: string[]; from: number; to: number } | null>(null)
+  const taste = useNotes(s => s.taste.length)
+  const [learning, setLearning] = useState(false)
   // Beats to prose falls back on the plan card's note when no beats are written.
   const sceneNote = useStore(s => s.book?.chapters.flatMap(c => c.scenes).find(x => x.id === s.sceneId)?.note ?? '')
   const instruction = action === 'beats' && !text.beats.trim() ? sceneNote : text[action]
@@ -100,6 +104,12 @@ export default function ContextPanel() {
         ) : (
           <button type="button" className="sk-btn sk-btn-primary" disabled={hasProposal} onClick={() => runAction(action, instruction, overrides)}>
             <Send size={14} /> {t(LABELS[action].button)}
+          </button>
+        )}
+        {!running && (
+          <button type="button" className="sk-btn" disabled={hasProposal} title={t('Three versions side by side; keep the one you like')}
+            onClick={async () => { const r = await alternatives(action, instruction, overrides); if (r) setAlts(r) }}>
+            <Copy size={14} /> {t('×3')}
           </button>
         )}
       </div>
@@ -183,6 +193,22 @@ export default function ContextPanel() {
         </section>
       )}
 
+      {taste >= 6 && (
+        <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm pl-learn" disabled={learning}
+          title={t('Claude reads the proposals you kept and threw away and notes what you like, in Settings → Voice.')}
+          onClick={async () => { setLearning(true); try { await learnTaste(); useStore.getState().notify('ok', t('Noted in Settings → Voice.')) } catch (e) { useStore.getState().notify('error', (e as Error).message) } setLearning(false) }}>
+          <GraduationCap size={13} /> {learning ? t('Learning…') : t('Learn from my choices ({n})', { n: taste })}
+        </button>
+      )}
+
+      {alts && (
+        <Dialog wide title={t('Alternatives')} subtitle={t('Edit any of them, then use the one you want.')} onClose={() => setAlts(null)}>
+          <div className="pl-alts">
+            {alts.texts.map((x, i) => <Alternative key={i} text={x} onUse={v => { pickAlternative(v, alts.from, alts.to); setAlts(null) }} />)}
+          </div>
+        </Dialog>
+      )}
+
       {preview && ctx && (
         <Dialog title={t('Prompt preview')} subtitle={`≈ ${n(total)} ${t('tokens')}`} wide onClose={() => setPreview(false)}>
           <span className="sk-label">{t('System prompt (cached)')}</span>
@@ -192,5 +218,16 @@ export default function ContextPanel() {
         </Dialog>
       )}
     </aside>
+  )
+}
+
+function Alternative({ text, onUse }: { text: string; onUse: (text: string) => void }) {
+  const [v, setV] = useState(text)
+  const t = useT()
+  return (
+    <div className="pl-alt">
+      <textarea className="sk-input" value={v} onChange={e => setV(e.target.value)} />
+      <button type="button" className="sk-btn sk-btn-primary sk-btn-sm" onClick={() => onUse(v)}><Check size={13} /> {t('Use this one')}</button>
+    </div>
   )
 }

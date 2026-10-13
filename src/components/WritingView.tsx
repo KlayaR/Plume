@@ -14,6 +14,9 @@ import ContextPanel from './ContextPanel'
 import ReviewPanel from './ReviewPanel'
 import BookView from './BookView'
 import ChatPanel from './ChatPanel'
+import NotesPanel from './NotesPanel'
+import { EntryEditor } from './BibleView'
+import { countPlaceholders } from '../editor/marks'
 import { useChat } from '../chat'
 import { useT } from '../i18n'
 
@@ -37,7 +40,8 @@ export default function WritingView() {
 
   return (
     <div className="pl-manuscript" data-pin-left={prefs.pinLeft} data-pin-right={prefs.pinRight}>
-      <div className="pl-scroll">
+      <div className={`pl-scroll ${prefs.split !== null ? 'pl-scroll-split' : ''}`}>
+        {prefs.split !== null && found && <SplitPane />}
         {found ? (prefs.page ? <BookView key={viewKey} /> : <Sheet key={viewKey} />) :<div className="sk-empty" style={{ paddingTop: 80 }}>{t('Pick or add a scene on the left.')}</div>}
       </div>
 
@@ -62,10 +66,11 @@ export default function WritingView() {
               <span className="pl-switch pl-panetabs" role="group" aria-label="Claude">
                 <button type="button" aria-pressed={prefs.rightTab === 'write'} onClick={() => setPrefs({ rightTab: 'write' })}>{t('Write')}</button>
                 <button type="button" aria-pressed={prefs.rightTab === 'chat'} onClick={() => setPrefs({ rightTab: 'chat' })}>{t('Chat')}</button>
+                <button type="button" aria-pressed={prefs.rightTab === 'notes'} onClick={() => setPrefs({ rightTab: 'notes' })}>{t('Notes')}</button>
               </span>
             )} pinned={prefs.pinRight} onPin={() => setPrefs({ pinRight: !prefs.pinRight })} />
             <div className="pl-pane-body pl-pane-grow">
-              {prefs.mode === 'review' ? <ReviewPanel /> : prefs.rightTab === 'chat' ? <ChatPanel /> : <ContextPanel key={found.scene.id} />}
+              {prefs.mode === 'review' ? <ReviewPanel /> : prefs.rightTab === 'chat' ? <ChatPanel /> : prefs.rightTab === 'notes' ? <NotesPanel /> : <ContextPanel key={found.scene.id} />}
             </div>
           </aside>
         </>
@@ -195,6 +200,7 @@ function SceneTree() {
                 onClick={() => cycleKind(c, ci)}>
                 {c.kind === 'chapter' ? labels[ci].number : c.kind === 'prologue' ? 'P' : 'É'}
               </button>
+              {c.scenes.some(s => countPlaceholders(s.text) > 0) && <span className="pl-redot" title={t('Placeholders to fill in this chapter')} />}
               <input className="pl-chapter-title" value={c.title} placeholder={t('Untitled')} onChange={e => st().updateChapter(c.id, { title: e.target.value })} aria-label={t('Chapter title')} />
               <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm sk-btn-icon" title={t('New scene')}
                 onClick={() => st().addScene(c.id, fr ? `Scène ${c.scenes.length + 1}` : `Scene ${c.scenes.length + 1}`)}>
@@ -216,6 +222,7 @@ function SceneTree() {
                 <GripVertical size={12} className="pl-grip" />
                 <span className={`pl-status pl-status-${s.status}`} title={t(s.status === 'draft' ? 'Draft' : s.status === 'revised' ? 'Revised' : 'Done')} />
                 <span className="pl-scene-title">{s.title}</span>
+                {countPlaceholders(s.text) > 0 && <span className="pl-redot" title={t('{n} placeholders to fill', { n: countPlaceholders(s.text) })} />}
                 <span className="pl-scene-words">{countWords(s.text)}</span>
                 <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm sk-btn-icon pl-hover" title={t('Remove scene')}
                   onClick={e => { e.stopPropagation(); remove(s.id, s.title) }}>
@@ -231,5 +238,41 @@ function SceneTree() {
         <FolderPlus size={14} /> {t('New chapter')}
       </button>
     </nav>
+  )
+}
+
+/** Split view: a second scene (to read) or a bible entry (to read or edit) beside the text. */
+function SplitPane() {
+  const book = useStore(s => s.book)!
+  const split = useStore(s => s.prefs.split) ?? ''
+  const t = useT()
+  const set = (v: string | null) => useStore.getState().setPrefs({ split: v })
+  const [kind, id] = split.split(':')
+  const scene = kind === 'scene' ? book.chapters.flatMap(c => c.scenes).find(s => s.id === id) : undefined
+  const entry = kind === 'entry' ? book.entries.find(e => e.slug === id) : undefined
+  return (
+    <div className="pl-splitpane">
+      <div className="pl-row">
+        <select className="sk-select sk-btn-sm pl-grow" value={split} onChange={e => set(e.target.value)}>
+          <option value="">{t('Show beside the text…')}</option>
+          <optgroup label={t('Scenes')}>
+            {book.chapters.flatMap(c => c.scenes).map(s => <option key={s.id} value={`scene:${s.id}`}>{s.title}</option>)}
+          </optgroup>
+          <optgroup label={t('Bible')}>
+            {book.entries.filter(e => e.type !== 'style').sort((a, b) => a.name.localeCompare(b.name)).map(e => <option key={e.slug} value={`entry:${e.slug}`}>{e.name}</option>)}
+          </optgroup>
+        </select>
+        <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm" onClick={() => set(null)}>{t('Close')}</button>
+      </div>
+      {scene && (
+        <div className="pl-splittext">
+          <div className="pl-head-chapter">{scene.title}</div>
+          {scene.text.split('\n').filter(p => p.trim()).map((p, i) => <p key={i}>{p}</p>)}
+          <button type="button" className="sk-btn sk-btn-sm" onClick={() => useStore.getState().selectScene(scene.id)}>{t('Write in this scene')}</button>
+        </div>
+      )}
+      {entry && <div className="pl-splitentry"><EntryEditor key={entry.slug} entry={entry} /></div>}
+      {!scene && !entry && <p className="sk-hint">{t('Pick a scene to read, or a bible entry to read or edit, while you write.')}</p>}
+    </div>
   )
 }

@@ -1,7 +1,7 @@
 // The thin bar at the bottom of the room: the book, the three spaces, the
 // manuscript's switches, and the counters (words, signs, Claude, plan limits).
 import { useEffect, useRef, useState } from 'react'
-import { ChevronLeft, Settings } from 'lucide-react'
+import { ChevronLeft, Columns2, Settings } from 'lucide-react'
 import ManuscriptOptions from './ManuscriptOptions'
 import { findScene, useStore, type Scope, type View } from '../store'
 import { useAI } from '../editor/actions'
@@ -75,6 +75,7 @@ export default function BottomBar() {
                 <button key={id} type="button" aria-pressed={prefs.scope === id} onClick={() => st().setPrefs({ scope: id })} title={t(tip)}>{t(label)}</button>
               ))}
             </span>
+            <button type="button" className="pl-quiet pl-splitbtn" aria-pressed={prefs.split !== null} onClick={() => st().setPrefs({ split: prefs.split === null ? '' : null })} title={t('Split view: a scene or a bible entry beside the text')}><Columns2 size={15} /></button>
             <DisplayPanel />
           </>
         )}

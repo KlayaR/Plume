@@ -218,6 +218,7 @@ export const useStore = create<State>((set, get) => {
       store(RECENT_KEY, recent)
       set({ book, recent, view: 'manuscript', sceneId: book.chapters[0]?.scenes[0]?.id ?? null, entrySlug: null, freshSceneId: null, bibleTab: 'entry', planTab: 'board' })
       import('./chat').then(m => m.loadChat(book))
+      import('./writing').then(m => m.loadNotes(book))
     },
     close: () => { get().flush(); set({ book: null, sceneId: null, entrySlug: null }) },
     setView: view => set({ view }),
@@ -228,7 +229,15 @@ export const useStore = create<State>((set, get) => {
       mutate(b => ({ ...b, chapters: b.chapters.map(c => ({ ...c, scenes: c.scenes.map(s => s.id === id ? { ...s, ...patch } : s) })) }))
       if (patch.text && get().freshSceneId === id) set({ freshSceneId: null })
       const found = findScene(get().book, id)
-      if (found) later(found.scene.path, async () => { const f = findScene(get().book, id); if (f) await saveScene(get().book!.root, f.scene) })
+      if (found) later(found.scene.path, async () => {
+        const f = findScene(get().book, id)
+        if (!f) return
+        await saveScene(get().book!.root, f.scene)
+        // Version history: a copy now and then, in .plume/history.
+        import('./writing').then(m => m.snapshot(get().book!.root, f.scene))
+      })
+      // A scene marked done gets its summary (Haiku), unless it already has an up-to-date one.
+      if (patch.status === 'done' && get().claudeExe) import('./writing').then(m => { if (m.staleScenes(get().book!).some(s => s.id === id)) m.summarizeScene(id).catch(() => {}) })
     },
     updateChapter: (id, patch) => {
       mutate(b => ({ ...b, chapters: b.chapters.map(c => c.id === id ? { ...c, ...patch } : c) }))
