@@ -523,3 +523,35 @@ html[data-theme="light"] .pl-shelf-books { box-shadow: 0 10px 14px -12px rgba(0,
 .pl-redot { width: 7px; height: 7px; border-radius: 50%; background: #d0533f; flex: none; }
 .cm-placeholder-mark { background: rgba(208, 83, 63, 0.14); border-bottom: 1px dashed #d0533f; color: #b04432; border-radius: 2px; }
 .cm-comment { background: rgba(217, 180, 92, 0.25); border-bottom: 2px solid #d9b45c; }
+
+/* 0.7.0 Review, after AutoCrit: score, categories, reports, AI findings, tracked changes. */
+.pl-review-panel { gap: 10px; }
+.pl-scorebox { display: flex; gap: 12px; align-items: center; padding: 10px; border-radius: 8px; background: var(--surface-2); }
+.pl-score { flex: none; width: 58px; height: 58px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 600; border: 3px solid currentColor; }
+.pl-good { color: #6aa56a; } .pl-ok { color: #d39b3a; } .pl-bad { color: #d0533f; }
+.pl-cat { display: flex; flex-direction: column; gap: 4px; border-top: 1px solid var(--border); padding-top: 8px; }
+.pl-cat-head { display: flex; align-items: center; gap: 8px; background: none; border: 0; font: inherit; font-weight: 600; color: var(--text); cursor: pointer; padding: 2px 0; text-align: left; }
+.pl-rot { transform: rotate(180deg); }
+.pl-dotstatus { width: 9px; height: 9px; border-radius: 50%; flex: none; background: currentColor; }
+.pl-report { border-radius: 6px; }
+.pl-report-on { background: var(--surface-2); }
+.pl-report-main { display: flex; align-items: center; gap: 8px; width: 100%; background: none; border: 0; font: inherit; font-size: var(--fs-sm); color: var(--text); cursor: pointer; padding: 4px 6px; text-align: left; }
+.pl-report-detail { padding: 0 6px 6px 23px; }
+.pl-report-detail p { margin: 0 0 4px; }
+.pl-overused { padding: 4px 6px; display: flex; flex-direction: column; gap: 4px; }
+.pl-overused .pl-chip b { font-weight: 600; color: var(--accent); margin-left: 3px; }
+.pl-rhythm { width: 100%; height: 48px; }
+.pl-rhythm rect { fill: var(--accent); opacity: 0.75; }
+.pl-aichecks { display: flex; flex-wrap: wrap; gap: 4px; }
+.pl-aifound { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+.pl-aiitem { display: flex; flex-direction: column; gap: 2px; text-align: left; background: var(--surface-2); border: 0; border-radius: 6px; padding: 6px 8px; font: inherit; font-size: var(--fs-sm); color: var(--text); cursor: pointer; }
+.pl-aiquote { font-style: italic; color: var(--text-dim); }
+.cm-review { background: rgba(211, 155, 58, 0.22); border-bottom: 2px solid rgba(211, 155, 58, 0.8); }
+.cm-review-pacing { background: rgba(95, 134, 176, 0.18); border-bottom-color: rgba(95, 134, 176, 0.8); }
+.cm-review-repetition { background: rgba(176, 95, 150, 0.18); border-bottom-color: rgba(176, 95, 150, 0.8); }
+.cm-review-ai { background: rgba(120, 140, 200, 0.2); border-bottom: 2px dotted rgba(120, 140, 200, 0.9); }
+.cm-change-del { text-decoration: line-through; text-decoration-color: #d0533f; background: rgba(208, 83, 63, 0.12); }
+.cm-change { white-space: pre-wrap; }
+.cm-change ins { text-decoration: none; background: rgba(90, 170, 100, 0.25); color: inherit; padding: 0 1px; }
+.cm-change-btn { font: 11px var(--font); line-height: 1; margin-left: 2px; padding: 1px 4px; border-radius: 4px; border: 1px solid var(--border-strong); background: var(--surface-1); color: var(--text); cursor: pointer; vertical-align: 2px; }
+.cm-change-yes:hover { background: #6aa56a; color: #fff; } .cm-change-no:hover { background: #d0533f; color: #fff; }

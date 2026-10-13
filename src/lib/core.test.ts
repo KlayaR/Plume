@@ -9,6 +9,8 @@ import type { Book, Entry } from './types'
 import { DEFAULT_AI, DEFAULT_VOICE } from './types'
 import { adverbs, passives, echoes } from './analysis'
 import { checkRules, expandVariables } from './voice'
+import { review } from './review'
+import { parseStoryTime } from './structures'
 
 const entry = (over: Partial<Entry>): Entry => ({
   slug: 'x', type: 'character', path: 'bible/characters/x.md', name: 'X', aliases: [], include: 'auto',
@@ -209,5 +211,27 @@ describe('voice', () => {
     const c = Object.fromEntries(checkRules('A rich tapestry of light. He walked slowly and quietly and softly.', vbook).map(x => [x.id, x.ok]))
     expect(c.banned).toBe(false)
     expect(c.adverbs).toBe(false)
+  })
+})
+
+describe('review', () => {
+  const book: Book = {
+    root: '', chapters: [],
+    meta: { format: 1, title: 'T', author: '', language: 'fr', order: [], ai: { ...DEFAULT_AI }, voice: DEFAULT_VOICE, structure: { template: '', beats: [] }, loose: [], history: {}, goal: { book: 0, daily: 0 }, series: null, map: null, ignored: [] },
+    entries: [],
+  }
+  it('flags adverbs, filter words and showy tags', () => {
+    const r = review('Il marchait lentement. Elle vit la porte. Elle sentit la peur.\n— Viens, murmura-t-elle doucement.', book)
+    const by = Object.fromEntries(r.results.map(x => [x.def.id, x.count]))
+    expect(by.adverbs).toBe(2)
+    expect(by.filter).toBe(2)
+    expect(by.tags).toBe(1)
+    expect(by.tagadverbs).toBe(1)
+    expect(r.score).toBeGreaterThanOrEqual(0)
+  })
+  it('reads story time', () => {
+    expect(parseStoryTime('Jour 3, 22h30')).toEqual({ day: 3, minutes: 22 * 60 + 30 })
+    expect(parseStoryTime('Day 2, night')).toEqual({ day: 2, minutes: 23 * 60 })
+    expect(parseStoryTime('le lendemain')).toBe(null)
   })
 })

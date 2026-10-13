@@ -14,6 +14,25 @@ import { accept, discard, fillPlaceholder, getEditorView, runAction, setEditorVi
 import { marksExt, placeholderExt, setHighlights, trackedChangesExt, unknownNamesExt, type Highlight } from './marks'
 import type { Comment, EntryType } from '../lib/types'
 import { cutToDarlings } from '../writing'
+import { useReview } from '../review'
+import { occurrences, REPORTS } from '../lib/review'
+
+/** The findings of the Review report chosen in the panel, on one scene's text. */
+function reviewHighlights(text: string, report: string | null, ai: { quote: string; note: string }[]): Highlight[] {
+  const book = useStore.getState().book
+  if (!report || !book) return []
+  if (report === 'ai') {
+    const out: Highlight[] = []
+    for (const f of ai) {
+      const at = f.quote ? text.indexOf(f.quote) : -1
+      if (at >= 0) out.push({ from: at, to: at + f.quote.length, cls: 'cm-review-ai', title: f.note })
+    }
+    return out
+  }
+  if (report.startsWith('word:')) return occurrences(text, report.slice(5)).map(f => ({ ...f, cls: 'cm-review' }))
+  const def = REPORTS.find(r => r.id === report)
+  return def ? def.find(text, book.meta.language, book).map(f => ({ from: f.from, to: f.to, cls: `cm-review cm-review-${def.category}`, title: f.note })) : []
+}
 
 // The bible matcher for unknown-name detection, rebuilt only when the entries change.
 let matcherCache: { entries: Entry[] | null; matcher: ReturnType<typeof buildMatcher> } = { entries: null, matcher: buildMatcher([]) }
@@ -146,6 +165,17 @@ export default function Editor({ scene }: { scene: Scene }) {
   useEffect(() => { viewRef.current?.dispatch({ effects: names(entries) }) }, [entries])
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { viewRef.current?.dispatch({ effects: setHighlights.of({ key: 'comments', list: commentHighlights(viewRef.current.state.doc.toString(), scene.comments) }) }) }, [scene.comments])
+
+  // Review: the chosen report's findings, recomputed a moment after the text changes.
+  const report = useReview(s => (mode === 'review' ? s.report : null))
+  const aiFound = useReview(s => s.ai)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const v = viewRef.current
+      if (v) v.dispatch({ effects: setHighlights.of({ key: 'review', list: reviewHighlights(v.state.doc.toString(), report, aiFound) }) })
+    }, report ? 300 : 0)
+    return () => clearTimeout(timer)
+  }, [report, aiFound, scene.text])
   useEffect(() => { viewRef.current?.dispatch({ effects: spelling.reconfigure(spellingExt(mode === 'write')) }) }, [mode])
 
   // Chosen in the tree, or just created: become the active editor, focused and in view.
