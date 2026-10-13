@@ -82,6 +82,150 @@ fn move_to_trash(root: String, rel: String) -> Result<(), String> {
     std::fs::rename(from, to).map_err(|e| e.to_string())
 }
 
+// --- Binary files, outside files, backups --------------------------------------
+// Pictures, imports, exports and backups move as base64 text between the two sides.
+
+const B64: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+fn b64_encode(data: &[u8]) -> String {
+    let mut out = String::with_capacity(data.len().div_ceil(3) * 4);
+    for chunk in data.chunks(3) {
+        let n = (chunk[0] as u32) << 16 | (*chunk.get(1).unwrap_or(&0) as u32) << 8 | *chunk.get(2).unwrap_or(&0) as u32;
+        for i in 0..4 {
+            if i <= chunk.len() {
+                out.push(B64[(n >> (18 - 6 * i) & 63) as usize] as char);
+            } else {
+                out.push('=');
+            }
+        }
+    }
+    out
+}
+
+fn b64_decode(text: &str) -> Result<Vec<u8>, String> {
+    let mut out = Vec::with_capacity(text.len() / 4 * 3);
+    let mut buf = 0u32;
+    let mut bits = 0;
+    for c in text.bytes() {
+        let v = match c {
+            b'A'..=b'Z' => c - b'A',
+            b'a'..=b'z' => c - b'a' + 26,
+            b'0'..=b'9' => c - b'0' + 52,
+            b'+' => 62,
+            b'/' => 63,
+            b'=' | b'\n' | b'\r' => continue,
+            _ => return Err("Invalid base64".into()),
+        } as u32;
+        buf = buf << 6 | v;
+        bits += 6;
+        if bits >= 8 {
+            bits -= 8;
+            out.push((buf >> bits & 255) as u8);
+        }
+    }
+    Ok(out)
+}
+
+/// A file of the book as base64 (pictures, the map).
+#[tauri::command]
+fn read_base64(root: String, rel: String) -> Result<String, String> {
+    std::fs::read(safe_join(&root, &rel)?).map(|d| b64_encode(&d)).map_err(|e| format!("{rel}: {e}"))
+}
+
+/// Copies a file the user picked into the book (a portrait, a map).
+#[tauri::command]
+fn copy_into(root: String, src: String, rel: String) -> Result<(), String> {
+    let to = safe_join(&root, &rel)?;
+    if let Some(dir) = to.parent() {
+        std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    }
+    std::fs::copy(&src, &to).map(|_| ()).map_err(|e| format!("{src}: {e}"))
+}
+
+/// A file the user picked to import (.docx, .md), as base64.
+#[tauri::command]
+fn read_file_base64(path: String) -> Result<String, String> {
+    std::fs::read(&path).map(|d| b64_encode(&d)).map_err(|e| format!("{path}: {e}"))
+}
+
+/// An export, written where the user chose.
+#[tauri::command]
+fn write_file_base64(path: String, data: String) -> Result<(), String> {
+    std::fs::write(&path, b64_decode(&data)?).map_err(|e| format!("{path}: {e}"))
+}
+
+/// Every file of the book except Plume's own folder, for a backup.
+#[tauri::command]
+fn list_all(root: String) -> Vec<String> {
+    fn walk(dir: &Path, base: &Path, out: &mut Vec<String>) {
+        let Ok(entries) = std::fs::read_dir(dir) else { return };
+        for e in entries.flatten() {
+            let p = e.path();
+            let name = e.file_name().to_string_lossy().into_owned();
+            if name == ".plume" || name.ends_with(".plume-tmp") {
+                continue;
+            }
+            if p.is_dir() {
+                walk(&p, base, out);
+            } else if let Ok(r) = p.strip_prefix(base) {
+                out.push(r.to_string_lossy().replace('\\', "/"));
+            }
+        }
+    }
+    let mut out = Vec::new();
+    walk(Path::new(&root), Path::new(&root), &mut out);
+    out
+}
+
+/// Writes today's backup zip of a book and removes the ones older than two weeks.
+#[tauri::command]
+fn write_backup(app: AppHandle, name: String, date: String, data: String) -> Result<String, String> {
+    let safe: String = name.chars().map(|c| if c.is_alphanumeric() || c == ' ' || c == '-' { c } else { '_' }).collect();
+    let dir = app.path().app_local_data_dir().map_err(|e| e.to_string())?.join("backups").join(safe.trim());
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let file = dir.join(format!("{date}.zip"));
+    std::fs::write(&file, b64_decode(&data)?).map_err(|e| e.to_string())?;
+    let cutoff = SystemTime::now() - std::time::Duration::from_secs(14 * 24 * 3600);
+    if let Ok(entries) = std::fs::read_dir(&dir) {
+        for e in entries.flatten() {
+            let old = e.metadata().and_then(|m| m.modified()).map(|t| t < cutoff).unwrap_or(false);
+            if old {
+                let _ = std::fs::remove_file(e.path());
+            }
+        }
+    }
+    Ok(file.to_string_lossy().into_owned())
+}
+
+/// Backups already made for a book, newest first.
+#[tauri::command]
+fn list_backups(app: AppHandle, name: String) -> Vec<String> {
+    let safe: String = name.chars().map(|c| if c.is_alphanumeric() || c == ' ' || c == '-' { c } else { '_' }).collect();
+    let Ok(dir) = app.path().app_local_data_dir().map(|d| d.join("backups").join(safe.trim())) else { return vec![] };
+    let mut out: Vec<String> = std::fs::read_dir(&dir).map(|r| r.flatten().map(|e| e.path().to_string_lossy().into_owned()).collect()).unwrap_or_default();
+    out.sort();
+    out.reverse();
+    out
+}
+
+/// When a file of the book last changed (ms), for safe sync; 0 if missing.
+#[tauri::command]
+fn file_mtime(root: String, rel: String) -> u64 {
+    safe_join(&root, &rel)
+        .ok()
+        .and_then(|p| std::fs::metadata(p).ok())
+        .and_then(|m| m.modified().ok())
+        .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
+}
+
+/// This computer's name, so two devices on a synced folder can tell each other apart.
+#[tauri::command]
+fn device_name() -> String {
+    std::env::var("COMPUTERNAME").or_else(|_| std::env::var("HOSTNAME")).unwrap_or_else(|_| "this computer".into())
+}
+
 #[tauri::command]
 fn find_claude(custom: Option<String>) -> Option<String> {
     if let Some(c) = custom.filter(|c| !c.trim().is_empty()) {
@@ -214,7 +358,16 @@ pub fn run() {
             move_to_trash,
             find_claude,
             run_claude,
-            cancel_claude
+            cancel_claude,
+            read_base64,
+            copy_into,
+            read_file_base64,
+            write_file_base64,
+            list_all,
+            write_backup,
+            list_backups,
+            file_mtime,
+            device_name
         ])
         .run(tauri::generate_context!())
         .expect("error while running Plume");

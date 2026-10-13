@@ -13,6 +13,8 @@ import { useAI } from '../editor/actions'
 import ContextPanel from './ContextPanel'
 import ReviewPanel from './ReviewPanel'
 import BookView from './BookView'
+import ChatPanel from './ChatPanel'
+import { useChat } from '../chat'
 import { useT } from '../i18n'
 
 export default function WritingView() {
@@ -21,13 +23,14 @@ export default function WritingView() {
   const prefs = useStore(s => s.prefs)
   const hasProposal = useAI(s => s.hasProposal)
   const running = useAI(s => s.running)
+  const chatting = useChat(s => s.streaming !== null)
   const [hoverL, setHoverL] = useState(false)
   const [hoverR, setHoverR] = useState(false)
   const t = useT()
   const found = findScene(book, sceneId)
   const openL = prefs.pinLeft || hoverL
   // The AI panel also comes out on its own while a reply streams or waits for a decision.
-  const openR = prefs.pinRight || hoverR || hasProposal || !!running
+  const openR = prefs.pinRight || hoverR || hasProposal || !!running || chatting
   const setPrefs = useStore.getState().setPrefs
   // A new view only when what's shown changes: in the whole book, moving between chapters keeps it.
   const viewKey = !found ? '' : prefs.scope === 'book' ? 'book' : prefs.scope === 'scene' ? found.scene.id : found.chapter.id
@@ -55,9 +58,14 @@ export default function WritingView() {
         <>
           {!prefs.pinRight && <div className="pl-hotzone pl-hotzone-right" onMouseEnter={() => setHoverR(true)} />}
           <aside className="pl-pane pl-pane-right" data-open={openR} data-pinned={prefs.pinRight} onMouseLeave={() => setHoverR(false)}>
-            <PaneHead title={prefs.mode === 'review' ? t('Review') : 'Claude'} pinned={prefs.pinRight} onPin={() => setPrefs({ pinRight: !prefs.pinRight })} />
-            <div className="pl-pane-body">
-              {prefs.mode === 'review' ? <ReviewPanel /> : <ContextPanel key={found.scene.id} />}
+            <PaneHead title={prefs.mode === 'review' ? t('Review') : (
+              <span className="pl-switch pl-panetabs" role="group" aria-label="Claude">
+                <button type="button" aria-pressed={prefs.rightTab === 'write'} onClick={() => setPrefs({ rightTab: 'write' })}>{t('Write')}</button>
+                <button type="button" aria-pressed={prefs.rightTab === 'chat'} onClick={() => setPrefs({ rightTab: 'chat' })}>{t('Chat')}</button>
+              </span>
+            )} pinned={prefs.pinRight} onPin={() => setPrefs({ pinRight: !prefs.pinRight })} />
+            <div className="pl-pane-body pl-pane-grow">
+              {prefs.mode === 'review' ? <ReviewPanel /> : prefs.rightTab === 'chat' ? <ChatPanel /> : <ContextPanel key={found.scene.id} />}
             </div>
           </aside>
         </>
@@ -66,11 +74,11 @@ export default function WritingView() {
   )
 }
 
-function PaneHead({ title, pinned, onPin }: { title: string; pinned: boolean; onPin: () => void }) {
+function PaneHead({ title, pinned, onPin }: { title: React.ReactNode; pinned: boolean; onPin: () => void }) {
   const t = useT()
   return (
     <div className="pl-pane-head">
-      <span className="pl-label">{title}</span>
+      {typeof title === 'string' ? <span className="pl-label">{title}</span> : title}
       <button type="button" className="pl-quiet pl-pin" aria-pressed={pinned} onClick={onPin} title={t(pinned ? 'Unpin' : 'Pin open')}>
         {pinned ? <PinOff size={14} /> : <Pin size={14} />}
       </button>

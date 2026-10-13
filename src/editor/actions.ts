@@ -91,6 +91,14 @@ export async function runAction(action: ActionId, instruction: string, overrides
   if (useAI.getState().running === 'starting') useAI.setState({ running: id })
 }
 
+/** Fill with AI: the placeholder ⟦note⟧ is replaced by a proposal written from its note. */
+export function fillPlaceholder(v: EditorView, from: number, to: number, note: string) {
+  if (useAI.getState().running) return
+  setEditorView(v)
+  v.dispatch({ selection: { anchor: from, head: to } })
+  runAction('fill', note, {})
+}
+
 export function stopAction() {
   const id = useAI.getState().running
   if (id && id !== 'starting') cancelClaude(id)

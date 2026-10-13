@@ -31,6 +31,7 @@ function normalizeMeta(raw: Partial<BookMeta>): BookMeta {
     goal: { book: 80000, daily: 500, ...(raw.goal ?? {}) },
     series: raw.series ?? null,
     map: raw.map ?? null,
+    ignored: Array.isArray(raw.ignored) ? raw.ignored : [],
     summary: raw.summary,
   }
 }

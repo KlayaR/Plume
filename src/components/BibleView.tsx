@@ -1,17 +1,26 @@
 // Research & Bible: every entry by type, and the entry editor.
 import { useEffect, useMemo, useState } from 'react'
 import { ask } from '@tauri-apps/plugin-dialog'
-import { Plus, Search, Trash2, X } from 'lucide-react'
-import { useStore } from '../store'
+import { ImagePlus, MessagesSquare, Plus, Search, Trash2, X } from 'lucide-react'
+import { useStore, type BibleTab } from '../store'
 import { EMPTY_VOICE, ENTRY_TYPES, typeInfo, type Entry, type EntryType, type ExcerptKind, type Include, type VoiceCard } from '../lib/types'
 import { formatFact, parseFact } from '../lib/bible'
 import { buildMatcher, findMentions } from '../lib/context'
 import { foldText } from '../lib/text'
 import { useT } from '../i18n'
+import { ChatDock } from './ChatPanel'
+import { Contradictions, MapView, Relations, ReviewList, Tracker } from './BibleTools'
+import { startInterview, useChat } from '../chat'
+import { pickImage, useImage } from '../lib/images'
+
+const TABS: [BibleTab, string][] = [['entry', 'Entry'], ['review', 'To review'], ['tracker', 'Tracker'], ['map', 'Map'], ['relations', 'Relations'], ['contradictions', 'Contradictions']]
 
 export default function BibleView() {
   const book = useStore(s => s.book)!
   const slug = useStore(s => s.entrySlug)
+  const tab = useStore(s => s.bibleTab)
+  const pinned = useStore(s => s.prefs.chatOpen)
+  const drafts = useChat(s => s.proposals.length)
   const [query, setQuery] = useState('')
   const [adding, setAdding] = useState<EntryType | null>(null)
   const [name, setName] = useState('')
@@ -27,7 +36,7 @@ export default function BibleView() {
   }
 
   return (
-    <>
+    <div className="pl-withdock" data-pin={pinned}>
       <div className="pl-bible">
         <nav className="pl-bible-list" aria-label={t('Bible entries')}>
           <div className="pl-row" title={t('Characters, places, objects, lore and story lines the AI can draw on')}>
@@ -79,10 +88,23 @@ export default function BibleView() {
           })}
         </nav>
         <div className="pl-bible-main">
-          {selected ? <EntryEditor key={selected.slug} entry={selected} /> : <div className="sk-empty">{t('Pick an entry, or add one with New entry.')}</div>}
+          <nav className="pl-switch pl-bible-tabs" aria-label={t('Bible')}>
+            {TABS.map(([id, label]) => (
+              <button key={id} type="button" aria-pressed={tab === id} onClick={() => useStore.setState({ bibleTab: id })}>
+                {t(label)}{id === 'review' && drafts > 0 ? ` (${drafts})` : ''}
+              </button>
+            ))}
+          </nav>
+          {tab === 'entry' && (selected ? <EntryEditor key={selected.slug} entry={selected} /> : <div className="sk-empty">{t('Pick an entry, or add one with New entry.')}</div>)}
+          {tab === 'review' && <ReviewList />}
+          {tab === 'tracker' && <Tracker />}
+          {tab === 'map' && <MapView />}
+          {tab === 'relations' && <Relations />}
+          {tab === 'contradictions' && <Contradictions />}
         </div>
       </div>
-    </>
+      <ChatDock />
+    </div>
   )
 }
 
@@ -102,10 +124,10 @@ function EntryEditor({ entry }: { entry: Entry }) {
   const mentions = useMemo(() => {
     if (plain) return []
     const m = buildMatcher([entry])
-    const out: { id: string; label: string; count: number }[] = []
+    const out: { id: string; label: string; count: number; ci: number }[] = []
     book.chapters.forEach((c, ci) => c.scenes.forEach(s => {
       const count = findMentions(s.text, m).length
-      if (count) out.push({ id: s.id, label: `${ci + 1} · ${s.title}`, count })
+      if (count) out.push({ id: s.id, label: `${ci + 1} · ${s.title}`, count, ci })
     }))
     return out
   }, [book.chapters, entry, plain])
@@ -119,8 +141,11 @@ function EntryEditor({ entry }: { entry: Entry }) {
       <div className="pl-row">
         <input className="pl-entryname" value={entry.name} onChange={e => update({ name: e.target.value })} aria-label={t('Name')} />
         <span className="sk-badge">{t(typeInfo(entry.type).label)}</span>
+        {!plain && <button type="button" className="sk-btn sk-btn-sm" title={t('Claude asks you questions to fill the gaps of this entry')} onClick={() => startInterview(entry.slug)}><MessagesSquare size={14} /> {t('Interview me')}</button>}
         {!isStyle && <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm sk-btn-icon" title={t('Remove entry')} onClick={remove}><Trash2 size={14} /></button>}
       </div>
+
+      {!plain && <Portrait entry={entry} update={update} />}
 
       {!plain && (
         <div className="pl-grid2">
@@ -203,6 +228,11 @@ function EntryEditor({ entry }: { entry: Entry }) {
       {!plain && (
         <div className="sk-field">
           <label>{t('Mentions')}</label>
+          {mentions.length > 0 && (() => {
+            const written = book.chapters.reduce((n, c, i) => (c.scenes.some(s => s.text.trim()) ? i : n), -1)
+            const gap = written - mentions[mentions.length - 1].ci
+            return gap >= 5 ? <span className="sk-hint pl-warn">{t('{name} hasn’t appeared for {n} chapters.', { name: entry.name, n: gap })}</span> : null
+          })()}
           {mentions.length === 0 ? <span className="sk-hint">{t('Not mentioned in any scene yet.')}</span> : (
             <div className="sk-list">
               {mentions.map(m => (
@@ -258,6 +288,25 @@ function VoiceEditor({ entry, update }: { entry: Entry; update: (patch: Partial<
           <textarea className="sk-input" rows={3} value={entry.unaware ?? ''} placeholder={t('Secrets of others, twists to come…')} onChange={e => update({ unaware: e.target.value })} />
         </div>
       </div>
+    </div>
+  )
+}
+
+/** A portrait (or any picture) for the entry, kept in the book's bible/images. */
+function Portrait({ entry, update }: { entry: Entry; update: (patch: Partial<Entry>) => void }) {
+  const root = useStore(s => s.book!.root)
+  const url = useImage(root, entry.image)
+  const t = useT()
+  const choose = async () => {
+    const rel = await pickImage(root, `bible/images/${entry.slug}`, t('Choose a picture'))
+    if (rel) update({ image: rel })
+  }
+  return (
+    <div className="pl-portrait">
+      {url ? <img src={url} alt={entry.name} onClick={choose} title={t('Change picture')} /> : (
+        <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm" onClick={choose}><ImagePlus size={14} /> {t('Add a picture')}</button>
+      )}
+      {url && <button type="button" className="pl-quiet pl-portrait-x" onClick={() => update({ image: undefined })} aria-label={t('Remove picture')}><X size={12} /></button>}
     </div>
   )
 }

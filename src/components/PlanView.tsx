@@ -4,6 +4,7 @@ import { useStore } from '../store'
 import { chapterLabels } from '../lib/chapters'
 import { countWords } from '../lib/text'
 import { useT } from '../i18n'
+import { ChatDock } from './ChatPanel'
 
 const firstLine = (t: string) => t.split('\n').find(l => l.trim())?.trim() ?? ''
 
@@ -11,8 +12,9 @@ export default function PlanView() {
   const book = useStore(s => s.book)!
   const labels = chapterLabels(book.chapters, book.meta.language)
   const t = useT()
+  const pinned = useStore(s => s.prefs.chatOpen)
   return (
-    <>
+    <div className="pl-withdock" data-pin={pinned}>
       <div className="pl-plan">
         <div className="pl-plan-intro">
           <span className="pl-label">{t('Every chapter and scene as a card; click one to write it')}</span>
@@ -37,6 +39,7 @@ export default function PlanView() {
           </section>
         ))}
       </div>
-    </>
+      <ChatDock />
+    </div>
   )
 }

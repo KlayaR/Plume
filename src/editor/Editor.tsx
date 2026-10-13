@@ -10,7 +10,41 @@ import type { Entry, Lang, Scene } from '../lib/types'
 import { buildMatcher } from '../lib/context'
 import { enterStartsScene } from '../lib/chapters'
 import { proposalField, sceneExtensions, setNames } from './cm'
-import { accept, discard, getEditorView, runAction, setEditorView, syncProposalState, useAI } from './actions'
+import { accept, discard, fillPlaceholder, getEditorView, runAction, setEditorView, syncProposalState, useAI } from './actions'
+import { marksExt, placeholderExt, setHighlights, trackedChangesExt, unknownNamesExt, type Highlight } from './marks'
+import type { Comment, EntryType } from '../lib/types'
+
+// The bible matcher for unknown-name detection, rebuilt only when the entries change.
+let matcherCache: { entries: Entry[] | null; matcher: ReturnType<typeof buildMatcher> } = { entries: null, matcher: buildMatcher([]) }
+const currentMatcher = () => {
+  const entries = useStore.getState().book?.entries ?? []
+  if (matcherCache.entries !== entries) matcherCache = { entries, matcher: buildMatcher(entries) }
+  return matcherCache.matcher
+}
+
+const unknown = unknownNamesExt({
+  matcher: currentMatcher,
+  ignored: () => useStore.getState().book?.meta.ignored ?? [],
+  add: (name: string, type: EntryType) => {
+    const st = useStore.getState()
+    const e = st.addEntry(type, name)
+    st.notify('ok', t('{name} added to the bible.', { name }), { label: t('Open'), run: () => { useStore.setState({ view: 'bible', entrySlug: e.slug, bibleTab: 'entry' }) } })
+  },
+  ignore: (name: string) => {
+    const st = useStore.getState()
+    st.updateMeta({ ignored: [...(st.book?.meta.ignored ?? []), name] })
+  },
+})
+
+/** Margin comments, found again in the text by their quote. */
+export function commentHighlights(text: string, comments: Comment[] | undefined): Highlight[] {
+  const out: Highlight[] = []
+  for (const c of comments ?? []) {
+    const at = c.quote ? text.indexOf(c.quote) : -1
+    if (at >= 0) out.push({ from: at, to: at + c.quote.length, cls: 'cm-comment', title: c.text })
+  }
+  return out
+}
 
 const names = (entries: Entry[]) => setNames.of({ matcher: buildMatcher(entries), entries: new Map(entries.map(e => [e.slug, e])) })
 
@@ -48,7 +82,12 @@ function makeState(s: Scene, lang: Lang) {
         ...defaultKeymap,
         ...historyKeymap,
       ]),
-      placeholder(t('Start writing…')),
+      // The plan card's note, in grey, until the scene has text.
+      placeholder(s.note?.trim() ? s.note.trim() : t('Start writing…')),
+      marksExt,
+      trackedChangesExt,
+      unknown,
+      placeholderExt((view, from, to, note) => fillPlaceholder(view, from, to, note)),
       EditorView.domEventHandlers({
         focus: () => {
           // Clicking into a scene makes it the active one.
@@ -102,6 +141,8 @@ export default function Editor({ scene }: { scene: Scene }) {
   }, [scene.text])
 
   useEffect(() => { viewRef.current?.dispatch({ effects: names(entries) }) }, [entries])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { viewRef.current?.dispatch({ effects: setHighlights.of({ key: 'comments', list: commentHighlights(viewRef.current.state.doc.toString(), scene.comments) }) }) }, [scene.comments])
   useEffect(() => { viewRef.current?.dispatch({ effects: spelling.reconfigure(spellingExt(mode === 'write')) }) }, [mode])
 
   // Chosen in the tree, or just created: become the active editor, focused and in view.

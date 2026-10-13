@@ -8,6 +8,10 @@ import { loadBook, makeChapter, makeEntry, makeScene, saveChapter, saveEntry, sa
 import { t } from './i18n'
 
 export type View = 'bible' | 'plan' | 'manuscript'
+export type BibleTab = 'entry' | 'review' | 'tracker' | 'map' | 'relations' | 'contradictions'
+export type PlanTab = 'board' | 'structure' | 'timeline' | 'lines'
+/** What the right pane of the Manuscript shows in Write mode. */
+export type RightTab = 'write' | 'chat' | 'notes'
 
 const SETTINGS_KEY = 'plume.settings'
 const RECENT_KEY = 'plume.recent'
@@ -49,6 +53,13 @@ export interface Prefs {
   pageNumbers: boolean
   /** Cheap mode: past this % of the 5-hour limit, AI calls use Haiku (0 = off). */
   cheapAt: number
+  /** The chat pane in Bible and Plan: pinned open. */
+  chatOpen: boolean
+  rightTab: RightTab
+  /** Split view in the Manuscript: a second scene or a bible entry beside the text. */
+  split: string | null
+  /** Read aloud: the Windows voice to use (its name). */
+  readVoice: string
   /** Version of the saved prefs, for one-time upgrades. */
   v?: number
 }
@@ -69,6 +80,10 @@ export const DEFAULT_PREFS: Prefs = {
   showStatus: true,
   pageNumbers: true,
   cheapAt: 0,
+  chatOpen: false,
+  rightTab: 'write',
+  split: null,
+  readVoice: '',
   v: 2,
 }
 
@@ -113,6 +128,8 @@ interface State {
   toast: Toast | null
   showSettings: boolean
   editorTick: number
+  bibleTab: BibleTab
+  planTab: PlanTab
 
   open: (root: string) => Promise<void>
   setBook: (b: Book) => void
@@ -186,6 +203,8 @@ export const useStore = create<State>((set, get) => {
     toast: null,
     showSettings: false,
     editorTick: 0,
+    bibleTab: 'entry',
+    planTab: 'board',
 
     open: async root => {
       await get().flush()
@@ -195,12 +214,13 @@ export const useStore = create<State>((set, get) => {
     setBook: book => {
       const recent = [book.root, ...get().recent.filter(r => r !== book.root)].slice(0, 8)
       store(RECENT_KEY, recent)
-      set({ book, recent, view: 'manuscript', sceneId: book.chapters[0]?.scenes[0]?.id ?? null, entrySlug: null, freshSceneId: null })
+      set({ book, recent, view: 'manuscript', sceneId: book.chapters[0]?.scenes[0]?.id ?? null, entrySlug: null, freshSceneId: null, bibleTab: 'entry', planTab: 'board' })
+      import('./chat').then(m => m.loadChat(book))
     },
     close: () => { get().flush(); set({ book: null, sceneId: null, entrySlug: null }) },
     setView: view => set({ view }),
     selectScene: id => set({ sceneId: id, view: 'manuscript', freshSceneId: get().freshSceneId === id ? id : null }),
-    selectEntry: slug => set({ entrySlug: slug }),
+    selectEntry: slug => set({ entrySlug: slug, bibleTab: 'entry' }),
 
     updateScene: (id, patch) => {
       mutate(b => ({ ...b, chapters: b.chapters.map(c => ({ ...c, scenes: c.scenes.map(s => s.id === id ? { ...s, ...patch } : s) })) }))

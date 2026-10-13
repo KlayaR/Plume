@@ -78,6 +78,17 @@ async function invoke(cmd: string, args: any = {}): Promise<unknown> {
       return null
     }
     case 'cancel_claude': return null
+    // A 2×2 grey picture stands in for every image of the book.
+    case 'read_base64': return 'iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFklEQVR42mN89+7dfwYGBgYmBhgAAGWfBCWuH5WgAAAAAElFTkSuQmCC'
+    case 'copy_into': files.set(rel(args), '(image)'); return null
+    case 'read_file_base64': return (window as any).__importFile ?? ''
+    case 'write_file_base64': (window as any).__exports = { ...((window as any).__exports ?? {}), [args.path]: args.data }; return null
+    case 'list_all': return [...files.keys()].filter(k => !k.startsWith('.plume/'))
+    case 'write_backup': (window as any).__backup = args; return `C:\\Users\\Test\\AppData\\Local\\Plume\\backups\\${args.name}\\${args.date}.zip`
+    case 'list_backups': return (window as any).__backup ? ['C:\\backups\\today.zip'] : []
+    case 'file_mtime': return 0
+    case 'device_name': return 'MOCK-PC'
+    case 'plugin:dialog|save': return 'C:\\Users\\Test\\Export'
     default:
       return null // window theme and other plugin calls
   }

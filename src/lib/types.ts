@@ -210,6 +210,8 @@ export interface BookMeta {
   series: { path: string; index: number } | null
   /** Map image for the places, with pins in % of its size. */
   map: { image: string; pins: { slug: string; x: number; y: number }[] } | null
+  /** Capitalised words you told Plume aren't bible names. */
+  ignored: string[]
   summary?: string
 }
 

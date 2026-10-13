@@ -392,3 +392,54 @@ html[data-theme="light"] .pl-shelf-books { box-shadow: 0 10px 14px -12px rgba(0,
 .pl-wrap { white-space: normal; text-align: right; }
 .pl-voicecard { display: flex; flex-direction: column; gap: 8px; }
 .pl-span2 { grid-column: 1 / -1; }
+
+/* 0.4.0 Bible with AI: chat, dock, tabs, review list, tracker, map, web. */
+.pl-withdock { position: absolute; inset: 0; }
+.pl-withdock[data-pin="true"] > .pl-bible, .pl-withdock[data-pin="true"] > .pl-plan { right: var(--pl-pane-w); }
+.pl-hotzone-dock { width: 22px; }
+.pl-pane-grow { flex: 1; min-height: 0; }
+.pl-panetabs { gap: 2px; }
+.pl-chat { display: flex; flex-direction: column; gap: 8px; height: 100%; min-height: 0; }
+.pl-chat-head { flex: none; }
+.pl-chat-log { flex: 1; min-height: 120px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 2px; }
+.pl-msg { padding: 8px 10px; border-radius: 8px; font-size: var(--fs-sm); line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.pl-msg-user { align-self: flex-end; max-width: 88%; background: var(--accent-tint); }
+.pl-msg-assistant { background: var(--surface-2); }
+.pl-msg-streaming { opacity: 0.85; }
+.pl-chat-input { flex: none; resize: vertical; }
+.pl-chat-review { color: var(--accent); font-size: var(--fs-sm); text-align: left; }
+.pl-bible-tabs { margin-bottom: 22px; flex-wrap: wrap; }
+.pl-review, .pl-contra, .pl-tracker, .pl-relations, .pl-mapview { display: flex; flex-direction: column; gap: 12px; max-width: 60rem; }
+.pl-proposal { display: flex; flex-direction: column; gap: 6px; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-1); }
+.pl-tracker-grid { display: grid; gap: 2px 3px; align-items: center; font-size: 12px; }
+.pl-tracker-ch { text-align: center; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.pl-tracker-name { text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pl-tracker-cell { height: 18px; border-radius: 3px; background: var(--surface-2); display: flex; align-items: center; justify-content: center; }
+.pl-tracker-cell i { display: block; width: 100%; height: 100%; border-radius: 3px; background: var(--accent); }
+.pl-tracker-note { color: var(--text-muted); padding-left: 8px; white-space: nowrap; }
+.pl-warn { color: var(--warning, #d39b3a) !important; }
+.pl-map { position: relative; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); user-select: none; }
+.pl-map img { display: block; width: 100%; height: auto; }
+.pl-map-pinning { cursor: crosshair; }
+.pl-pin-mark { position: absolute; transform: translate(-8px, -100%); display: flex; align-items: center; gap: 2px; font-size: 12px; white-space: nowrap; }
+.pl-pin-mark > .pl-quiet:first-child { display: flex; align-items: center; gap: 2px; color: #fff; text-shadow: 0 1px 3px #000, 0 0 2px #000; }
+.pl-pin-mark svg { color: var(--accent); filter: drop-shadow(0 1px 2px #000); }
+.pl-pin-x { opacity: 0; color: #fff; }
+.pl-pin-mark:hover .pl-pin-x { opacity: 1; }
+.pl-web { width: 100%; max-width: 760px; height: auto; }
+.pl-web-edge { stroke: var(--border-strong); stroke-width: 1.2; }
+.pl-web-edge.pl-lit { stroke: var(--accent); }
+.pl-web-node { cursor: pointer; }
+.pl-web-node circle { fill: var(--accent); stroke: var(--bg); stroke-width: 2; }
+.pl-web-faction circle { fill: #8a6fb0; } .pl-web-place circle { fill: #5f9a7a; } .pl-web-object circle { fill: #b07a5f; } .pl-web-storyline circle { fill: #5f86b0; }
+.pl-web-node text { fill: var(--text); font-size: 13px; }
+.pl-web-node.pl-dim { opacity: 0.25; }
+.pl-check-label { gap: 4px; font-size: var(--fs-sm); }
+.pl-contra-item { padding: 10px 12px; border-left: 3px solid var(--warning, #d39b3a); background: var(--surface-1); border-radius: 0 6px 6px 0; }
+.pl-contra-item p { margin: 6px 0 0; }
+.pl-portrait { position: relative; align-self: flex-start; }
+.pl-portrait img { width: 9rem; height: 9rem; object-fit: cover; border-radius: 8px; cursor: pointer; border: 1px solid var(--border); }
+.pl-portrait-x { position: absolute; top: 4px; right: 4px; background: rgba(0, 0, 0, 0.55); color: #fff; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; }
+.cm-unknown { text-decoration: underline dotted; text-decoration-color: rgba(120, 140, 200, 0.75); text-underline-offset: 3px; }
+.cm-card-row { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.cm-card-btn { margin-top: 8px; }
