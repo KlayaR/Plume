@@ -15,11 +15,14 @@ import BibleView from './components/BibleView'
 import PlanView from './components/PlanView'
 import SettingsView from './components/SettingsView'
 import BottomBar from './components/BottomBar'
+import { AgentDialog, ExportDialog, PrintView } from './components/BookDialogs'
 
 export default function App() {
   const book = useStore(s => s.book)
   const view = useStore(s => s.view)
   const showSettings = useStore(s => s.showSettings)
+  const dialog = useStore(s => s.dialog)
+  const printing = useStore(s => s.printing)
   const prefs = useStore(s => s.prefs)
   const version = useAppVersion()
   const lang = book?.meta.language ?? 'fr'
@@ -63,6 +66,9 @@ export default function App() {
       </main>
       {book && <BottomBar />}
       {showSettings && <SettingsView version={version} />}
+      {book && dialog === 'export' && <ExportDialog onClose={() => useStore.setState({ dialog: null })} />}
+      {book && dialog === 'agents' && <AgentDialog onClose={() => useStore.setState({ dialog: null })} />}
+      {book && printing && <PrintView />}
       <Toasts />
     </div>
   )

@@ -1,7 +1,7 @@
 // The thin bar at the bottom of the room: the book, the three spaces, the
 // manuscript's switches, and the counters (words, signs, Claude, plan limits).
 import { useEffect, useRef, useState } from 'react'
-import { ChevronLeft, Columns2, Settings } from 'lucide-react'
+import { Bot, ChevronLeft, Columns2, FileOutput, Settings } from 'lucide-react'
 import ManuscriptOptions from './ManuscriptOptions'
 import GoalsPanel from './GoalsPanel'
 import { findScene, useStore, type Scope, type View } from '../store'
@@ -109,6 +109,8 @@ export default function BottomBar() {
           </span>
         )}
         <span className={`pl-dot ${exe === null ? 'pl-dot-off' : running ? 'pl-dot-busy' : ''}`} title={usageTip} aria-label={t(claude)} />
+        <button type="button" className="pl-quiet" onClick={() => useStore.setState({ dialog: 'agents' })} title={t('Agent tasks')}><Bot size={15} /></button>
+        <button type="button" className="pl-quiet" onClick={() => useStore.setState({ dialog: 'export' })} title={t('Export the book')}><FileOutput size={15} /></button>
         <button type="button" className="pl-quiet" onClick={() => useStore.setState({ showSettings: true })} title={t('Settings') + ' (Ctrl+,)'}><Settings size={15} /></button>
       </div>
     </footer>

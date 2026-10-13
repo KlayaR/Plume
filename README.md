@@ -7,6 +7,59 @@ in with your Claude subscription. No API key.
 Plan: [Plume — Roadmap](https://claude.ai/code/artifact/1bbb8ac1-8e0c-4a44-bed0-fcd2de1d195d) (0.2.0 → 0.9.0) ·
 first spec: [Plume — Step 1 Spec](https://claude.ai/code/artifact/f1897651-066d-49a1-ae39-1357421b88be)
 
+## What 0.3.0 – 0.9.0 add
+Built in one go from the roadmap; expect rough edges.
+
+**0.3.0 Your voice.** Settings → Voice: a prompt library (yours, kept on this
+computer, plus genre presets) with variables (`{book.tense}`, `{scene.pov}`,
+`{list.AI-isms}`…), the book's tense, an adult-fiction line, scene rules, and
+measurable rules. Every proposal gets a scorecard against those rules, with
+"Retry fixing these" (zero tokens). Style profile measured from your excerpts
+or finished scenes, and "Describe my voice" (one Sonnet call). New bible types:
+word lists (banned from AI text) and excerpts of your prose (sent as examples,
+matched to the kind of passage). Characters get a voice card (always sent with
+them) and what they know / don't know (for POV scenes).
+
+**0.4.0 Bible with AI.** A brainstorm chat in every space (right pane), aware of
+the bible; "Turn into entries" drafts entries into a review list (accept, edit,
+reject). Interview mode on an entry. Contradiction check. Unknown names in the
+text get a dotted mark and "Add to bible?". Secret entries (never sent).
+Appearance tracker, portraits, a map with pinned places, a relationship web.
+
+**0.5.0 Plan.** A board of index cards that are the real scenes: drag cards and
+chapters, loose ideas, zoom, an inspector (note, POV, status, story time, place,
+story lines). Card notes show in grey in the manuscript and feed Beats to prose.
+Structure templates with AI-suggested beats and a pacing view; a timeline from
+story time and dated facts that flags time running backwards; a story-lines
+tracker.
+
+**0.6.0 Writing tools.** Darlings (Ctrl+Shift+D, restored to the exact spot),
+placeholders ⟦…⟧ (Ctrl+Shift+X) with Fill with AI and red dots in the tree,
+margin comments, split view, version history with a word diff, scene / chapter
+/ book summaries (Haiku, redone only when the text changes, used as "story so
+far"), alternatives ×3, "Learn from my choices", cheap mode.
+
+**0.7.0 Review, after AutoCrit.** A score and reports by category (pacing,
+dialogue, strong writing, word choice, repetition, readability) with targets,
+highlights in the text and next / previous; most-used words; sentence rhythm.
+On demand: voice check, continuity check, beta-reader personas, a line edit as
+tracked changes (✓ / ✕ in the text). Read aloud with Windows voices.
+
+**0.8.0 Library and safety.** Bookshelf with generated covers, word-goal
+progress and one shelf per series; goals (daily, book), streak, word sprints,
+30-day chart; a daily zip backup kept two weeks; safe sync (a file changed on
+another computer is never overwritten: your version goes to a `.conflict`
+copy, and a lock warns when the book is open elsewhere); import .docx / .md /
+.txt with chapters and scene breaks detected; series with a shared bible and
+facts dated per book (`[b2 ch 3+]`).
+
+**0.9.0 Export and agent tasks.** EPUB (with a KDP-ready table of contents),
+Word (book layout or submission format: French publishers or English
+manuscript format), PDF printed from Page view, Markdown; placeholders removed
+and typography fixed. Agent tasks with the estimated cost shown first:
+whole-book continuity audit and structure edit through the summaries, a deep
+audit that reads the files itself (read-only tools), web research with sources.
+
 ## What 0.2.6 adds
 - **Scene · Chapter · Book** switch in the bottom bar, for both Sheet and Page:
   show the current scene, the whole chapter, or the whole book. In the book,
@@ -116,8 +169,7 @@ browser with a sample book and a fake `claude` (`src/dev/mockTauri.ts`, dev only
 StudioKit is vendored in `src/studio-kit/`: never edit it here. Edit
 `audio/StudioKit`, bump its `VERSION`, then `npm run sync-kit`.
 
-## Next steps (planned)
-2. Writing: style profile from your samples, POV awareness, scene summaries, snapshots, alternatives
-3. Research & Bible AI: brainstorm chat, "turn into entries" with a review list, interview mode
-4. Outline: structure templates, scene cards, pacing, story lines
-5. Editing: structure, line and copy edits, tracked changes, beta readers, agent tasks, export
+## Book folder, continued
+`.plume/` also holds the chat, the review list, darlings, the taste log,
+agent findings, version history (`history/<scene>/`) and the lock file. Backups
+go to Plume's own folder on this computer (`%LOCALAPPDATA%`), not the book.

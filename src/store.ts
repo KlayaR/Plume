@@ -131,6 +131,9 @@ interface State {
   editorTick: number
   bibleTab: BibleTab
   planTab: PlanTab
+  /** The book's big dialogs, and the PDF print view. */
+  dialog: 'export' | 'agents' | null
+  printing: boolean
 
   open: (root: string) => Promise<void>
   setBook: (b: Book) => void
@@ -217,6 +220,8 @@ export const useStore = create<State>((set, get) => {
     editorTick: 0,
     bibleTab: 'entry',
     planTab: 'board',
+    dialog: null,
+    printing: false,
 
     open: async root => {
       await get().flush()
@@ -229,6 +234,7 @@ export const useStore = create<State>((set, get) => {
       set({ book, recent, view: 'manuscript', sceneId: book.chapters[0]?.scenes[0]?.id ?? null, entrySlug: null, freshSceneId: null, bibleTab: 'entry', planTab: 'board' })
       import('./chat').then(m => m.loadChat(book))
       import('./writing').then(m => m.loadNotes(book))
+      import('./agents').then(m => m.loadAgents())
       // Library and safety: the lock for synced folders, today's backup, progress, the shelf card.
       import('./library').then(m => { m.takeLock(book); m.autoBackup(book); m.recordProgress(get().book!); m.noteOnShelf(get().book!) })
     },

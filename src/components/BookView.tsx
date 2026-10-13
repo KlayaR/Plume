@@ -128,7 +128,7 @@ async function paginate(parts: Part[], host: HTMLElement, cancelled: () => boole
   return pages
 }
 
-export default function BookView() {
+export default function BookView({ scopeOverride }: { scopeOverride?: 'book' } = {}) {
   const book = useStore(s => s.book)!
   const sceneId = useStore(s => s.sceneId)
   const prefs = useStore(s => s.prefs)
@@ -140,9 +140,10 @@ export default function BookView() {
   const labels = chapterLabels(book.chapters, book.meta.language)
 
   // What is laid out: the scene (its chapter's opening only if it's the first scene), the chapter, or every chapter.
-  const parts: Part[] = prefs.scope === 'book'
+  const scope = scopeOverride ?? prefs.scope
+  const parts: Part[] = scope === 'book'
     ? book.chapters.map((c, i) => ({ head: headOf(c, labels[i].label), blocks: partBlocks(c.scenes, true) }))
-    : prefs.scope === 'scene'
+    : scope === 'scene'
       ? [{ head: chapter.scenes[0]?.id === scene.id ? headOf(chapter, label) : null, blocks: partBlocks([scene], chapter.scenes[0]?.id === scene.id) }]
       : [{ head: headOf(chapter, label), blocks: partBlocks(chapter.scenes, true) }]
   const textKey = JSON.stringify(parts)

@@ -11,6 +11,8 @@ import { adverbs, passives, echoes } from './analysis'
 import { checkRules, expandVariables } from './voice'
 import { review } from './review'
 import { parseStoryTime } from './structures'
+import { makeZip, readZip, utf8, fromUtf8 } from './zip'
+import { toMarkdown } from './export'
 
 const entry = (over: Partial<Entry>): Entry => ({
   slug: 'x', type: 'character', path: 'bible/characters/x.md', name: 'X', aliases: [], include: 'auto',
@@ -233,5 +235,24 @@ describe('review', () => {
     expect(parseStoryTime('Jour 3, 22h30')).toEqual({ day: 3, minutes: 22 * 60 + 30 })
     expect(parseStoryTime('Day 2, night')).toEqual({ day: 2, minutes: 23 * 60 })
     expect(parseStoryTime('le lendemain')).toBe(null)
+  })
+})
+
+describe('export', () => {
+  it('round-trips a zip', async () => {
+    const zip = await makeZip([{ name: 'a.txt', data: utf8('Bonjour '.repeat(50)) }, { name: 'mimetype', data: utf8('x'), store: true }])
+    const files = await readZip(zip)
+    expect(fromUtf8(files.get('a.txt')!)).toBe('Bonjour '.repeat(50))
+    expect(fromUtf8(files.get('mimetype')!)).toBe('x')
+  })
+  it('writes Markdown without placeholders', () => {
+    const book: Book = {
+      root: '', entries: [],
+      meta: { format: 1, title: 'Le Livre', author: 'A', language: 'fr', order: [], ai: { ...DEFAULT_AI }, voice: DEFAULT_VOICE, structure: { template: '', beats: [] }, loose: [], history: {}, goal: { book: 0, daily: 0 }, series: null, map: null, ignored: [] },
+      chapters: [{ id: 'c', folder: 'c', kind: 'chapter', title: 'Le bal', notes: '', scenes: [{ id: 's', path: 'p', title: 'S', pov: null, status: 'draft', text: 'Il vint. ⟦à écrire⟧\nElle partit.', extra: {} }] }],
+    }
+    const md = toMarkdown(book, { format: 'md', layout: 'book', titlePage: true, sceneBreak: '* * *' })
+    expect(md).toContain('## Chapitre 1 : Le bal')
+    expect(md).not.toContain('⟦')
   })
 })

@@ -575,3 +575,29 @@ html[data-theme="light"] .pl-shelf-books { box-shadow: 0 10px 14px -12px rgba(0,
 .pl-days rect { fill: var(--text-muted); opacity: 0.6; }
 .pl-days rect.pl-days-hit { fill: var(--accent); opacity: 1; }
 .pl-days-goal { stroke: var(--accent); stroke-dasharray: 3 3; stroke-width: 1; }
+
+/* 0.9.0 Export, print, agent tasks. */
+.pl-formats { display: flex; flex-direction: column; gap: 6px; }
+.pl-format { display: flex; gap: 10px; align-items: flex-start; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; }
+.pl-format.pl-active { border-color: var(--accent); background: var(--accent-tint); }
+.pl-format input { margin-top: 3px; }
+.pl-agents { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.pl-agent, .pl-finding { display: flex; gap: 12px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-1); }
+.pl-agent .sk-input { margin-top: 6px; }
+.pl-agent-run { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex: none; }
+.pl-agent-note { padding: 8px 10px; border-radius: 8px; background: color-mix(in srgb, var(--warning, #d39b3a) 12%, transparent); margin-bottom: 10px; }
+.pl-agent-progress { max-height: 6rem; overflow: hidden; white-space: pre-wrap; font-size: 11px; color: var(--text-muted); background: var(--surface-2); padding: 6px 8px; border-radius: 6px; }
+.pl-findings { display: flex; flex-direction: column; gap: 6px; }
+.pl-finding-detail { font-size: var(--fs-sm); color: var(--text-dim); white-space: pre-wrap; margin-top: 2px; }
+.pl-finding.pl-done { opacity: 0.5; }
+.pl-print { position: fixed; inset: 0; z-index: 200; overflow: auto; background: var(--bg); }
+.pl-print-bar { position: sticky; top: 0; z-index: 2; display: flex; gap: 10px; align-items: center; justify-content: center; padding: 10px; background: var(--surface-1); border-bottom: 1px solid var(--border); }
+@media print {
+  body.pl-printing .pl-room > :not(.pl-print) { display: none !important; }
+  body.pl-printing .pl-print { position: static; overflow: visible; background: none; }
+  body.pl-printing .pl-print-bar, body.pl-printing .pl-print .pl-sheet-meta { display: none; }
+  body.pl-printing .pl-print .pl-desk { padding: 0; background: none; }
+  body.pl-printing .pl-print .pl-bookpages { display: block; gap: 0; }
+  body.pl-printing .pl-print .pl-bookpage-slot { width: auto; height: auto; break-after: page; page-break-after: always; }
+  body.pl-printing .pl-print .pl-bookpage-slot > .pl-bookpage { transform: none; box-shadow: none; }
+}

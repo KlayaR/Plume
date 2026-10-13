@@ -23,11 +23,8 @@ README.md first (features, book folder format, how AI calls stay small).
 - "What could we add / how could X be better" means: list proposals and wait for a choice.
 - Keep diffs minimal and match the surrounding style.
 
-## In progress (0.2.7, not yet type-checked or built)
-Drop cap: after a one-line opening paragraph the next one wraps beside the
-letter without indent (`dropcapMeasure` in `src/editor/cm.ts`, and in
-`paginate` in `BookView.tsx`). Book name and back button at the top of the
-chapters pane. Bottom bar: Bible/Plan/Manuscript as the main pill switch; the
-manuscript switches quieter, in groups. Less space at scene breaks. Book
-language in Settings → This book. Still to do: type-check, check in `?mock`,
-bump to 0.2.7, build.
+## Where things are
+- `src/lib/`: pure logic (types, files, context engine, analysis, review reports, voice, structures, export, zip); tested in `core.test.ts`.
+- `src/*.ts` at the top: stores and AI tasks (`ai.ts` one-shot calls and cheap mode, `chat.ts`, `writing.ts`, `review.ts`, `library.ts`, `agents.ts`).
+- `src/editor/marks.ts`: editor overlays (unknown names, placeholders, highlights, tracked changes).
+- 0.3.0 – 0.9.0 were built in one pass (see README); the user tests and reports bugs next.
