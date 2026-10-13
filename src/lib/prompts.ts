@@ -1,8 +1,24 @@
 // Prompt text, one version per book language. The system rules are the same
 // for every action, so the cached system prompt is reused across actions.
-import type { ActionId, BookMeta, Lang } from './types'
+import type { ActionId, BookMeta, Lang, SceneRule } from './types'
+import { sceneRulesText } from './voice'
 
-export function systemRules(lang: Lang, title: string): string {
+/** The adult-fiction line: a plain statement of what the book is, nothing more. */
+const ADULT: Record<Lang, string> = {
+  fr: 'Ce livre est une œuvre de fiction littéraire pour adultes. Il peut traiter de thèmes sombres (violence, sexualité, deuil, désespoir) avec le sérieux de la littérature ; écris ces passages sans les adoucir ni les commenter.',
+  en: 'This book is adult literary fiction. It may treat dark themes (violence, sexuality, grief, despair) with literary seriousness; write those passages without softening or commenting on them.',
+}
+
+export function systemRules(lang: Lang, title: string, opts: { adult?: boolean; sceneRules?: SceneRule[]; tense?: string } = {}): string {
+  const extra = [
+    opts.tense ? (lang === 'fr' ? `- Temps du récit : ${opts.tense}.` : `- Narrative tense: ${opts.tense}.`) : '',
+    sceneRulesText(opts.sceneRules ?? [], lang),
+    opts.adult ? `\n${ADULT[lang]}` : '',
+  ].filter(Boolean).join('\n')
+  return base(lang, title) + (extra ? '\n' + extra : '')
+}
+
+function base(lang: Lang, title: string): string {
   if (lang === 'fr') {
     return `Tu es coauteur de fiction dans Plume, un logiciel d'écriture de romans. Tu écris la prose du livre « ${title} », en français.
 
@@ -37,6 +53,15 @@ export function taskMessage(lang: Lang, action: ActionId, instruction: string, s
       fr
         ? `<task>\nRéécris uniquement le passage <selection>, pour qu'il s'enchaîne avec ce qui précède et ce qui suit. Garde à peu près la même longueur (${words(n)}) sauf si la consigne dit autrement.\nConsigne : ${dir || 'améliore la prose sans changer le sens'}\nRéponds uniquement avec le passage réécrit.\n</task>`
         : `<task>\nRewrite only the <selection> passage so it flows from what comes before and into what follows. Keep roughly the same length (${words(n)}) unless the direction says otherwise.\nDirection: ${dir || 'improve the prose without changing the meaning'}\nReply with the rewritten passage only.\n</task>`,
+    ].filter(Boolean).join('\n\n')
+  }
+  if (action === 'fill') {
+    return [
+      story.before ? `<before>\n${story.before}\n</before>` : '',
+      story.after ? `<after>\n${story.after}\n</after>` : '',
+      fr
+        ? `<task>\nUn passage manque entre <before> et <after>. Écris-le pour qu'il relie les deux sans couture.\nCe qu'il doit contenir : ${dir || 'ce que la scène demande'}\nRéponds uniquement avec le passage.\n</task>`
+        : `<task>\nA passage is missing between <before> and <after>. Write it so it joins them seamlessly.\nWhat it must hold: ${dir || 'whatever the scene needs'}\nReply with the passage only.\n</task>`,
     ].filter(Boolean).join('\n\n')
   }
   const storyBlock = story.before.trim()

@@ -1,15 +1,16 @@
 // Settings, as tabs on the left: Appearance, Manuscript, Writing, Claude,
 // This book (when one is open), About.
 import { useState } from 'react'
-import { BookMarked, Bot, Info, Palette, PenLine, Type, Settings as Gear } from 'lucide-react'
+import { BookMarked, Bot, Feather, Info, Palette, PenLine, Type, Settings as Gear } from 'lucide-react'
 import { Dialog, SettingRow, SettingsSection, Switch, ThemePicker } from '../studio-kit/shell.js'
 import { useStore } from '../store'
 import type { ActionId, Effort, Model } from '../lib/types'
 import { useT } from '../i18n'
 import ManuscriptOptions from './ManuscriptOptions'
+import VoiceSettings from './VoiceSettings'
 
 const ACTIONS: [ActionId, string][] = [['continue', 'Continue'], ['rewrite', 'Rewrite selection'], ['beats', 'Beats to prose']]
-type Tab = 'appearance' | 'manuscript' | 'writing' | 'claude' | 'book' | 'about'
+type Tab = 'appearance' | 'manuscript' | 'writing' | 'voice' | 'claude' | 'book' | 'about'
 
 export default function SettingsView({ version }: { version: string }) {
   const book = useStore(s => s.book)
@@ -20,6 +21,7 @@ export default function SettingsView({ version }: { version: string }) {
     ['appearance', 'Appearance', Palette],
     ['manuscript', 'Manuscript', Type],
     ['writing', 'Writing', PenLine],
+    ...(book ? [['voice', 'Voice', Feather] as [Tab, string, typeof Palette]] : []),
     ['claude', 'Claude', Bot],
     ...(book ? [['book', 'This book', BookMarked] as [Tab, string, typeof Palette]] : []),
     ['about', 'About', Info],
@@ -44,6 +46,7 @@ export default function SettingsView({ version }: { version: string }) {
             </SettingsSection>
           )}
           {tab === 'writing' && <WritingTab />}
+          {tab === 'voice' && book && <VoiceSettings />}
           {tab === 'claude' && <ClaudeTab />}
           {tab === 'book' && book && <BookTab />}
           {tab === 'about' && (
@@ -102,6 +105,8 @@ function WritingTab() {
 
 function ClaudeTab() {
   const settings = useStore(s => s.settings)
+  const prefs = useStore(s => s.prefs)
+  const setPrefs = useStore(s => s.setPrefs)
   const exe = useStore(s => s.claudeExe)
   const [path, setPath] = useState(settings.claudePath)
   const t = useT()
@@ -113,6 +118,12 @@ function ClaudeTab() {
           <input className="sk-input pl-wide" placeholder={t('Automatic')} value={path} onChange={e => setPath(e.target.value)} onBlur={save} />
           <button type="button" className="sk-btn sk-btn-sm" onClick={save}>{t('Detect')}</button>
         </div>
+      </SettingRow>
+      <SettingRow label={t('Cheap mode')} description={t('Past this share of your 5-hour limit, every call uses Haiku with low effort and a shorter context. 0 = off.')}>
+        <span className="pl-row">
+          <input className="sk-input pl-num" type="number" min={0} max={100} step={5} value={prefs.cheapAt} onChange={e => setPrefs({ cheapAt: Math.max(0, Math.min(100, Number(e.target.value) || 0)) })} />
+          <span>%</span>
+        </span>
       </SettingRow>
     </SettingsSection>
   )

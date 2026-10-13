@@ -372,3 +372,23 @@ html[data-theme="light"] .pl-shelf-books { box-shadow: 0 10px 14px -12px rgba(0,
 .pl-card-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pl-card-text { flex: 1; padding: 0 12px; font-family: var(--pl-serif); font-size: 13px; color: #4a463f; line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
 .pl-card-foot { padding: 0 12px; font-size: 11px; color: #6f6a5e; }
+
+/* 0.3.0 Your voice: the scorecard under a proposal, the prompt library, voice cards. */
+.pl-scorecard { display: flex; flex-direction: column; gap: 3px; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface-1); }
+.pl-check { display: flex; align-items: center; gap: 6px; font-size: var(--fs-sm); }
+.pl-check.pl-ok { color: var(--text-dim); }
+.pl-check.pl-ok svg { color: var(--success, #6aa56a); }
+.pl-check.pl-bad { color: var(--text); }
+.pl-check.pl-bad svg { color: var(--danger, #c0392b); }
+.pl-scorecard .sk-btn { align-self: flex-start; margin-top: 4px; }
+.pl-cheap { color: var(--accent); }
+.pl-promptlist { display: flex; flex-direction: column; gap: 2px; margin: 6px 0; }
+.pl-promptrow { display: flex; align-items: center; gap: 6px; padding: 3px 6px; border-radius: 6px; }
+.pl-promptrow.pl-active, .pl-promptrow:hover { background: var(--surface-2); }
+.pl-promptlist > .sk-btn { align-self: flex-start; margin-top: 6px; }
+.pl-left { text-align: left; }
+.pl-promptedit { display: flex; flex-direction: column; gap: 6px; }
+.pl-profile { margin-bottom: 12px; }
+.pl-wrap { white-space: normal; text-align: right; }
+.pl-voicecard { display: flex; flex-direction: column; gap: 8px; }
+.pl-span2 { grid-column: 1 / -1; }

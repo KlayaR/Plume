@@ -128,6 +128,8 @@ fn run_claude(
     effort: String,
     system: String,
     message: String,
+    tools: Option<String>,
+    cwd: Option<String>,
 ) -> Result<(), String> {
     // An empty folder of Plume's own, so no CLAUDE.md or project file is ever read.
     let run_dir = app.path().app_local_data_dir().map_err(|e| e.to_string())?.join("run");
@@ -136,8 +138,14 @@ fn run_claude(
     std::fs::write(&sp_file, system).map_err(|e| e.to_string())?;
 
     let mut cmd = Command::new(&exe);
+    // Writing calls get no tools at all; agent tasks get read-only ones (or web search), pre-approved.
+    let tools = tools.unwrap_or_default();
+    cmd.args(["-p", "--safe-mode", "--tools", &tools]);
+    if !tools.is_empty() {
+        cmd.args(["--allowedTools", &tools]);
+    }
     cmd.args([
-        "-p", "--safe-mode", "--tools", "", "--strict-mcp-config", "--disable-slash-commands",
+        "--strict-mcp-config", "--disable-slash-commands",
         "--no-session-persistence", "--output-format", "stream-json",
         "--include-partial-messages", "--verbose", "--model", &model,
     ]);
@@ -145,7 +153,9 @@ fn run_claude(
         cmd.args(["--effort", &effort]);
     }
     cmd.arg("--system-prompt-file").arg(&sp_file);
-    cmd.current_dir(&run_dir)
+    // Agent tasks read the book folder; everything else runs in Plume's empty folder.
+    let work_dir = cwd.filter(|c| Path::new(c).is_dir()).map(PathBuf::from).unwrap_or(run_dir.clone());
+    cmd.current_dir(&work_dir)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());

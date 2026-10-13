@@ -47,6 +47,8 @@ export interface Prefs {
   showStatus: boolean
   /** Page numbers in Page (book) view. */
   pageNumbers: boolean
+  /** Cheap mode: past this % of the 5-hour limit, AI calls use Haiku (0 = off). */
+  cheapAt: number
   /** Version of the saved prefs, for one-time upgrades. */
   v?: number
 }
@@ -66,6 +68,7 @@ export const DEFAULT_PREFS: Prefs = {
   showPov: true,
   showStatus: true,
   pageNumbers: true,
+  cheapAt: 0,
   v: 2,
 }
 

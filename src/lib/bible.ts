@@ -1,7 +1,7 @@
 // Bible entries and scenes as Markdown files with a YAML header.
 import YAML from 'yaml'
-import type { Entry, EntryType, Fact, Include, Scene, SceneStatus } from './types'
-import { ENTRY_TYPES } from './types'
+import type { Entry, EntryType, ExcerptKind, Fact, Include, Scene, SceneStatus, VoiceCard } from './types'
+import { EMPTY_VOICE, ENTRY_TYPES } from './types'
 
 export function splitFrontmatter(text: string): { data: Record<string, unknown>; body: string } {
   const t = text.replace(/^﻿/, '').replace(/\r\n/g, '\n')
@@ -39,26 +39,34 @@ function sections(body: string): Record<string, string> {
   return out
 }
 
-const FACT_RE = /^\[(?:ch(?:ap)?\.?)\s*(\d+)\s*(?:(?:[–—-]\s*(\d+))|(\+))?\s*\]\s*/i
+// [ch 3–8], [ch 12+], [ch 5]; in a series also [b2 ch 3+] or [b2] (book 2 of the series).
+const FACT_RE = /^\[\s*(?:(?:b|book|livre|t|tome)\.?\s*(\d+)\s*)?(?:(?:ch(?:ap)?\.?)\s*(\d+)\s*(?:(?:[–—-]\s*(\d+))|(\+))?)?\s*\]\s*/i
 
 export function parseFact(line: string): Fact | null {
   const text = line.replace(/^\s*[-*]\s*/, '').trim()
   if (!text) return null
   const m = FACT_RE.exec(text)
-  if (!m) return { from: null, to: null, text }
-  const from = Number(m[1])
-  const to = m[3] ? null : m[2] ? Number(m[2]) : from
-  return { from, to, text: text.slice(m[0].length).trim() }
+  if (!m || (!m[1] && !m[2])) return { from: null, to: null, text }
+  const book = m[1] ? Number(m[1]) : null
+  const from = m[2] ? Number(m[2]) : null
+  const to = m[4] || from === null ? null : m[3] ? Number(m[3]) : from
+  return { from, to, ...(book ? { book } : {}), text: text.slice(m[0].length).trim() }
 }
 
 export function formatFact(f: Fact): string {
-  if (f.from === null && f.to === null) return `- ${f.text}`
-  const range = f.to === null ? `${f.from}+` : f.to === f.from ? `${f.from}` : `${f.from}–${f.to}`
-  return `- [ch ${range}] ${f.text}`
+  if (f.from === null && f.to === null && !f.book) return `- ${f.text}`
+  const range = f.from === null ? '' : f.to === null ? `ch ${f.from}+` : f.to === f.from ? `ch ${f.from}` : `ch ${f.from}–${f.to}`
+  return `- [${[f.book ? `b${f.book}` : '', range].filter(Boolean).join(' ')}] ${f.text}`
 }
 
-export const factApplies = (f: Fact, chapter: number) =>
-  (f.from === null || chapter >= f.from) && (f.to === null || chapter <= f.to)
+/**
+ * Is the fact true at this chapter of this book of the series? A fact dated in
+ * an earlier book stays true afterwards only when its range is open-ended.
+ */
+export function factApplies(f: Fact, chapter: number, bookIndex = 1): boolean {
+  if (f.book && f.book !== bookIndex) return f.book < bookIndex && f.to === null
+  return (f.from === null || chapter >= f.from) && (f.to === null || chapter <= f.to)
+}
 
 export function parseEntry(path: string, text: string): Entry {
   const { data, body } = splitFrontmatter(text)
@@ -67,8 +75,17 @@ export function parseEntry(path: string, text: string): Entry {
   const byFolder = ENTRY_TYPES.find(t => t.folder && t.folder === folder)?.type
   const type = (ENTRY_TYPES.some(t => t.type === data.type) ? data.type : path === 'bible/style.md' ? 'style' : byFolder ?? 'lore') as EntryType
   const s = sections(body)
-  const include = (['auto', 'always', 'never'].includes(String(data.include)) ? data.include : type === 'style' ? 'always' : 'auto') as Include
+  const include = (['auto', 'always', 'never', 'secret'].includes(String(data.include)) ? data.include : type === 'style' ? 'always' : 'auto') as Include
+  const str = (v: unknown) => (v === undefined || v === null ? undefined : String(v))
+  const voice = data.voice && typeof data.voice === 'object' ? { ...EMPTY_VOICE, ...Object.fromEntries(Object.entries(data.voice as object).map(([k, v]) => [k, String(v ?? '')])) } as VoiceCard : undefined
   return {
+    voice,
+    knows: str(data.knows),
+    unaware: str(data.unaware),
+    image: str(data.image),
+    kind: (['any', 'dialogue', 'action', 'description', 'introspection'].includes(String(data.kind)) ? data.kind : undefined) as ExcerptKind | undefined,
+    resolved: data.resolved === true ? true : undefined,
+    extra: rest(data, ENTRY_KEYS),
     slug,
     type,
     path,
@@ -83,11 +100,17 @@ export function parseEntry(path: string, text: string): Entry {
   }
 }
 
+const ENTRY_KEYS = ['type', 'name', 'aliases', 'include', 'links', 'voice', 'knows', 'unaware', 'image', 'kind', 'resolved']
+const SCENE_KEYS = ['id', 'title', 'pov', 'status', 'note', 'time', 'place', 'lines', 'summary', 'summaryOf', 'comments']
+const rest = (data: Record<string, unknown>, known: string[]) => Object.fromEntries(Object.entries(data).filter(([k]) => !known.includes(k)))
+const filled = (v: VoiceCard | undefined) => (v && Object.values(v).some(x => x.trim()) ? v : undefined)
+
 export function serializeEntry(e: Entry): string {
   const data: Record<string, unknown> = { type: e.type, name: e.name }
   if (e.aliases.length) data.aliases = e.aliases
   data.include = e.include
   if (e.links.length) data.links = e.links
+  Object.assign(data, { voice: filled(e.voice), knows: e.knows, unaware: e.unaware, image: e.image, kind: e.kind, resolved: e.resolved }, e.extra)
   const body = [
     `## Short\n${e.short.trim()}`,
     `## Full\n${e.full.trim()}`,
@@ -106,9 +129,24 @@ export function parseScene(path: string, text: string): Scene {
     pov: data.pov ? String(data.pov) : null,
     status,
     text: body.replace(/^\n/, ''),
+    note: data.note ? String(data.note) : undefined,
+    time: data.time ? String(data.time) : undefined,
+    place: data.place ? String(data.place) : null,
+    lines: asList(data.lines),
+    summary: data.summary ? String(data.summary) : undefined,
+    summaryOf: data.summaryOf ? String(data.summaryOf) : undefined,
+    comments: Array.isArray(data.comments)
+      ? (data.comments as Record<string, unknown>[]).map(c => ({ id: String(c.id ?? ''), quote: String(c.quote ?? ''), text: String(c.text ?? ''), date: String(c.date ?? '') }))
+      : [],
+    extra: rest(data, SCENE_KEYS),
   }
 }
 
 export function serializeScene(s: Scene): string {
-  return joinFrontmatter({ id: s.id, title: s.title, pov: s.pov ?? undefined, status: s.status }, `\n${s.text}`)
+  return joinFrontmatter({
+    id: s.id, title: s.title, pov: s.pov ?? undefined, status: s.status,
+    note: s.note, time: s.time, place: s.place ?? undefined, lines: s.lines?.length ? s.lines : undefined,
+    summary: s.summary, summaryOf: s.summaryOf, comments: s.comments?.length ? s.comments : undefined,
+    ...s.extra,
+  }, `\n${s.text}`)
 }

@@ -2,7 +2,7 @@
 // to it is relative to the book folder; the native side refuses anything else.
 import { invoke } from '@tauri-apps/api/core'
 import type { Book, BookMeta, Chapter, Entry, EntryType, Lang, Scene } from './types'
-import { DEFAULT_AI, typeInfo } from './types'
+import { DEFAULT_AI, DEFAULT_RULES, DEFAULT_VOICE, typeInfo } from './types'
 import { joinFrontmatter, parseEntry, parseScene, serializeEntry, serializeScene, splitFrontmatter } from './bible'
 import { newId, slugify } from './text'
 
@@ -24,11 +24,20 @@ function normalizeMeta(raw: Partial<BookMeta>): BookMeta {
     language: raw.language === 'en' ? 'en' : 'fr',
     order: Array.isArray(raw.order) ? raw.order : [],
     ai,
+    voice: { ...DEFAULT_VOICE, ...(raw.voice ?? {}), rules: { ...DEFAULT_RULES, ...(raw.voice?.rules ?? {}) } },
+    structure: raw.structure ?? { template: '', beats: [] },
+    loose: Array.isArray(raw.loose) ? raw.loose : [],
+    history: raw.history ?? {},
+    goal: { book: 80000, daily: 500, ...(raw.goal ?? {}) },
+    series: raw.series ?? null,
+    map: raw.map ?? null,
+    summary: raw.summary,
   }
 }
 
 async function readChapter(root: string, folder: string, files: string[]): Promise<Chapter> {
   let id = folder, title = folder, notes = ''
+  let summary: string | undefined, summaryOf: string | undefined
   let kind: Chapter['kind'] = 'chapter'
   try {
     const { data, body } = splitFrontmatter(await read(root, `manuscript/${folder}/chapter.md`))
@@ -36,13 +45,14 @@ async function readChapter(root: string, folder: string, files: string[]): Promi
     // An untitled chapter stays untitled; the folder name is only for a missing chapter.md.
     title = String(data.title ?? '')
     if (data.kind === 'prologue' || data.kind === 'epilogue') kind = data.kind
+    if (data.summary) { summary = String(data.summary); summaryOf = String(data.summaryOf ?? '') }
     notes = body.trim()
   } catch { /* chapter.md missing: keep the folder name */ }
   const scenes: Scene[] = []
   for (const f of files) {
     try { scenes.push(parseScene(`manuscript/${folder}/${f}`, await read(root, `manuscript/${folder}/${f}`))) } catch { /* moved away */ }
   }
-  return { id, folder, kind, title, notes, scenes }
+  return { id, folder, kind, title, notes, summary, summaryOf, scenes }
 }
 
 export async function loadBook(root: string): Promise<Book> {
@@ -75,7 +85,7 @@ export const saveMeta = (book: Book) =>
 export const saveScene = (root: string, s: Scene) => write(root, s.path, serializeScene(s))
 export const saveEntry = (root: string, e: Entry) => write(root, e.path, serializeEntry(e))
 export const saveChapter = (root: string, c: Chapter) =>
-  write(root, `manuscript/${c.folder}/chapter.md`, joinFrontmatter({ id: c.id, title: c.title, kind: c.kind === 'chapter' ? undefined : c.kind }, c.notes ? `\n${c.notes}\n` : '\n'))
+  write(root, `manuscript/${c.folder}/chapter.md`, joinFrontmatter({ id: c.id, title: c.title, kind: c.kind === 'chapter' ? undefined : c.kind, summary: c.summary, summaryOf: c.summaryOf }, c.notes ? `\n${c.notes}\n` : '\n'))
 
 const unique = (base: string, taken: Set<string>) => {
   let s = base, i = 2
@@ -87,7 +97,7 @@ export function makeEntry(book: Book, type: EntryType, name: string): Entry {
   const info = typeInfo(type)
   const slug = unique(slugify(name), new Set(book.entries.map(e => e.slug)))
   return {
-    slug, type, name, aliases: [], include: 'auto', links: [], short: '', facts: [],
+    slug, type, name, aliases: [], include: 'auto', links: [], short: '', facts: [], extra: {},
     path: `bible/${info.folder}/${slug}.md`,
     full: info.headings[book.meta.language].map(h => `### ${h}\n`).join('\n'),
   }
@@ -101,7 +111,7 @@ export function makeChapter(book: Book, title: string): Chapter {
 export function makeScene(chapter: Chapter, title: string): Scene {
   const taken = new Set(chapter.scenes.map(s => s.path.split('/').pop()!.replace(/\.md$/, '')))
   const file = unique(`sc-${slugify(title)}`, taken)
-  return { id: newId(), path: `manuscript/${chapter.folder}/${file}.md`, title, pov: null, status: 'draft', text: '' }
+  return { id: newId(), path: `manuscript/${chapter.folder}/${file}.md`, title, pov: null, status: 'draft', text: '', extra: {} }
 }
 
 const STYLE: Record<Lang, string> = {
@@ -112,7 +122,7 @@ const STYLE: Record<Lang, string> = {
 export async function createBook(root: string, title: string, author: string, language: Lang): Promise<Book> {
   if (await isBook(root)) throw new Error('This folder already holds a book.')
   const meta = normalizeMeta({ title, author, language })
-  const style: Entry = { slug: 'style', type: 'style', path: 'bible/style.md', name: language === 'fr' ? 'Guide de style' : 'Style guide', aliases: [], include: 'always', links: [], short: '', full: STYLE[language], facts: [] }
+  const style: Entry = { slug: 'style', type: 'style', path: 'bible/style.md', name: language === 'fr' ? 'Guide de style' : 'Style guide', aliases: [], include: 'always', links: [], short: '', full: STYLE[language], facts: [], extra: {} }
   const book: Book = { root, meta, entries: [style], chapters: [] }
   const ch = makeChapter(book, language === 'fr' ? 'Chapitre 1' : 'Chapter 1')
   ch.scenes.push(makeScene(ch, language === 'fr' ? 'Scène 1' : 'Scene 1'))

@@ -1,12 +1,14 @@
 // Right panel: the three AI actions, the size meter, and the bible entries
 // that will be sent, each droppable or switchable between short and full.
 import { useMemo, useState } from 'react'
-import { Check, Eye, RotateCcw, Send, Square, X } from 'lucide-react'
+import { Check, CircleCheck, CircleX, Eye, RotateCcw, Send, Square, Wand2, X } from 'lucide-react'
 import { Dialog } from '../studio-kit/shell.js'
 import { useStore } from '../store'
 import type { ActionId, Effort, Model } from '../lib/types'
 import type { Override } from '../lib/context'
-import { accept, currentContext, discard, retry, runAction, stopAction, useAI } from '../editor/actions'
+import { accept, currentContext, discard, retry, retryFixing, runAction, stopAction, useAI } from '../editor/actions'
+import { allPrompts } from '../lib/voice'
+import { isCheap } from '../ai'
 import { numLocale, useT } from '../i18n'
 
 /** Reasons come from the context engine in English; shown in the interface language. */
@@ -17,7 +19,8 @@ function reasonText(r: string, t: ReturnType<typeof useT>) {
   return t(r)
 }
 
-const LABELS: Record<ActionId, { tab: string; button: string; hint: string }> = {
+type Tab = 'continue' | 'rewrite' | 'beats'
+const LABELS: Record<Tab, { tab: string; button: string; hint: string }> = {
   continue: { tab: 'Continue', button: 'Continue', hint: 'Optional direction, e.g. "she refuses, coldly"' },
   rewrite: { tab: 'Rewrite', button: 'Rewrite selection', hint: 'How to rewrite, e.g. "tighter, more tension"' },
   beats: { tab: 'Beats', button: 'Write from beats', hint: 'One beat per line' },
@@ -30,12 +33,18 @@ export default function ContextPanel() {
   const tick = useStore(s => s.editorTick)
   const running = useAI(s => s.running)
   const hasProposal = useAI(s => s.hasProposal)
-  const [action, setAction] = useState<ActionId>('continue')
-  const [text, setText] = useState<Record<ActionId, string>>({ continue: '', rewrite: '', beats: '' })
+  const checks = useAI(s => s.checks)
+  const [action, setAction] = useState<Tab>('continue')
+  const [text, setText] = useState<Record<Tab, string>>({ continue: '', rewrite: '', beats: '' })
   const [overrides, setOverrides] = useState<Record<string, Override>>({})
   const [preview, setPreview] = useState(false)
-  const instruction = text[action]
+  // Beats to prose falls back on the plan card's note when no beats are written.
+  const sceneNote = useStore(s => s.book?.chapters.flatMap(c => c.scenes).find(x => x.id === s.sceneId)?.note ?? '')
+  const instruction = action === 'beats' && !text.beats.trim() ? sceneNote : text[action]
   const t = useT()
+  const prompts = allPrompts()
+  const voice = book.meta.voice
+  const setActionPrompt = (id: string) => useStore.getState().updateMeta({ voice: { ...voice, actionPrompts: { ...voice.actionPrompts, [action]: id || undefined } } })
 
   const ctx = useMemo(
     () => currentContext(action, instruction, overrides),
@@ -56,7 +65,7 @@ export default function ContextPanel() {
   return (
     <aside className="pl-context">
       <div className="sk-segmented pl-actions" role="group" aria-label={t('AI action')}>
-        {(Object.keys(LABELS) as ActionId[]).map(a => (
+        {(Object.keys(LABELS) as Tab[]).map(a => (
           <button key={a} type="button" aria-pressed={action === a} onClick={() => setAction(a)}>{t(LABELS[a].tab)}</button>
         ))}
       </div>
@@ -64,8 +73,8 @@ export default function ContextPanel() {
       <textarea
         className="sk-input pl-instruction"
         rows={action === 'beats' ? 6 : 3}
-        placeholder={t(LABELS[action].hint) + ' · ' + t('@Name sends the full entry')}
-        value={instruction}
+        placeholder={action === 'beats' && sceneNote ? sceneNote : t(LABELS[action].hint) + ' · ' + t('@Name sends the full entry')}
+        value={text[action]}
         onChange={e => setText(t => ({ ...t, [action]: e.target.value }))}
         onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); runAction(action, instruction, overrides) } }}
       />
@@ -78,6 +87,13 @@ export default function ContextPanel() {
           <option value="low">{t('Low')}</option><option value="medium">{t('Medium')}</option><option value="high">{t('High')}</option>
         </select>
       </div>
+      <div className="pl-row">
+        <select className="sk-select sk-btn-sm" value={voice.actionPrompts[action as ActionId] ?? ''} onChange={e => setActionPrompt(e.target.value)} aria-label={t('Prompt')} title={t('Instructions from your prompt library for this action')}>
+          <option value="">{t('Prompt')} : {voice.prompt ? (prompts.find(p => p.id === voice.prompt)?.name ?? '–') + ' ' + t('(book)') : t('None')}</option>
+          {prompts.map(p => <option key={p.id} value={p.id}>{t('Prompt')} : {p.preset ? t(p.name) : p.name}</option>)}
+        </select>
+      </div>
+      {isCheap() && <p className="sk-hint pl-cheap">{t('Cheap mode: past your usage threshold, calls use Haiku.')}</p>}
       <div className="pl-send">
         {running ? (
           <button type="button" className="sk-btn sk-btn-danger" onClick={stopAction}><Square size={14} /> {t('Stop')}</button>
@@ -93,9 +109,29 @@ export default function ContextPanel() {
           <span>{t('Proposal')}</span>
           <span className="pl-grow" />
           <button type="button" className="sk-btn sk-btn-sm sk-btn-primary" onClick={accept} title="Tab"><Check size={14} /> {t('Accept')}</button>
-          <button type="button" className="sk-btn sk-btn-sm" onClick={retry}><RotateCcw size={14} /> {t('Retry')}</button>
+          <button type="button" className="sk-btn sk-btn-sm" onClick={() => retry()}><RotateCcw size={14} /> {t('Retry')}</button>
           <button type="button" className="sk-btn sk-btn-sm sk-btn-ghost" onClick={discard} title="Esc"><X size={14} /> {t('Discard')}</button>
         </div>
+      )}
+
+      {hasProposal && !running && checks.length > 0 && (
+        <section className="pl-scorecard" aria-label={t('Your rules')}>
+          <div className="pl-row">
+            <span className="sk-label">{t('Your rules')}</span>
+            <span className="pl-grow" />
+            <span className="sk-num">{checks.filter(c => c.ok).length} / {checks.length}</span>
+          </div>
+          {checks.map(c => (
+            <div key={c.id} className={`pl-check ${c.ok ? 'pl-ok' : 'pl-bad'}`} title={c.ok ? '' : c.fix}>
+              {c.ok ? <CircleCheck size={13} /> : <CircleX size={13} />}
+              <span className="pl-grow">{t(c.label)}</span>
+              <span className="sk-num">{c.detail}</span>
+            </div>
+          ))}
+          {checks.some(c => !c.ok) && (
+            <button type="button" className="sk-btn sk-btn-sm" onClick={retryFixing}><Wand2 size={14} /> {t('Retry fixing these')}</button>
+          )}
+        </section>
       )}
 
       {ctx && (

@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { ask } from '@tauri-apps/plugin-dialog'
 import { Plus, Search, Trash2, X } from 'lucide-react'
 import { useStore } from '../store'
-import { ENTRY_TYPES, typeInfo, type Entry, type EntryType, type Include } from '../lib/types'
+import { EMPTY_VOICE, ENTRY_TYPES, typeInfo, type Entry, type EntryType, type ExcerptKind, type Include, type VoiceCard } from '../lib/types'
 import { formatFact, parseFact } from '../lib/bible'
 import { buildMatcher, findMentions } from '../lib/context'
 import { foldText } from '../lib/text'
@@ -71,6 +71,7 @@ export default function BibleView() {
                     <span>{e.name}</span>
                     {e.include === 'always' && ty.type !== 'style' && <span className="sk-badge sk-badge-accent">{t('always')}</span>}
                     {e.include === 'never' && <span className="sk-badge">{t('never')}</span>}
+                    {e.include === 'secret' && <span className="sk-badge">{t('secret')}</span>}
                   </button>
                 ))}
               </div>
@@ -89,6 +90,8 @@ function EntryEditor({ entry }: { entry: Entry }) {
   const book = useStore(s => s.book)!
   const update = (patch: Partial<Entry>) => useStore.getState().updateEntry(entry.slug, patch)
   const isStyle = entry.type === 'style'
+  // Word lists and excerpts are plain text: no aliases, links, short version or facts.
+  const plain = isStyle || entry.type === 'wordlist' || entry.type === 'excerpt'
   const t = useT()
   const [aliases, setAliases] = useState(entry.aliases.join(', '))
   const [facts, setFacts] = useState(entry.facts.map(formatFact).join('\n'))
@@ -97,7 +100,7 @@ function EntryEditor({ entry }: { entry: Entry }) {
 
   const others = book.entries.filter(e => e.slug !== entry.slug && e.type !== 'style')
   const mentions = useMemo(() => {
-    if (isStyle) return []
+    if (plain) return []
     const m = buildMatcher([entry])
     const out: { id: string; label: string; count: number }[] = []
     book.chapters.forEach((c, ci) => c.scenes.forEach(s => {
@@ -105,7 +108,7 @@ function EntryEditor({ entry }: { entry: Entry }) {
       if (count) out.push({ id: s.id, label: `${ci + 1} · ${s.title}`, count })
     }))
     return out
-  }, [book.chapters, entry, isStyle])
+  }, [book.chapters, entry, plain])
 
   const remove = async () => {
     if (await ask(t('Move "{title}" to the book\'s trash folder?', { title: entry.name }), { title: t('Remove entry'), kind: 'warning' })) useStore.getState().removeEntry(entry.slug)
@@ -119,7 +122,7 @@ function EntryEditor({ entry }: { entry: Entry }) {
         {!isStyle && <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm sk-btn-icon" title={t('Remove entry')} onClick={remove}><Trash2 size={14} /></button>}
       </div>
 
-      {!isStyle && (
+      {!plain && (
         <div className="pl-grid2">
           <div className="sk-field">
             <label htmlFor="ee-aliases">{t('Aliases')}</label>
@@ -133,12 +136,13 @@ function EntryEditor({ entry }: { entry: Entry }) {
               <option value="auto">{t('When mentioned')}</option>
               <option value="always">{t('Always')}</option>
               <option value="never">{t('Never (unless @-mentioned)')}</option>
+              <option value="secret">{t('Secret: never, not even @-mentioned')}</option>
             </select>
           </div>
         </div>
       )}
 
-      {!isStyle && (
+      {!plain && (
         <div className="sk-field">
           <label>{t('Links')}</label>
           <div className="pl-chips">
@@ -157,20 +161,37 @@ function EntryEditor({ entry }: { entry: Entry }) {
         </div>
       )}
 
-      {!isStyle && (
+      {!plain && (
         <div className="sk-field">
           <label htmlFor="ee-short">{t('Short version')}</label>
           <textarea id="ee-short" className="sk-input" rows={2} value={entry.short} onChange={e => update({ short: e.target.value })} placeholder={t('One or two lines, sent by default.')} />
         </div>
       )}
 
+      {entry.type === 'excerpt' && (
+        <div className="sk-field">
+          <label htmlFor="ee-kind">{t('Kind of passage')}</label>
+          <select id="ee-kind" className="sk-select" value={entry.kind ?? 'any'} onChange={e => update({ kind: e.target.value as ExcerptKind })}>
+            <option value="any">{t('Any')}</option>
+            <option value="dialogue">{t('Dialogue')}</option>
+            <option value="action">{t('Action')}</option>
+            <option value="description">{t('Description')}</option>
+            <option value="introspection">{t('Introspection')}</option>
+          </select>
+          <span className="sk-hint">{t('Up to two excerpts are sent with each request, those matching the kind of passage being written first.')}</span>
+        </div>
+      )}
+
       <div className="sk-field">
-        <label htmlFor="ee-full">{t(isStyle ? 'Style guide (always sent)' : 'Full version')}</label>
+        <label htmlFor="ee-full">{t(isStyle ? 'Style guide (always sent)' : entry.type === 'wordlist' ? 'Words and phrases, one per line' : entry.type === 'excerpt' ? 'Your passage (a few hundred words of your own prose)' : 'Full version')}</label>
         <textarea id="ee-full" className="sk-input pl-full" rows={14} value={entry.full} onChange={e => update({ full: e.target.value })} />
-        {!isStyle && <span className="sk-hint">{t("Sent for the scene's POV character, or when you write @{name} in an instruction.", { name: entry.name })}</span>}
+        {!plain && <span className="sk-hint">{t("Sent for the scene's POV character, or when you write @{name} in an instruction.", { name: entry.name })}</span>}
+        {entry.type === 'wordlist' && <span className="sk-hint">{t('Banned from AI text and flagged by the rule checker. In a prompt:')} {`{list.${entry.name}}`}</span>}
       </div>
 
-      {!isStyle && (
+      {entry.type === 'character' && <VoiceEditor entry={entry} update={update} />}
+
+      {!plain && (
         <div className="sk-field">
           <label htmlFor="ee-facts">{t('Facts')}</label>
           <textarea id="ee-facts" className="sk-input" rows={4} value={facts} placeholder={'- [ch 3–8] Carries the sword Aube.\n- [ch 12+] Blind in the left eye.'}
@@ -179,7 +200,7 @@ function EntryEditor({ entry }: { entry: Entry }) {
         </div>
       )}
 
-      {!isStyle && (
+      {!plain && (
         <div className="sk-field">
           <label>{t('Mentions')}</label>
           {mentions.length === 0 ? <span className="sk-hint">{t('Not mentioned in any scene yet.')}</span> : (
@@ -193,6 +214,50 @@ function EntryEditor({ entry }: { entry: Entry }) {
           )}
         </div>
       )}
+    </div>
+  )
+}
+
+const VOICE_FIELDS: [keyof VoiceCard, string, string][] = [
+  ['register', 'Register', 'formal, slangy, clipped, old-fashioned…'],
+  ['sentences', 'Sentence length', 'short and blunt, long and winding…'],
+  ['tic', 'Verbal tic', 'a word or turn of phrase they repeat'],
+  ['gesture', 'Signature gesture', 'what their hands or body do when they talk'],
+  ['never', 'Never says', 'words or topics they avoid'],
+  ['inner', 'Inner voice', 'how their thoughts sound, if they are a POV'],
+  ['lines', 'Sample lines', '3 to 5 lines they could say, one per line'],
+]
+
+/** How the character speaks, and what they know: always sent with them. */
+function VoiceEditor({ entry, update }: { entry: Entry; update: (patch: Partial<Entry>) => void }) {
+  const t = useT()
+  const voice = entry.voice ?? EMPTY_VOICE
+  return (
+    <div className="pl-voicecard">
+      <div className="pl-opt-group">{t('Voice')}</div>
+      <span className="sk-hint">{t('Sent whenever this character is in the scene, even in the short version.')}</span>
+      <div className="pl-grid2">
+        {VOICE_FIELDS.map(([k, label, hint]) => (
+          <div key={k} className={`sk-field ${k === 'lines' ? 'pl-span2' : ''}`}>
+            <label>{t(label)}</label>
+            {k === 'lines'
+              ? <textarea className="sk-input" rows={4} value={voice[k]} placeholder={t(hint)} onChange={e => update({ voice: { ...voice, [k]: e.target.value } })} />
+              : <input className="sk-input" value={voice[k]} placeholder={t(hint)} onChange={e => update({ voice: { ...voice, [k]: e.target.value } })} />}
+          </div>
+        ))}
+      </div>
+      <div className="pl-opt-group">{t('Point of view')}</div>
+      <span className="sk-hint">{t('When this character is the scene’s POV, Claude writes only what they can know.')}</span>
+      <div className="pl-grid2">
+        <div className="sk-field">
+          <label>{t('Knows')}</label>
+          <textarea className="sk-input" rows={3} value={entry.knows ?? ''} onChange={e => update({ knows: e.target.value })} />
+        </div>
+        <div className="sk-field">
+          <label>{t('Doesn’t know')}</label>
+          <textarea className="sk-input" rows={3} value={entry.unaware ?? ''} placeholder={t('Secrets of others, twists to come…')} onChange={e => update({ unaware: e.target.value })} />
+        </div>
+      </div>
     </div>
   )
 }

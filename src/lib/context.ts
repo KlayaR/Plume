@@ -1,10 +1,15 @@
 // The context engine: finds which bible entries a request needs and builds
 // the prompt. Runs locally, costs no tokens. Stable parts go in the system
 // prompt (cached by the CLI for an hour); story text and the task in the message.
-import type { ActionId, Book, Entry, Lang } from './types'
+import type { ActionId, Book, Entry, Lang, Scene } from './types'
 import { factApplies } from './bible'
 import { estimateTokens, fold, lastWords, firstWords } from './text'
 import { taskMessage, systemRules } from './prompts'
+import { expandVariables, promptFor } from './voice'
+import { passageKind } from './analysis'
+
+/** Entry types that are never looked for in the text. */
+const UNNAMED = new Set(['style', 'wordlist', 'excerpt'])
 
 export interface Mention { from: number; to: number; slug: string }
 
@@ -18,7 +23,7 @@ const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 export function buildMatcher(entries: Entry[]): Matcher {
   const aliases: Alias[] = []
   for (const e of entries) {
-    if (e.type === 'style') continue
+    if (UNNAMED.has(e.type)) continue
     const mine: Alias[] = []
     for (const raw of [e.name, ...e.aliases]) {
       const exact = raw.endsWith('!') ? raw.slice(0, -1).trim() : null
@@ -80,6 +85,8 @@ export interface ContextInput {
   selection: string
   after: string
   overrides: Record<string, Override>
+  /** The scene being written: its title, time, place and card note go with the task. */
+  scene?: Scene
 }
 
 export interface Built {
@@ -91,18 +98,65 @@ export interface Built {
   budget: number
 }
 
-function renderEntry(e: Entry, mode: Mode, chapter: number, lang: Lang): string {
+const VOICE_LABELS: Record<Lang, Record<string, string>> = {
+  fr: { register: 'Registre', sentences: 'Phrases', tic: 'Tic de langage', gesture: 'Geste signature', never: 'Ne dit jamais', inner: 'Voix intérieure', lines: 'Répliques types' },
+  en: { register: 'Register', sentences: 'Sentences', tic: 'Verbal tic', gesture: 'Signature gesture', never: 'Never says', inner: 'Inner voice', lines: 'Sample lines' },
+}
+
+/** A character's voice card: sent whenever the character is, in short or full. */
+function voiceBlock(e: Entry, lang: Lang): string {
+  if (!e.voice) return ''
+  const rows = Object.entries(e.voice).filter(([, v]) => v.trim()).map(([k, v]) => `${VOICE_LABELS[lang][k] ?? k} : ${v.trim()}`)
+  return rows.length ? `<voice>\n${rows.join('\n')}\n</voice>` : ''
+}
+
+function renderEntry(e: Entry, mode: Mode, chapter: number, lang: Lang, bookIndex = 1, pov = false): string {
   const aka = e.aliases.filter(a => a !== e.name).map(a => a.replace(/!$/, ''))
-  const head = `<entry type="${e.type}" name="${e.name}"${aka.length ? ` aka="${aka.join(', ')}"` : ''}>`
+  const head = `<entry type="${e.type}" name="${e.name}"${aka.length ? ` aka="${aka.join(', ')}"` : ''}${pov ? ' pov="true"' : ''}>`
   const body = mode === 'full' && e.full.trim() ? [e.short, e.full].filter(s => s.trim()).join('\n\n') : (e.short.trim() || e.full.trim().split('\n\n')[0])
-  const facts = e.facts.filter(f => factApplies(f, chapter)).map(f => `- ${f.text}`)
+  const facts = e.facts.filter(f => factApplies(f, chapter, bookIndex)).map(f => `- ${f.text}`)
   const label = lang === 'fr' ? 'Faits à ce stade de l’histoire :' : 'Facts at this point of the story:'
-  return [head, body.trim(), facts.length ? `${label}\n${facts.join('\n')}` : '', '</entry>'].filter(Boolean).join('\n')
+  // POV awareness: what the point-of-view character knows and doesn't.
+  const knows = pov && e.knows?.trim() ? `${lang === 'fr' ? 'Sait' : 'Knows'} : ${e.knows.trim()}` : ''
+  const unaware = pov && e.unaware?.trim() ? `${lang === 'fr' ? 'Ignore (ne le pense ni ne le devine jamais)' : 'Does not know (never thinks or guesses it)'} : ${e.unaware.trim()}` : ''
+  return [head, body?.trim(), facts.length ? `${label}\n${facts.join('\n')}` : '', knows, unaware, voiceBlock(e, lang), '</entry>'].filter(Boolean).join('\n')
+}
+
+/** Up to two passages of the author's own prose, matching the kind of passage being written. */
+function pickExcerpts(book: Book, before: string): Entry[] {
+  const all = book.entries.filter(e => e.type === 'excerpt' && e.full.trim() && e.include !== 'never' && e.include !== 'secret')
+  if (!all.length) return []
+  const kind = passageKind(lastWords(before, 300), book.meta.language)
+  const match = all.filter(e => e.kind === kind)
+  const rest = all.filter(e => e.kind !== kind && (!e.kind || e.kind === 'any'))
+  return [...match, ...rest].sort((a, b) => a.slug.localeCompare(b.slug)).slice(0, 2)
+}
+
+/** Summaries of what came before this scene, for long books: earlier chapters, then earlier scenes of this one. */
+export function storySoFar(book: Book, sceneId: string, maxTokens = 700): string {
+  const lines: string[] = []
+  for (const c of book.chapters) {
+    const at = c.scenes.findIndex(s => s.id === sceneId)
+    if (at < 0) { if (c.summary) lines.push(`${c.title || '…'} : ${c.summary}`); continue }
+    for (const s of c.scenes.slice(0, at)) if (s.summary) lines.push(`${s.title} : ${s.summary}`)
+    break
+  }
+  const out: string[] = []
+  let used = 0
+  for (const l of lines.reverse()) {
+    used += estimateTokens(l)
+    if (used > maxTokens) break
+    out.unshift(l)
+  }
+  return out.join('\n')
 }
 
 export function storyParts(input: Pick<ContextInput, 'action' | 'before' | 'selection' | 'after'>, windowWords: number) {
   if (input.action === 'rewrite') {
     return { before: lastWords(input.before, Math.min(400, windowWords)), selection: input.selection, after: firstWords(input.after, 150) }
+  }
+  if (input.action === 'fill') {
+    return { before: lastWords(input.before, windowWords), selection: '', after: firstWords(input.after, 300) }
   }
   return { before: lastWords(input.before, windowWords), selection: '', after: '' }
 }
@@ -133,26 +187,28 @@ export function buildContext(input: ContextInput): Built {
   }
 
   for (const e of book.entries) {
-    if (e.type === 'style') continue
+    if (UNNAMED.has(e.type)) continue
     if (e.include === 'always') add(e, 'full', 'always')
   }
   const pov = input.pov ? bySlug.get(input.pov) : undefined
-  if (pov) add(pov, 'full', 'POV')
+  if (pov && pov.include !== 'secret') add(pov, 'full', 'POV')
   for (const [slug, n] of counts) {
     const e = bySlug.get(slug)
-    if (!e || (e.include === 'never' && !atFull.has(slug))) continue
+    if (!e || e.include === 'secret' || (e.include === 'never' && !atFull.has(slug))) continue
     add(e, atFull.has(slug) ? 'full' : 'short', atFull.has(slug) ? '@-mentioned' : `mentioned ${n}×`)
   }
   for (const p of [...picked.values()]) {
     for (const l of bySlug.get(p.slug)?.links ?? []) {
       const e = bySlug.get(l)
-      if (e && e.type !== 'style' && e.include !== 'never') add(e, 'short', `linked from ${p.name}`, true)
+      if (e && !UNNAMED.has(e.type) && e.include !== 'never' && e.include !== 'secret') add(e, 'short', `linked from ${p.name}`, true)
     }
   }
 
   // Budget: drop linked entries first, then switch full versions to short, least-mentioned first.
   const list = [...picked.values()]
-  const size = (p: Picked) => estimateTokens(renderEntry(bySlug.get(p.slug)!, p.mode, chapter, lang))
+  const bookIndex = book.meta.series?.index ?? 1
+  const render = (p: Picked) => renderEntry(bySlug.get(p.slug)!, p.mode, chapter, lang, bookIndex, p.slug === input.pov)
+  const size = (p: Picked) => estimateTokens(render(p))
   const forced = (p: Picked) => p.slug in overrides
   for (const p of list) {
     const o = overrides[p.slug]
@@ -177,15 +233,36 @@ export function buildContext(input: ContextInput): Built {
   const style = book.entries.find(e => e.type === 'style')
   const styleText = style ? [style.short, style.full].filter(s => s.trim()).join('\n\n').trim() : ''
   const kept = list.filter(p => !p.dropped).sort((a, b) => a.slug.localeCompare(b.slug))
-  const bible = kept.map(p => renderEntry(bySlug.get(p.slug)!, p.mode, chapter, lang)).join('\n\n')
-  const rules = systemRules(lang, book.meta.title)
+  const bible = kept.map(render).join('\n\n')
+  const voice = book.meta.voice
+  const rules = systemRules(lang, book.meta.title, { adult: voice.adult, sceneRules: voice.sceneRules, tense: voice.tense })
+  const vars = { book, sceneTitle: input.scene?.title, pov: input.pov, chapter }
+  const prompt = promptFor(book, input.action)
+  const excerpts = input.action === 'rewrite' ? [] : pickExcerpts(book, input.before)
   const system = [
     rules,
-    styleText ? `<style_guide>\n${styleText}\n</style_guide>` : '',
+    prompt ? `<author_instructions>\n${expandVariables(prompt.text, vars)}\n</author_instructions>` : '',
+    voice.description.trim() ? `<author_voice>\n${voice.description.trim()}\n</author_voice>` : '',
+    voice.taste.trim() ? `<author_taste>\n${voice.taste.trim()}\n</author_taste>` : '',
+    styleText ? `<style_guide>\n${expandVariables(styleText, vars)}\n</style_guide>` : '',
+    excerpts.length ? `<author_excerpts>\n${excerpts.map(e => `<excerpt>\n${e.full.trim()}\n</excerpt>`).join('\n')}\n</author_excerpts>` : '',
     bible ? `<bible>\n${bible}\n</bible>` : '',
   ].filter(Boolean).join('\n\n')
 
-  const message = taskMessage(lang, input.action, input.instruction, story, ai)
+  // What happened before, and where and when the scene stands (not for rewrites: the passage is enough).
+  const sc = input.scene
+  const placeName = sc?.place ? bySlug.get(sc.place)?.name ?? sc.place : ''
+  const so = input.action !== 'rewrite' && sc ? storySoFar(book, sc.id) : ''
+  const info = input.action !== 'rewrite' && sc ? [
+    sc.time ? `${lang === 'fr' ? 'Moment' : 'Time'} : ${sc.time}` : '',
+    placeName ? `${lang === 'fr' ? 'Lieu' : 'Place'} : ${placeName}` : '',
+    sc.note?.trim() ? `${lang === 'fr' ? 'Ce qui se passe dans la scène' : 'What happens in the scene'} : ${sc.note.trim()}` : '',
+  ].filter(Boolean).join('\n') : ''
+  const message = [
+    so ? `<story_so_far>\n${so}\n</story_so_far>` : '',
+    info ? `<scene>\n${info}\n</scene>` : '',
+    taskMessage(lang, input.action, input.instruction, story, ai),
+  ].filter(Boolean).join('\n\n')
   const parts = {
     rules: estimateTokens(rules) + 830, // + the CLI's own minimum, measured
     bible: estimateTokens(system) - estimateTokens(rules),

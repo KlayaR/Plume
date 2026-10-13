@@ -6,11 +6,13 @@ import { lastWords, slugify } from './text'
 import { allowedKinds, chapterLabels, enterStartsScene } from './chapters'
 import { countSigns, textStats } from './stats'
 import type { Book, Entry } from './types'
-import { DEFAULT_AI } from './types'
+import { DEFAULT_AI, DEFAULT_VOICE } from './types'
+import { adverbs, passives, echoes } from './analysis'
+import { checkRules, expandVariables } from './voice'
 
 const entry = (over: Partial<Entry>): Entry => ({
   slug: 'x', type: 'character', path: 'bible/characters/x.md', name: 'X', aliases: [], include: 'auto',
-  links: [], short: '', full: '', facts: [], ...over,
+  links: [], short: '', full: '', facts: [], extra: {}, ...over,
 })
 
 const elise = entry({ slug: 'elise', name: 'Élise Varenne', aliases: ['Élise', 'Lise', 'la Duchesse'], links: ['aube'], short: 'Young duchess.', full: 'Long portrait.', facts: [{ from: 3, to: 8, text: 'Carries Aube.' }, { from: 12, to: null, text: 'Blind in the left eye.' }] })
@@ -39,7 +41,7 @@ describe('entry files', () => {
     expect(factApplies({ from: 3, to: 8, text: '' }, 5)).toBe(true)
   })
   it('round-trips a scene', () => {
-    const s = { id: 'a1', path: 'manuscript/c/s.md', title: 'Le bal', pov: 'elise', status: 'draft' as const, text: 'Il pleuvait.\n\nEncore.' }
+    const s = { id: 'a1', path: 'manuscript/c/s.md', title: 'Le bal', pov: 'elise', status: 'draft' as const, text: 'Il pleuvait.\n\nEncore.', place: null, lines: [], comments: [], extra: {} }
     expect(parseScene(s.path, serializeScene(s))).toEqual(s)
   })
 })
@@ -72,7 +74,7 @@ describe('name detection', () => {
 describe('context', () => {
   const book: Book = {
     root: '',
-    meta: { format: 1, title: 'Test', author: '', language: 'en', order: [], ai: { ...DEFAULT_AI } },
+    meta: { format: 1, title: 'Test', author: '', language: 'en', order: [], ai: { ...DEFAULT_AI }, voice: DEFAULT_VOICE, structure: { template: '', beats: [] }, loose: [], history: {}, goal: { book: 0, daily: 0 }, series: null, map: null },
     entries: [elise, aube, rose, maison, varenne, entry({ slug: 'style', type: 'style', path: 'bible/style.md', name: 'Style guide', include: 'always', full: 'Past tense.' })],
     chapters: [],
   }
@@ -174,5 +176,38 @@ describe('text helpers', () => {
   })
   it('slugifies French names', () => {
     expect(slugify('Élise Varenne')).toBe('elise-varenne')
+  })
+})
+
+describe('voice', () => {
+  it('reads facts dated in a book of the series', () => {
+    expect(parseFact('- [b2 ch 3+] Queen.')).toEqual({ from: 3, to: null, book: 2, text: 'Queen.' })
+    expect(factApplies({ from: 3, to: null, book: 2, text: '' }, 1, 3)).toBe(true)
+    expect(factApplies({ from: 3, to: 5, book: 2, text: '' }, 4, 3)).toBe(false)
+  })
+  it('finds French adverbs but not nouns in -ment', () => {
+    const t = 'Il entra lentement dans l’appartement, un moment, puis sourit doucement.'
+    expect(adverbs(t, 'fr').map(f => t.slice(f.from, f.to))).toEqual(['lentement', 'doucement'])
+  })
+  it('finds passives but not être + state verbs', () => {
+    expect(passives('La porte fut ouverte par le vent.', 'fr').length).toBe(1)
+    expect(passives('Elle est allée au bal.', 'fr').length).toBe(0)
+    expect(passives('The door was opened by the wind.', 'en').length).toBe(1)
+  })
+  it('flags echoes', () => {
+    expect(echoes('Le regard de Marc croisa son regard.', 'fr').length).toBe(1)
+  })
+  const vbook: Book = {
+    root: '', chapters: [],
+    meta: { format: 1, title: 'T', author: 'A', language: 'en', order: [], ai: { ...DEFAULT_AI }, voice: { ...DEFAULT_VOICE, tense: 'present tense' }, structure: { template: '', beats: [] }, loose: [], history: {}, goal: { book: 0, daily: 0 }, series: null, map: null },
+    entries: [entry({ slug: 'ai-isms', type: 'wordlist', name: 'AI-isms', full: 'tapestry\ndelve' })],
+  }
+  it('fills variables', () => {
+    expect(expandVariables('In {book.tense}, avoid {list.AI-isms}.', { book: vbook })).toBe('In present tense, avoid tapestry, delve.')
+  })
+  it('scores a proposal', () => {
+    const c = Object.fromEntries(checkRules('A rich tapestry of light. He walked slowly and quietly and softly.', vbook).map(x => [x.id, x.ok]))
+    expect(c.banned).toBe(false)
+    expect(c.adverbs).toBe(false)
   })
 })

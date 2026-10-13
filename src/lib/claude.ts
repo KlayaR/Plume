@@ -76,7 +76,7 @@ function finish(id: string, code: number | null, stderr: string) {
 export const findClaude = (custom: string) => invoke<string | null>('find_claude', { custom: custom || null })
 
 export async function runClaude(
-  opts: { exe: string; model: Model; effort: Effort; system: string; message: string },
+  opts: { exe: string; model: Model; effort: Effort; system: string; message: string; tools?: string; cwd?: string },
   onText: (t: string) => void,
   onDone: (r: Result) => void,
 ): Promise<string> {
@@ -84,7 +84,7 @@ export async function runClaude(
   const id = newId() + newId()
   runs.set(id, { text: '', stopped: false, onText, onDone })
   try {
-    await invoke('run_claude', { id, ...opts })
+    await invoke('run_claude', { id, ...opts, tools: opts.tools ?? null, cwd: opts.cwd ?? null })
   } catch (e) {
     runs.delete(id)
     onDone({ ok: false, text: '', error: String(e) })
