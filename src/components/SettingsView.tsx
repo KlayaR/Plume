@@ -98,6 +98,9 @@ function WritingTab() {
       <SettingRow label={t('Enter, Enter, Enter')} description={t('At the end of a scene, Enter twice starts a new scene, three times a new chapter')}>
         <Switch checked={prefs.enterBreaks} onChange={v => setPrefs({ enterBreaks: v })} label={t('Enter, Enter, Enter')} />
       </SettingRow>
+      <SettingRow label={t('Typewriter scrolling')} description={t('The line you are writing stays in the middle of the screen, so your eyes stay still.')}>
+        <Switch checked={prefs.typewriter} onChange={v => setPrefs({ typewriter: v })} label={t('Typewriter scrolling')} />
+      </SettingRow>
       <SettingRow label={t('Chapters pane')} description={t('Pinned open, or sliding in from the left edge')}>
         <Switch checked={prefs.pinLeft} onChange={v => setPrefs({ pinLeft: v })} label={t('Chapters pane')} />
       </SettingRow>
@@ -124,7 +127,7 @@ function SpellSection() {
   const publicServer = /languagetool(plus)?\.(org|com)/.test(prefs.ltServer || LT_DEFAULT)
   const words = book?.meta.dictionary ?? []
   return (
-    <SettingsSection title={t('Spelling and grammar')} description={t('Used in Review mode, never while you write.')}>
+    <SettingsSection title={t('Spelling and grammar')} description={t('Used in Review mode, and while you write if you turn that on.')}>
       <SettingRow label={t('Checker')} description={t('Windows’ spellchecker only knows the languages installed in Windows, which may not be the book’s. LanguageTool always checks in the book’s language.')}>
         <select className="sk-select" value={prefs.spell} onChange={e => setPrefs({ spell: e.target.value as typeof prefs.spell })}>
           <option value="languagetool">LanguageTool</option>
@@ -134,6 +137,9 @@ function SpellSection() {
       </SettingRow>
       {prefs.spell === 'languagetool' && (
         <>
+          <SettingRow label={t('Check while writing')} description={t('Off by default. When on, the scene’s text is sent to the server a moment after you stop typing, in Write mode too.')}>
+            <Switch checked={prefs.ltLive} onChange={v => setPrefs({ ltLive: v })} label={t('Check while writing')} />
+          </SettingRow>
           <SettingRow label={t('LanguageTool server')} description={publicServer ? t('The public server: free, about 20 checks a minute, and the scene’s text is sent to it. A server running on your own computer keeps everything private.') : t('Your own server.')}>
             <input className="sk-input pl-wide" value={prefs.ltServer} placeholder={LT_DEFAULT} onChange={e => setPrefs({ ltServer: e.target.value })} />
           </SettingRow>

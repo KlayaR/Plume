@@ -1,7 +1,7 @@
 // The context engine: finds which bible entries a request needs and builds
 // the prompt. Runs locally, costs no tokens. Stable parts go in the system
 // prompt (cached by the CLI for an hour); story text and the task in the message.
-import type { ActionId, Book, Entry, Lang, Scene } from './types'
+import { isRewrite, type ActionId, type Book, type Entry, type Lang, type Scene } from './types'
 import { factApplies } from './bible'
 import { estimateTokens, fold, lastWords, firstWords } from './text'
 import { taskMessage, systemRules } from './prompts'
@@ -152,7 +152,7 @@ export function storySoFar(book: Book, sceneId: string, maxTokens = 700): string
 }
 
 export function storyParts(input: Pick<ContextInput, 'action' | 'before' | 'selection' | 'after'>, windowWords: number) {
-  if (input.action === 'rewrite') {
+  if (isRewrite(input.action)) {
     return { before: lastWords(input.before, Math.min(400, windowWords)), selection: input.selection, after: firstWords(input.after, 150) }
   }
   if (input.action === 'fill') {
@@ -238,7 +238,7 @@ export function buildContext(input: ContextInput): Built {
   const rules = systemRules(lang, book.meta.title, { adult: voice.adult, sceneRules: voice.sceneRules, tense: voice.tense })
   const vars = { book, sceneTitle: input.scene?.title, pov: input.pov, chapter }
   const prompt = promptFor(book, input.action)
-  const excerpts = input.action === 'rewrite' ? [] : pickExcerpts(book, input.before)
+  const excerpts = isRewrite(input.action) ? [] : pickExcerpts(book, input.before)
   const system = [
     rules,
     prompt ? `<author_instructions>\n${expandVariables(promptText(prompt, lang), vars)}\n</author_instructions>` : '',
@@ -252,8 +252,8 @@ export function buildContext(input: ContextInput): Built {
   // What happened before, and where and when the scene stands (not for rewrites: the passage is enough).
   const sc = input.scene
   const placeName = sc?.place ? bySlug.get(sc.place)?.name ?? sc.place : ''
-  const so = input.action !== 'rewrite' && sc ? storySoFar(book, sc.id) : ''
-  const info = input.action !== 'rewrite' && sc ? [
+  const so = !isRewrite(input.action) && sc ? storySoFar(book, sc.id) : ''
+  const info = !isRewrite(input.action) && sc ? [
     sc.time ? `${lang === 'fr' ? 'Moment' : 'Time'} : ${sc.time}` : '',
     placeName ? `${lang === 'fr' ? 'Lieu' : 'Place'} : ${placeName}` : '',
     sc.note?.trim() ? `${lang === 'fr' ? 'Ce qui se passe dans la scène' : 'What happens in the scene'} : ${sc.note.trim()}` : '',

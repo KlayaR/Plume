@@ -28,3 +28,4 @@ README.md first (features, book folder format, how AI calls stay small).
 - `src/*.ts` at the top: stores and AI tasks (`ai.ts` one-shot calls and cheap mode, `chat.ts`, `writing.ts`, `review.ts`, `library.ts`, `agents.ts`).
 - `src/editor/marks.ts`: editor overlays (unknown names, placeholders, highlights, tracked changes).
 - 0.3.0 – 0.9.0 were built in one pass (see README); the user tests and reports bugs next.
+- 1.0.0 adds the fantasy defaults (`lib/defaults.ts`), find/replace (`lib/find.ts`), reference books (`lib/references.ts`), speakers (`lib/speakers.ts`), snapshots (`lib/snapshots.ts`), revision passes (`lib/revision.ts`) and the Dashboard, Tension, Outline, Synonym and Snapshots components.

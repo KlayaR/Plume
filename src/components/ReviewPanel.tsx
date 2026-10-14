@@ -10,6 +10,8 @@ import { CATEGORIES, review, type ReportResult } from '../lib/review'
 import { getEditorView } from '../editor/actions'
 import { betaCost, betaRead, continuityCheck, continuityCost, lineEdit, lineEditCost, loadVoices, PERSONAS, readAloud, stopReading, useReview, voiceCheck, voiceCheckCost, voicesFor } from '../review'
 import { refreshLT, useLT } from '../editor/lt'
+import { referenceTargets, useRefs } from '../lib/references'
+import { speakerStats } from '../lib/speakers'
 import { numLocale, useT } from '../i18n'
 
 const n = (x: number, d = 0) => x.toLocaleString(numLocale(), { maximumFractionDigits: d, minimumFractionDigits: d })
@@ -26,7 +28,9 @@ export default function ReviewPanel() {
   const [open, setOpen] = useState<string | null>('strong')
   const t = useT()
   const text = scope === 'scene' ? scene.text : chapter.scenes.map(s => s.text).join('\n')
-  const r = useMemo(() => review(text, book), [text, book])
+  const refList = useRefs(s => s.list)
+  const refs = useMemo(() => referenceTargets(refList, book.meta.language), [refList, book.meta.language])
+  const r = useMemo(() => review(text, book, refs?.rates), [text, book, refs])
   // Leaving Review takes the highlights away.
   useEffect(() => () => useReview.setState({ report: null }), [])
 
@@ -61,6 +65,7 @@ export default function ReviewPanel() {
               <ChevronDown size={14} className={open === c.id ? 'pl-rot' : ''} />
             </button>
             {open === c.id && rs.map(x => <ReportRow key={x.def.id} r={x} active={report === x.def.id} />)}
+            {open === c.id && refs && c.id === rs[0]?.def.category && <span className="sk-hint">{t('Targets from your {n} reference books.', { n: refs.count })}</span>}
             {open === c.id && c.id === 'repetition' && r.overused.length > 0 && (
               <div className="pl-overused">
                 <span className="sk-hint">{t('Most used words')}</span>
@@ -89,15 +94,57 @@ export default function ReviewPanel() {
               <dt>{t('Dialogue')}</dt><dd>{n(r.dialogueShare * 100)} %</dd>
             </dl>
             <span className="sk-hint">{t('Reading ease (Flesch; Kandel–Moles in French): 60–80 reads as plain prose, below 50 asks effort.')}</span>
+            {refs && <span className="sk-hint">{t('Your reference books: reading ease {r}, sentences of {s} words, {d} % dialogue.', { r: n(refs.readability), s: n(refs.avgSentence, 1), d: n(refs.dialogueShare * 100) })}</span>}
             <Rhythm lengths={r.sentenceLengths} />
           </div>
         )}
       </section>
 
+      <Speakers text={text} />
+
       <AIChecks sceneId={scene.id} chapterId={chapter.id} chapterText={chapter.scenes.map(s => s.text).join('\n')} />
       <ReadAloud />
       <Figures scene={scene.text} chapter={chapter.scenes.map(s => s.text).join('\n')} label={label} />
     </aside>
+  )
+}
+
+/** Who says what: lines, length and tics per character, and what a voice card says they never say. */
+function Speakers({ text }: { text: string }) {
+  const book = useStore(s => s.book)!
+  const t = useT()
+  const [open, setOpen] = useState(false)
+  const list = useMemo(() => open ? speakerStats(text, book) : [], [open, text, book])
+  const jump = (from: number, to: number) => {
+    const v = getEditorView()
+    if (!v) return
+    // The text analysed is the scene or chapter shown; a jump works when it is the scene in the editor.
+    if (v.state.doc.toString() === text) { v.dispatch({ selection: { anchor: from, head: to }, scrollIntoView: true }); v.focus() }
+  }
+  return (
+    <section className="pl-cat">
+      <button type="button" className="pl-cat-head" onClick={() => setOpen(!open)} aria-expanded={open}>
+        <Users size={14} />
+        <span className="pl-grow">{t('Who says what')}</span>
+        <ChevronDown size={14} className={open ? 'pl-rot' : ''} />
+      </button>
+      {open && (list.length === 0
+        ? <span className="sk-hint">{t('No dialogue given to a character of your bible here. Name the speaker next to the line.')}</span>
+        : <div className="pl-speakers">
+          {list.map(s => (
+            <div key={s.slug} className="pl-speaker">
+              <div className="pl-row"><b className="pl-grow">{s.name}</b><span className="sk-num">{n(s.share)} %</span></div>
+              <div className="pl-rev-bar"><i style={{ width: `${s.share}%` }} /></div>
+              <span className="sk-hint">{t('{l} lines, {w} words, {a} words per line', { l: s.lines, w: s.words, a: n(s.avg, 1) })}</span>
+              {s.tics.length > 0 && <span className="sk-hint">{t('Tic:')} {s.tics.map(x => `${x.phrase} ×${x.count}`).join(', ')}</span>}
+              {s.violations.map((v, i) => (
+                <button key={i} type="button" className="pl-quiet pl-warn" onClick={() => jump(v.from, v.to)}>{t('Says “{p}”, which their card says they never say', { p: v.phrase })}</button>
+              ))}
+            </div>
+          ))}
+          <span className="sk-hint">{t('Lines are given to the name next to them, else to the last name before. Approximate.')}</span>
+        </div>)}
+    </section>
   )
 }
 
@@ -125,7 +172,7 @@ function ReportRow({ r, active }: { r: ReportResult; active: boolean }) {
         <div className="pl-report-detail">
           <p className="sk-hint">{t(r.def.help)}</p>
           <div className="pl-row">
-            <span className="sk-num pl-grow">{n(r.rate, 1)} {unit} · {t('target')} ≤ {n(r.def.target, 1)} {unit}</span>
+            <span className="sk-num pl-grow">{n(r.rate, 1)} {unit} · {t(r.fromRef ? 'reference' : 'target')} ≤ {n(r.target, 1)} {unit}</span>
             <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm sk-btn-icon" onClick={() => go(-1)} title={t('Previous')} disabled={!r.count}><ChevronLeft size={14} /></button>
             <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm sk-btn-icon" onClick={() => go(1)} title={t('Next')} disabled={!r.count}><ChevronRight size={14} /></button>
           </div>

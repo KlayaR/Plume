@@ -129,6 +129,10 @@ export interface Scene {
   /** Short summary made by the AI, and the text hash it was made from. */
   summary?: string
   summaryOf?: string
+  /** How tense the scene is, 0 to 10 (rated by Claude from the summaries, or by you). */
+  tension?: number
+  /** Revision passes (ids of meta.passes) already done on this scene. */
+  passes?: string[]
   comments?: Comment[]
   extra: Record<string, unknown>
 }
@@ -144,7 +148,10 @@ export interface Chapter {
   scenes: Scene[]
 }
 
-export type ActionId = 'continue' | 'rewrite' | 'beats' | 'fill'
+export type ActionId = 'continue' | 'rewrite' | 'beats' | 'fill' | 'expand' | 'shorten' | 'show' | 'dialogue' | 'describe'
+/** Actions that replace the selected passage (the others write at the cursor). */
+export const REWRITE_ACTIONS: ActionId[] = ['rewrite', 'expand', 'shorten', 'show', 'dialogue']
+export const isRewrite = (a: ActionId) => REWRITE_ACTIONS.includes(a)
 export type Model = 'haiku' | 'sonnet' | 'opus'
 export type Effort = 'low' | 'medium' | 'high'
 
@@ -216,6 +223,8 @@ export interface BookMeta {
   map: { image: string; pins: { slug: string; x: number; y: number }[] } | null
   /** Capitalised words you told Plume aren't bible names. */
   ignored: string[]
+  /** Revision passes: what to check on each scene, in order. */
+  passes?: { id: string; name: string }[]
   /** Words you added to the dictionary, and LanguageTool rules you turned off. */
   dictionary?: string[]
   ltIgnored?: string[]
@@ -235,6 +244,11 @@ export const DEFAULT_AI: BookMeta['ai'] = {
     rewrite: { model: 'sonnet', effort: 'low' },
     beats: { model: 'sonnet', effort: 'medium' },
     fill: { model: 'sonnet', effort: 'low' },
+    expand: { model: 'sonnet', effort: 'low' },
+    shorten: { model: 'sonnet', effort: 'low' },
+    show: { model: 'sonnet', effort: 'low' },
+    dialogue: { model: 'sonnet', effort: 'low' },
+    describe: { model: 'sonnet', effort: 'low' },
   },
   bibleBudget: 3000,
   storyWindow: 1500,

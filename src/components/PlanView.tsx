@@ -13,8 +13,11 @@ import { parseStoryTime, scenePositions, templateBeats, TEMPLATES, timeFlags } f
 import { ask, parseJSON } from '../ai'
 import { numLocale, useT } from '../i18n'
 import { ChatDock } from './ChatPanel'
+import Dashboard from './Dashboard'
+import Revision from './Revision'
+import Tension from './Tension'
 
-const TABS: [PlanTab, string][] = [['board', 'Board'], ['structure', 'Structure'], ['timeline', 'Timeline'], ['lines', 'Story lines']]
+const TABS: [PlanTab, string][] = [['board', 'Board'], ['structure', 'Structure'], ['timeline', 'Timeline'], ['lines', 'Story lines'], ['dashboard', 'Dashboard'], ['revision', 'Revision']]
 
 export default function PlanView() {
   const tab = useStore(s => s.planTab)
@@ -30,6 +33,8 @@ export default function PlanView() {
         {tab === 'structure' && <Structure />}
         {tab === 'timeline' && <Timeline />}
         {tab === 'lines' && <Lines />}
+        {tab === 'dashboard' && <Dashboard />}
+        {tab === 'revision' && <Revision />}
       </div>
       <ChatDock />
     </div>
@@ -70,6 +75,7 @@ function Board() {
     <div className="pl-board-wrap">
       <div className="pl-row pl-board-bar">
         <span className="pl-label pl-grow">{t('Drag cards to reorder: the text moves with them. Double-click a card to write it.')}</span>
+        <button type="button" className="sk-btn sk-btn-sm" onClick={() => useStore.setState({ dialog: 'outline' })}><Sparkles size={13} /> {t('Outline from a premise')}</button>
         <label className="pl-row pl-zoom">{t('Zoom')}
           <input type="range" className="sk-slider" min={0.4} max={1.2} step={0.05} value={zoom} onChange={e => setZoom(Number(e.target.value))}
             style={{ ['--sk-fill' as string]: `${((zoom - 0.4) / 0.8) * 100}%` }} />
@@ -256,6 +262,7 @@ function Structure() {
         {beats.length > 0 && <button type="button" className="sk-btn sk-btn-sm" disabled={busy} onClick={suggest}><Sparkles size={13} /> {busy ? t('Thinking…') : t('Suggest from my bible')}</button>}
       </div>
 
+      <Tension />
       {beats.length > 0 && <Pacing beats={beats} pos={pos} />}
 
       {beats.map((b, i) => {

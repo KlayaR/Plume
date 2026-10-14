@@ -8,6 +8,7 @@ import { getEditorView } from '../editor/actions'
 import { addComment, diffWords, dropDarling, listVersions, readVersion, removeComment, restoreDarling, snapshot, staleScenes, summarizeScene, updateSummaries, useNotes, type DiffPart } from '../writing'
 import { hashText } from '../ai'
 import { useT } from '../i18n'
+import { PassChecks } from './Revision'
 
 export default function NotesPanel() {
   const book = useStore(s => s.book)!
@@ -31,6 +32,7 @@ export default function NotesPanel() {
 
   return (
     <div className="pl-notes">
+      <PassChecks scene={scene} />
       <section>
         <span className="sk-label">{t('Comments')}</span>
         {(scene.comments ?? []).map(c => (

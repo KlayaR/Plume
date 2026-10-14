@@ -162,6 +162,23 @@ const isStockStyle = (full: string) => full.replace(/###[^\n]*/g, '').replace(/P
  * for a book with no voice yet; `force` (the button in Settings → Voice) does it
  * again, keeping your tense, adult setting, description and taste.
  */
+/** The text of a manuscript or a novel: .docx, .epub, .md or .txt (for reference books). */
+export async function readTextFile(path: string): Promise<string> {
+  const data = fromBase64(await invoke<string>('read_file_base64', { path }))
+  if (/\.docx$/i.test(path)) return (await parseDocx(data)).map(p => p.text).join('\n')
+  if (/\.epub$/i.test(path)) {
+    const files = await readZip(data)
+    const names = [...files.keys()].filter(n => /\.x?html?$/i.test(n) && !/nav|toc|cover|titlepage/i.test(n)).sort()
+    const parts: string[] = []
+    for (const n of names) {
+      const html = fromUtf8(files.get(n)!).replace(/<\/(p|div|h[1-6]|li|blockquote)>|<br\s*\/?>/gi, '\n')
+      parts.push(new DOMParser().parseFromString(html, 'text/html').body?.textContent ?? '')
+    }
+    return parts.join('\n').split('\n').map(l => l.replace(/\s+/g, ' ').trim()).filter(Boolean).join('\n')
+  }
+  return fromUtf8(data)
+}
+
 export function applyFantasyDefaults(book: Book, force = false): boolean {
   const v = book.meta.voice
   const pristine = !v.prompt && !v.sceneRules.length && !v.description.trim() && JSON.stringify(v.rules) === JSON.stringify(DEFAULT_RULES)

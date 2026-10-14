@@ -36,6 +36,48 @@ export interface ReportDef {
   find: (text: string, lang: Lang, book: Book) => Finding[]
 }
 
+/** Weak, imprecise adjectives: the reader has to guess what you mean. */
+const VAGUE: Record<Lang, string[]> = {
+  fr: ['beau', 'belle', 'joli', 'jolie', 'agréable', 'sympa', 'bizarre', 'étrange', 'intéressant', 'intéressante', 'bon', 'bonne', 'mauvais', 'mauvaise', 'énorme', 'incroyable', 'terrible', 'magnifique', 'merveilleux', 'merveilleuse'],
+  en: ['nice', 'good', 'bad', 'great', 'interesting', 'strange', 'weird', 'beautiful', 'pretty', 'amazing', 'terrible', 'awful', 'lovely', 'incredible', 'huge', 'wonderful', 'magnificent'],
+}
+
+/** Sentences made mostly of small glue words (the, of, de, que…): "sticky", they slow the reader down. */
+function stickySentences(text: string, lang: Lang): Finding[] {
+  return sentences(text).filter(s => {
+    const ws = words(s.s)
+    return ws.length >= 8 && ws.filter(w => STOPWORDS[lang].has(foldText(w.w))).length / ws.length >= 0.55
+  }).map(s => ({ from: s.from, to: s.to }))
+}
+
+/** Three words within a short stretch that start with the same letter. */
+function alliteration(text: string, lang: Lang): Finding[] {
+  const ws = words(text)
+  const solid = (w: string) => { const f = foldText(w); return f.length > 2 && !STOPWORDS[lang].has(f) }
+  const out: Finding[] = []
+  let i = 0
+  while (i < ws.length) {
+    if (!solid(ws[i].w)) { i++; continue }
+    const first = foldText(ws[i].w)[0]
+    const hits = [i]
+    for (let j = i + 1; j < Math.min(ws.length, i + 5); j++) if (solid(ws[j].w) && foldText(ws[j].w)[0] === first) hits.push(j)
+    if (hits.length >= 3) { out.push({ from: ws[hits[0]].from, to: ws[hits[hits.length - 1]].to }); i = hits[hits.length - 1] + 1 } else i++
+  }
+  return out
+}
+
+/** Names written differently from the bible: Elise for Élise, MARC for Marc. */
+function nameSpellings(text: string, book: Book): Finding[] {
+  const exact = new Set<string>()
+  const byFold = new Set<string>()
+  for (const e of book.entries) {
+    if (['style', 'wordlist', 'excerpt'].includes(e.type)) continue
+    for (const raw of [e.name, ...e.aliases]) for (const tok of raw.replace(/!$/, '').split(/[\s-]+/)) if (tok.length >= 3) { exact.add(tok); byFold.add(foldText(tok)) }
+  }
+  return words(text).filter(w => /^\p{Lu}/u.test(w.w) && byFold.has(foldText(w.w)) && !exact.has(w.w))
+    .map(w => ({ from: w.from, to: w.to, note: w.w }))
+}
+
 const firstWord = (s: string) => foldText((s.replace(/^[—–«“"\s]+/, '').match(/[\p{L}’'-]+/u) ?? [''])[0])
 
 /** Dialogue tags: a speech verb right after a line of dialogue (« … », dit-il / "…," she said). */
@@ -101,7 +143,16 @@ export const REPORTS: ReportDef[] = [
   { id: 'cliches', category: 'strong', label: 'Clichés', unit: 'per1000', target: 0.3,
     help: 'Worn phrases. Add your own to a word list in the bible.',
     find: (text, lang) => phrases(text, CLICHES[lang]) },
+  { id: 'sticky', category: 'strong', label: 'Sticky sentences', unit: 'sentences', target: 8,
+    help: 'Sentences where over half the words are small glue words (the, of, que, de…): they slow the reader down. Trim the glue.',
+    find: (text, lang) => stickySentences(text, lang) },
   // Word choice
+  { id: 'vague', category: 'choice', label: 'Vague words', unit: 'per1000', target: 8,
+    help: 'Weak, imprecise adjectives (nice, good, beau, bizarre…): say what you actually see.',
+    find: (text, lang) => phrases(text, VAGUE[lang]) },
+  { id: 'names', category: 'choice', label: 'Name spellings', unit: 'per1000', target: 0,
+    help: 'A name written differently from the bible (Elise for Élise).',
+    find: (text, _l, book) => nameSpellings(text, book) },
   { id: 'filler', category: 'choice', label: 'Filler words', unit: 'per1000', target: 10,
     help: 'Just, really, very, suddenly, began to… Most can go.',
     find: (text, lang) => phrases(text, FILLER_WORDS[lang]) },
@@ -118,6 +169,9 @@ export const REPORTS: ReportDef[] = [
   { id: 'phrases', category: 'repetition', label: 'Repeated phrases', unit: 'per1000', target: 1.5,
     help: 'Phrases of three to five words used more than once.',
     find: (text, lang) => repeatedPhrases(text, lang) },
+  { id: 'alliteration', category: 'repetition', label: 'Alliteration', unit: 'per1000', target: 1.5,
+    help: 'Three words close together that start with the same letter: a sound that may jar (or may be on purpose).',
+    find: (text, lang) => alliteration(text, lang) },
   { id: 'starts', category: 'repetition', label: 'Repeated sentence starts', unit: 'sentences', target: 6,
     help: 'Sentences opening with the same word as the one before.',
     find: text => repeatedStarts(text) },
@@ -130,6 +184,9 @@ export interface ReportResult {
   findings: Finding[]
   count: number
   rate: number
+  /** The target used: the default, or one taken from your reference books. */
+  target: number
+  fromRef: boolean
   status: Status
 }
 
@@ -173,7 +230,7 @@ export function overused(text: string, lang: Lang): [string, number][] {
 }
 
 /** Every report on a text, with an overall score out of 100. */
-export function review(text: string, book: Book): Review {
+export function review(text: string, book: Book, refs?: Record<string, number> | null): Review {
   const lang = book.meta.language
   const ws = words(text).length
   const ss = sentences(text)
@@ -182,7 +239,9 @@ export function review(text: string, book: Book): Review {
   const results = REPORTS.map(def => {
     const findings = def.find(text, lang, book)
     const rate = rateOf(def, findings.length, ws, ss.length, ps, tagCount)
-    return { def, findings, count: findings.length, rate, status: statusOf(rate, def.target) }
+    const fromRef = refs?.[def.id] !== undefined
+    const target = fromRef ? Math.max(0.1, refs![def.id] * 1.15) : def.target
+    return { def, findings, count: findings.length, rate, target, fromRef, status: statusOf(rate, target) }
   })
   const dlg = dialogue(text).reduce((sum, d) => sum + d.to - d.from, 0)
   const chars = text.replace(/\n/g, '').length

@@ -9,6 +9,7 @@ import { useAppVersion } from './lib/useAppVersion'
 import { applyPrefs } from './lib/fonts'
 import { setClaudeTranslator } from './lib/claude'
 import { restorePrompts } from './lib/voice'
+import { restoreReferences } from './lib/references'
 import { shellStrings, translate, useT } from './i18n'
 import StartScreen from './components/StartScreen'
 import WritingView from './components/WritingView'
@@ -17,6 +18,10 @@ import PlanView from './components/PlanView'
 import SettingsView from './components/SettingsView'
 import BottomBar from './components/BottomBar'
 import { AgentDialog, ExportDialog, PrintView, TourDialog } from './components/BookDialogs'
+import FindDialog from './components/FindDialog'
+import OutlineDialog from './components/OutlineDialog'
+import SynonymDialog from './components/SynonymDialog'
+import SnapshotsDialog from './components/SnapshotsDialog'
 
 export default function App() {
   const book = useStore(s => s.book)
@@ -31,7 +36,7 @@ export default function App() {
   setShellStrings(shellStrings(prefs.ui))
   setClaudeTranslator((text, vars) => translate(useStore.getState().prefs.ui, text, vars))
 
-  useEffect(() => { useStore.getState().detectClaude(); restorePrompts() }, [])
+  useEffect(() => { useStore.getState().detectClaude(); restorePrompts(); restoreReferences() }, [])
   // The first time a book opens, a short tour of where things are.
   useEffect(() => {
     if (!book) return
@@ -51,6 +56,9 @@ export default function App() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === ',') { e.preventDefault(); useStore.setState({ showSettings: true }) }
+      // Find and replace across the book.
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'y' && useStore.getState().book) { e.preventDefault(); useStore.setState({ dialog: 'synonyms' }) }
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'f' && useStore.getState().book) { e.preventDefault(); useStore.setState({ dialog: 'find' }) }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -74,6 +82,10 @@ export default function App() {
       {book && <BottomBar />}
       {showSettings && <SettingsView version={version} />}
       {book && dialog === 'export' && <ExportDialog onClose={() => useStore.setState({ dialog: null })} />}
+      {book && dialog === 'find' && <FindDialog onClose={() => useStore.setState({ dialog: null })} />}
+      {book && dialog === 'outline' && <OutlineDialog onClose={() => useStore.setState({ dialog: null })} />}
+      {book && dialog === 'synonyms' && <SynonymDialog onClose={() => useStore.setState({ dialog: null })} />}
+      {book && dialog === 'snapshots' && <SnapshotsDialog onClose={() => useStore.setState({ dialog: null })} />}
       {book && dialog === 'tour' && <TourDialog onClose={() => useStore.setState({ dialog: null })} />}
       {book && dialog === 'agents' && <AgentDialog onClose={() => useStore.setState({ dialog: null })} />}
       {book && printing && <PrintView />}

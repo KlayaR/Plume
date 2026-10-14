@@ -4,7 +4,7 @@
 // The manuscript's own controls (Write / Review, Sheet / Page, Scene / Chapter /
 // Book, split, Aa) live in a toolbar above the page: ManuscriptToolbar.
 import { useEffect, useRef, useState } from 'react'
-import { Bot, ChevronLeft, Columns2, Compass, Ellipsis, FileOutput, Settings } from 'lucide-react'
+import { Bot, Camera, ChevronLeft, Columns2, Compass, Ellipsis, FileOutput, Replace, Search, Settings } from 'lucide-react'
 import ManuscriptOptions from './ManuscriptOptions'
 import GoalsPanel from './GoalsPanel'
 import { findScene, useStore, type Scope, type View } from '../store'
@@ -110,6 +110,7 @@ function MoreMenu() {
       {open && (
         <div className="pl-pop pl-menu" role="menu">
           <button type="button" role="menuitem" className="pl-menuitem" onClick={go(() => useStore.setState({ dialog: 'agents' }))}><Bot size={15} /> {t('Agent tasks')}</button>
+          <button type="button" role="menuitem" className="pl-menuitem" onClick={go(() => useStore.setState({ dialog: 'snapshots' }))}><Camera size={15} /> {t('Snapshots')}</button>
           <button type="button" role="menuitem" className="pl-menuitem" onClick={go(() => useStore.setState({ dialog: 'export' }))}><FileOutput size={15} /> {t('Export the book')}</button>
           <button type="button" role="menuitem" className="pl-menuitem" onClick={go(() => useStore.setState({ dialog: 'tour' }))}><Compass size={15} /> {t('Quick tour')}</button>
         </div>
@@ -139,6 +140,8 @@ export function ManuscriptToolbar() {
         ))}
       </span>
       <button type="button" className="pl-quiet pl-splitbtn" aria-pressed={prefs.split !== null} onClick={() => st().setPrefs({ split: prefs.split === null ? '' : null })} title={t('Split view: a scene or a bible entry beside the text')}><Columns2 size={15} /></button>
+      <button type="button" className="pl-quiet" onClick={() => useStore.setState({ dialog: 'find' })} title={t('Find and replace in the book') + ' (Ctrl+Shift+F)'}><Search size={15} /></button>
+      <button type="button" className="pl-quiet" onMouseDown={e => e.preventDefault()} onClick={() => useStore.setState({ dialog: 'synonyms' })} title={t('Synonyms for the selected word') + ' (Ctrl+Shift+Y)'}><Replace size={15} /></button>
       <DisplayPanel />
     </div>
   )

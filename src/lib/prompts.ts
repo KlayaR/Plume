@@ -46,15 +46,22 @@ export function taskMessage(lang: Lang, action: ActionId, instruction: string, s
   const dir = instruction.trim()
   const words = (n: number) => fr ? `environ ${n} mots` : `about ${n} words`
   const Words = (n: number) => fr ? `Environ ${n} mots` : `About ${n} words`
-  if (action === 'rewrite') {
+  const QUICK: Partial<Record<ActionId, { en: string; fr: string }>> = {
+    expand: { en: 'Expand it: add concrete sensory detail, interiority and beats of action, about one and a half times longer, without changing what happens.', fr: 'Développe-le : ajoute des détails sensoriels concrets, de l’intériorité et des gestes, environ une fois et demie plus long, sans changer ce qui se passe.' },
+    shorten: { en: 'Tighten it to about two thirds of its length: cut padding, repetition and weak words, keep what carries the scene.', fr: 'Resserre-le à environ deux tiers de sa longueur : coupe le remplissage, les répétitions et les mots faibles, garde ce qui porte la scène.' },
+    show: { en: 'Show, don’t tell: replace statements of feeling or summary with concrete action, gesture, sensation and dialogue, in the same point of view.', fr: 'Montre, ne dis pas : remplace les émotions annoncées et les résumés par de l’action concrète, des gestes, des sensations et des dialogues, dans le même point de vue.' },
+    dialogue: { en: 'Sharpen the dialogue: give each speaker their own voice, add subtext, cut small talk and tags that explain, keep the action beats.', fr: 'Aiguise les dialogues : donne à chaque personnage sa propre voix, ajoute du sous-texte, coupe les banalités et les incises qui expliquent, garde les gestes.' },
+  }
+  const quick = QUICK[action]
+  if (action === 'rewrite' || quick) {
     const n = Math.max(10, (story.selection.match(/\S+/g) ?? []).length)
     return [
       story.before ? `<before>\n${story.before}\n</before>` : '',
       `<selection>\n${story.selection}\n</selection>`,
       story.after ? `<after>\n${story.after}\n</after>` : '',
       fr
-        ? `<task>\nRéécris uniquement le passage <selection>, pour qu'il s'enchaîne avec ce qui précède et ce qui suit. Garde à peu près la même longueur (${words(n)}) sauf si la consigne dit autrement.\nConsigne : ${dir || 'améliore la prose sans changer le sens'}\nRéponds uniquement avec le passage réécrit.\n</task>`
-        : `<task>\nRewrite only the <selection> passage so it flows from what comes before and into what follows. Keep roughly the same length (${words(n)}) unless the direction says otherwise.\nDirection: ${dir || 'improve the prose without changing the meaning'}\nReply with the rewritten passage only.\n</task>`,
+        ? `<task>\nRéécris uniquement le passage <selection>, pour qu'il s'enchaîne avec ce qui précède et ce qui suit. ${quick ? '' : `Garde à peu près la même longueur (${words(n)}) sauf si la consigne dit autrement.\n`}Consigne : ${quick ? quick.fr + (dir ? ' ' + dir : '') : dir || 'améliore la prose sans changer le sens'}\nRéponds uniquement avec le passage réécrit.\n</task>`
+        : `<task>\nRewrite only the <selection> passage so it flows from what comes before and into what follows. ${quick ? '' : `Keep roughly the same length (${words(n)}) unless the direction says otherwise.\n`}Direction: ${quick ? quick.en + (dir ? ' ' + dir : '') : dir || 'improve the prose without changing the meaning'}\nReply with the rewritten passage only.\n</task>`,
     ].filter(Boolean).join('\n\n')
   }
   if (action === 'fill') {
@@ -69,6 +76,14 @@ export function taskMessage(lang: Lang, action: ActionId, instruction: string, s
   const storyBlock = story.before.trim()
     ? `<story>\n${story.before}\n</story>`
     : fr ? '<story>\n(La scène commence ici.)\n</story>' : '<story>\n(The scene starts here.)\n</story>'
+  if (action === 'describe') {
+    return [
+      storyBlock,
+      fr
+        ? `<task>\nÉcris une description (lieu, personnage ou objet) qui s'insère ici, en reprenant exactement là où le texte s'arrête. Détails concrets, plusieurs sens, vus par le personnage du point de vue ; pas de liste. Environ 120 mots.${dir ? `\nCe qu'il faut décrire : ${dir}` : '\nDécris ce que le personnage remarque en premier.'}\nRéponds uniquement avec la description.\n</task>`
+        : `<task>\nWrite a description (place, character or object) that fits in here, picking up exactly where the story stops. Concrete detail, more than one sense, seen through the point-of-view character; no lists. About 120 words.${dir ? `\nWhat to describe: ${dir}` : '\nDescribe what the character notices first.'}\nReply with the description only.\n</task>`,
+    ].join('\n\n')
+  }
   if (action === 'beats') {
     return [
       storyBlock,

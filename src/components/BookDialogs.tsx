@@ -7,7 +7,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { Bot, Check, Compass, FileOutput, ListChecks, Search, Square, Undo2 } from 'lucide-react'
 import { Dialog } from '../studio-kit/shell.js'
 import { useStore } from '../store'
-import { toDocx, toEpub, toMarkdown, type DocxLayout, type ExportFormat } from '../lib/export'
+import { toDocx, toEpub, toHtml, toMarkdown, type DocxLayout, type ExportFormat } from '../lib/export'
 import { toBase64, utf8 } from '../lib/zip'
 import { pageSizeFor } from '../lib/fonts'
 import { clearDone, estimate, goTo, markDone, missingSummaries, runTask, stopTask, toBible, useAgents, type AgentTask } from '../agents'
@@ -34,7 +34,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
     if (!path) return
     setBusy(true)
     try {
-      const data = format === 'epub' ? await toEpub(book, o) : format === 'docx' ? await toDocx(book, o) : utf8(toMarkdown(book, o))
+      const data = format === 'epub' ? await toEpub(book, o) : format === 'docx' ? await toDocx(book, o) : format === 'html' ? utf8(toHtml(book, o)) : utf8(toMarkdown(book, o))
       await invoke('write_file_base64', { path, data: toBase64(data) })
       useStore.getState().notify('ok', t('Exported: {path}', { path }))
       onClose()
@@ -46,6 +46,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
     ['epub', 'EPUB', 'E-book with a table of contents, ready for KDP and e-readers'],
     ['docx', 'Word (.docx)', 'To send, print or keep editing elsewhere'],
     ['pdf', 'PDF', 'Printed from Page view: real pages, page numbers ("Microsoft Print to PDF")'],
+    ['html', 'Web page (.html)', 'One file for beta readers: opens in any browser, phone or computer'],
     ['md', 'Markdown', 'Plain text with headings'],
   ]
   return (

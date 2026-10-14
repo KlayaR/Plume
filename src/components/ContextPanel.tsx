@@ -27,6 +27,15 @@ const LABELS: Record<Tab, { tab: string; button: string; hint: string }> = {
   beats: { tab: 'Beats', button: 'Write from beats', hint: 'One beat per line' },
 }
 
+/** One-click actions on the selected passage (Describe: at the cursor). */
+const QUICK: [ActionId, string, string][] = [
+  ['expand', 'Expand', 'Select a passage: adds detail and interiority'],
+  ['shorten', 'Shorten', 'Select a passage: cuts it to about two thirds'],
+  ['show', 'Show it', 'Select a passage: turns telling into action and sensation'],
+  ['dialogue', 'Sharpen dialogue', 'Select a passage: more subtext, a distinct voice for each speaker'],
+  ['describe', 'Describe', 'Writes a description at the cursor'],
+]
+
 const n = (x: number) => x.toLocaleString(numLocale())
 
 export default function ContextPanel() {
@@ -96,6 +105,11 @@ export default function ContextPanel() {
           <option value="">{t('Prompt')} : {voice.prompt ? (prompts.find(p => p.id === voice.prompt)?.name ?? '–') + ' ' + t('(book)') : t('None')}</option>
           {prompts.map(p => <option key={p.id} value={p.id}>{t('Prompt')} : {p.preset ? t(p.name) : p.name}</option>)}
         </select>
+      </div>
+      <div className="pl-row pl-quick" role="group" aria-label={t('Quick actions')}>
+        {QUICK.map(([id, label, hint]) => (
+          <button key={id} type="button" className="sk-btn sk-btn-sm sk-btn-ghost" disabled={hasProposal || !!running} title={t(hint)} onClick={() => runAction(id, '', overrides)}>{t(label)}</button>
+        ))}
       </div>
       {isCheap() && <p className="sk-hint pl-cheap">{t('Cheap mode: past your usage threshold, calls use Haiku.')}</p>}
       <div className="pl-send">

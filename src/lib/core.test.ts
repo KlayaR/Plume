@@ -5,7 +5,7 @@ import { fixTypography, typingRule } from './typography'
 import { lastWords, slugify } from './text'
 import { allowedKinds, chapterLabels, enterStartsScene } from './chapters'
 import { countSigns, textStats } from './stats'
-import type { Book, Entry } from './types'
+import type { Book, Entry, Scene } from './types'
 import { DEFAULT_AI, DEFAULT_VOICE } from './types'
 import { adverbs, passives, echoes } from './analysis'
 import { checkRules, expandVariables } from './voice'
@@ -19,7 +19,12 @@ import { parseJSON } from '../ai'
 import { chunks, kindOf, ltLanguage } from './languagetool'
 import { balanceSplit, inlineHtml, parseInline, stripInline } from './inline'
 import { splitManuscript } from '../library'
-import { toMarkdown } from './export'
+import { toHtml, toMarkdown } from './export'
+import { matchRanges, replaceInText } from './find'
+import { speakerStats } from './speakers'
+import { nextToDo, progress, togglePass } from './revision'
+import { compareSnap, makeSnap } from './snapshots'
+import { referenceTargets, type Reference } from './references'
 
 const entry = (over: Partial<Entry>): Entry => ({
   slug: 'x', type: 'character', path: 'bible/characters/x.md', name: 'X', aliases: [], include: 'auto',
@@ -386,5 +391,109 @@ describe('italics and bold', () => {
   })
   it('does not count the markers as signs', () => {
     expect(countSigns('un *mot*')).toBe(countSigns('un mot'))
+  })
+})
+
+const scene = (id: string, text: string, over: Partial<Scene> = {}): Scene => ({ id, path: `manuscript/c/${id}.md`, title: id, pov: null, status: 'draft', text, extra: {}, ...over })
+const bookOf = (scenes: Scene[], entries: Entry[] = [], language: 'en' | 'fr' = 'en'): Book => ({
+  root: '', entries,
+  meta: { format: 1, title: 'T', author: 'A', language, order: [], ai: { ...DEFAULT_AI }, voice: DEFAULT_VOICE, structure: { template: '', beats: [] }, loose: [], history: {}, goal: { book: 0, daily: 0 }, series: null, map: null, ignored: [] },
+  chapters: [{ id: 'c', folder: 'c', kind: 'chapter', title: 'One', notes: '', scenes }],
+})
+
+describe('find and replace', () => {
+  const o = { query: 'elise', caseSensitive: false, whole: false, regex: false }
+  it('ignores case and accents unless asked', () => {
+    expect(matchRanges('Voici \u00c9lise et elise.', o)).toHaveLength(2)
+    expect(matchRanges('Voici \u00c9lise et elise.', { ...o, caseSensitive: true })).toHaveLength(1)
+  })
+  it('matches whole words only on request', () => {
+    expect(matchRanges('cat concat cat', { ...o, query: 'cat', whole: true })).toHaveLength(2)
+    expect(matchRanges('cat concat cat', { ...o, query: 'cat' })).toHaveLength(3)
+  })
+  it('replaces everywhere and counts', () => {
+    expect(replaceInText('a b a', { ...o, query: 'a' }, 'z')).toEqual({ text: 'z b z', count: 2 })
+  })
+  it('treats an invalid regex as no match', () => {
+    expect(matchRanges('abc', { ...o, query: '(', regex: true })).toEqual([])
+  })
+})
+
+describe('scene frontmatter', () => {
+  it('keeps tension and revision passes', () => {
+    const s = parseScene('manuscript/c/a.md', '---\nid: a\ntitle: A\ntension: 7\npasses:\n  - structure\n---\nText')
+    expect(s.tension).toBe(7)
+    expect(s.passes).toEqual(['structure'])
+    expect(parseScene(s.path, serializeScene(s))).toEqual(s)
+  })
+  it('leaves tension unset when absent', () => {
+    expect(parseScene('manuscript/c/a.md', '---\nid: a\n---\nText').tension).toBeUndefined()
+  })
+})
+
+describe('speakers', () => {
+  const rose2 = entry({ slug: 'rose', name: 'Rose', voice: { register: '', sentences: '', tic: 'my dear', gesture: '', never: 'whatever', inner: '', lines: '' } })
+  const lise = entry({ slug: 'lise', name: 'Lise', aliases: [] })
+  it('gives each line to the name beside it, counts tics and flags forbidden words', () => {
+    const text = '\u201cWhere, my dear?\u201d said Rose.\n\u201cNorth,\u201d Lise answered.\n\u201cWhatever you say.\u201d Rose shrugged.'
+    const s = speakerStats(text, bookOf([], [rose2, lise]))
+    const r = s.find(x => x.slug === 'rose')!
+    expect(r.lines).toBe(2)
+    expect(s.find(x => x.slug === 'lise')!.lines).toBe(1)
+    expect(r.tics).toEqual([{ phrase: 'my dear', count: 1 }])
+    expect(r.violations.map(v => v.phrase)).toEqual(['whatever'])
+    expect(Math.round(s.reduce((n, x) => n + x.share, 0))).toBe(100)
+  })
+  it('returns nothing without characters', () => {
+    expect(speakerStats('\u201cHi,\u201d said Rose.', bookOf([]))).toEqual([])
+  })
+})
+
+describe('revision passes', () => {
+  it('walks pass by pass, scene by scene', () => {
+    const a = scene('a', 'x', { passes: ['structure'] }), b = scene('b', 'y')
+    const book = bookOf([a, b])
+    expect(nextToDo(book)).toMatchObject({ scene: { id: 'b' }, pass: { id: 'structure' } })
+    expect(progress(book)[0]).toMatchObject({ done: 1, total: 2 })
+    const done = bookOf([{ ...a, passes: ['structure', 'line', 'proof'] }, { ...b, passes: ['structure', 'line', 'proof'] }])
+    expect(nextToDo(done)).toBeNull()
+  })
+  it('toggles a pass', () => {
+    expect(togglePass(undefined, 'line')).toEqual(['line'])
+    expect(togglePass(['line', 'proof'], 'line')).toEqual(['proof'])
+  })
+})
+
+describe('snapshots', () => {
+  it('lists changed, new and removed scenes', () => {
+    const before = bookOf([scene('a', 'one two'), scene('b', 'three')])
+    const snap = makeSnap(before, 'v1')
+    expect(snap.words).toBe(3)
+    const now = bookOf([scene('a', 'one two more'), scene('c', 'fresh')])
+    const changes = compareSnap(now, snap)
+    expect(changes.map(c => [c.id, c.kind, c.delta])).toEqual([['a', 'changed', 1], ['c', 'new', 1], ['b', 'removed', -1]])
+    expect(compareSnap(before, snap)).toEqual([])
+  })
+})
+
+describe('reference books', () => {
+  const ref = (over: Partial<Reference>): Reference => ({ id: 'r', name: 'R', lang: 'en', words: 1000, on: true, rates: { adverbs: 4 }, avgSentence: 14, dialogueShare: 0.3, readability: 70, ...over })
+  it('averages the references in use for the language', () => {
+    const t = referenceTargets([ref({}), ref({ id: 's', rates: { adverbs: 8 }, avgSentence: 18 }), ref({ id: 'off', on: false, avgSentence: 99 }), ref({ id: 'fr', lang: 'fr', avgSentence: 99 })], 'en')!
+    expect(t.count).toBe(2)
+    expect(t.rates.adverbs).toBe(6)
+    expect(t.avgSentence).toBe(16)
+  })
+  it('is null without references', () => {
+    expect(referenceTargets([ref({ on: false })], 'en')).toBeNull()
+  })
+})
+
+describe('html export', () => {
+  it('makes one page with a table of contents and inline emphasis', () => {
+    const html = toHtml(bookOf([scene('a', 'He said *no*.\n\nSecond.')]), { format: 'html', layout: 'book', titlePage: true, sceneBreak: '* * *' })
+    expect(html).toContain('<title>T</title>')
+    expect(html).toContain('href="#c1"')
+    expect(html).toContain('<em>no</em>')
   })
 })

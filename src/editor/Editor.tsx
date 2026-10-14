@@ -108,7 +108,7 @@ function makeState(s: Scene, lang: Lang) {
       spelling.of(spellingExt(windowsSpell())),
       languageToolExt({
         // Review mode, LanguageTool chosen, and this is the scene you are in.
-        enabled: () => { const st = useStore.getState(); return st.prefs.mode === 'review' && st.prefs.spell === 'languagetool' && st.sceneId === s.id },
+        enabled: () => { const st = useStore.getState(); return (st.prefs.mode === 'review' || st.prefs.ltLive) && st.prefs.spell === 'languagetool' && st.sceneId === s.id },
         check: checkWithLT,
         addWord: w => { const st = useStore.getState(); st.updateMeta({ dictionary: [...(st.book?.meta.dictionary ?? []), w] }) },
         ignoreRule: r => { const st = useStore.getState(); st.updateMeta({ ltIgnored: [...(st.book?.meta.ltIgnored ?? []), r] }) },
@@ -151,6 +151,11 @@ function makeState(s: Scene, lang: Lang) {
           tick = setTimeout(() => useStore.getState().bumpEditor(), 250)
         }
         if (u.transactions.some(tr => tr.effects.length)) syncProposalState()
+        // Typewriter scrolling: typing keeps the line in the middle of the screen.
+        if ((u.docChanged || u.selectionSet) && u.view.hasFocus && useStore.getState().prefs.typewriter && !u.transactions.some(tr => tr.scrollIntoView)) {
+          const head = u.state.selection.main.head
+          requestAnimationFrame(() => { if (u.view.dom.isConnected) u.view.dispatch({ effects: EditorView.scrollIntoView(head, { y: 'center' }) }) })
+        }
       }),
     ],
   })
@@ -199,7 +204,18 @@ export default function Editor({ scene }: { scene: Scene }) {
     return () => clearTimeout(timer)
   }, [report, aiFound, scene.text])
   const spell = useStore(s => s.prefs.spell)
-  useEffect(() => { viewRef.current?.dispatch({ effects: [spelling.reconfigure(spellingExt(mode === 'review' && spell === 'windows')), refreshLT.of(null)] }) }, [mode, spell])
+  const ltLive = useStore(s => s.prefs.ltLive)
+  useEffect(() => { viewRef.current?.dispatch({ effects: [spelling.reconfigure(spellingExt(mode === 'review' && spell === 'windows')), refreshLT.of(null)] }) }, [mode, spell, ltLive])
+  // Coming from Find: select the match once this scene is the open one.
+  const jump = useStore(s => s.jump)
+  useEffect(() => {
+    const v = viewRef.current
+    if (!v || !jump || jump.sceneId !== scene.id || !active) return
+    const to = Math.min(jump.to, v.state.doc.length)
+    v.dispatch({ selection: { anchor: Math.min(jump.from, to), head: to }, scrollIntoView: true })
+    v.focus()
+    useStore.setState({ jump: null })
+  }, [jump, active, scene.id])
   // Another scene became the active one: LanguageTool moves with it.
   useEffect(() => { viewRef.current?.dispatch({ effects: refreshLT.of(null) }) }, [active])
 

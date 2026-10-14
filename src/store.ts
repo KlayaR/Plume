@@ -10,7 +10,7 @@ import { t } from './i18n'
 
 export type View = 'bible' | 'plan' | 'manuscript'
 export type BibleTab = 'entry' | 'review' | 'tracker' | 'map' | 'relations' | 'contradictions'
-export type PlanTab = 'board' | 'structure' | 'timeline' | 'lines'
+export type PlanTab = 'board' | 'structure' | 'timeline' | 'lines' | 'dashboard' | 'revision'
 /** What the right pane of the Manuscript shows in Write mode. */
 export type RightTab = 'write' | 'chat' | 'notes'
 
@@ -71,6 +71,10 @@ export interface Prefs {
   ltUser: string
   ltKey: string
   ltEnglish: string
+  /** LanguageTool also while you write (off by default: sends the scene's text as you pause). */
+  ltLive: boolean
+  /** Typewriter scrolling: the line you write stays in the middle of the screen. */
+  typewriter: boolean
   /** Version of the saved prefs, for one-time upgrades. */
   v?: number
 }
@@ -102,6 +106,8 @@ export const DEFAULT_PREFS: Prefs = {
   ltUser: '',
   ltKey: '',
   ltEnglish: 'en-US',
+  ltLive: false,
+  typewriter: false,
   v: 2,
 }
 
@@ -148,8 +154,10 @@ interface State {
   editorTick: number
   bibleTab: BibleTab
   planTab: PlanTab
+  /** A place to go to in a scene: the editor selects it once the scene is open. */
+  jump: { sceneId: string; from: number; to: number } | null
   /** The book's big dialogs, and the PDF print view. */
-  dialog: 'export' | 'agents' | 'tour' | null
+  dialog: 'export' | 'agents' | 'tour' | 'find' | 'snapshots' | 'outline' | 'synonyms' | null
   printing: boolean
 
   open: (root: string) => Promise<void>
@@ -238,6 +246,7 @@ export const useStore = create<State>((set, get) => {
     bibleTab: 'entry',
     planTab: 'board',
     dialog: null,
+    jump: null,
     printing: false,
 
     open: async root => {

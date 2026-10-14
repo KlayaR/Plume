@@ -101,7 +101,7 @@ export function parseEntry(path: string, text: string): Entry {
 }
 
 const ENTRY_KEYS = ['type', 'name', 'aliases', 'include', 'links', 'voice', 'knows', 'unaware', 'image', 'kind', 'resolved']
-const SCENE_KEYS = ['id', 'title', 'pov', 'status', 'note', 'time', 'place', 'lines', 'summary', 'summaryOf', 'comments']
+const SCENE_KEYS = ['id', 'title', 'pov', 'status', 'note', 'time', 'place', 'lines', 'summary', 'summaryOf', 'comments', 'tension', 'passes']
 const rest = (data: Record<string, unknown>, known: string[]) => Object.fromEntries(Object.entries(data).filter(([k]) => !known.includes(k)))
 const filled = (v: VoiceCard | undefined) => (v && Object.values(v).some(x => x.trim()) ? v : undefined)
 
@@ -135,6 +135,8 @@ export function parseScene(path: string, text: string): Scene {
     lines: asList(data.lines),
     summary: data.summary ? String(data.summary) : undefined,
     summaryOf: data.summaryOf ? String(data.summaryOf) : undefined,
+    tension: Number.isFinite(Number(data.tension)) && data.tension !== undefined && data.tension !== '' ? Math.max(0, Math.min(10, Number(data.tension))) : undefined,
+    passes: data.passes ? asList(data.passes) : undefined,
     comments: Array.isArray(data.comments)
       ? (data.comments as Record<string, unknown>[]).map(c => ({ id: String(c.id ?? ''), quote: String(c.quote ?? ''), text: String(c.text ?? ''), date: String(c.date ?? '') }))
       : [],
@@ -146,7 +148,7 @@ export function serializeScene(s: Scene): string {
   return joinFrontmatter({
     id: s.id, title: s.title, pov: s.pov ?? undefined, status: s.status,
     note: s.note, time: s.time, place: s.place ?? undefined, lines: s.lines?.length ? s.lines : undefined,
-    summary: s.summary, summaryOf: s.summaryOf, comments: s.comments?.length ? s.comments : undefined,
+    summary: s.summary, summaryOf: s.summaryOf, tension: s.tension, passes: s.passes?.length ? s.passes : undefined, comments: s.comments?.length ? s.comments : undefined,
     ...s.extra,
   }, `\n${s.text}`)
 }

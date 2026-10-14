@@ -9,7 +9,7 @@ import { countWords, newId } from './text'
 import { makeZip, utf8 } from './zip'
 import { inlineDocx, inlineHtml } from './inline'
 
-export type ExportFormat = 'epub' | 'docx' | 'md' | 'pdf'
+export type ExportFormat = 'epub' | 'docx' | 'md' | 'pdf' | 'html'
 export type DocxLayout = 'book' | 'submission'
 
 export interface ExportOptions { format: ExportFormat; layout: DocxLayout; titlePage: boolean; sceneBreak: string }
@@ -42,6 +42,48 @@ export function toMarkdown(book: Book, o: ExportOptions): string {
     out.push(p.scenes.map(s => s.join('\n\n')).join(`\n\n${o.sceneBreak}\n\n`))
   }
   return out.filter(Boolean).join('\n\n') + '\n'
+}
+
+// --- HTML: one file for beta readers -------------------------------------------------
+
+/** The book as a single web page: readable on any screen, light or dark, with a table of contents. Nothing to install. */
+export function toHtml(book: Book, o: ExportOptions): string {
+  const lang = book.meta.language
+  const ps = parts(book)
+  const toc = ps.map((p, i) => `<li><a href="#c${i + 1}">${esc(p.label)}${p.title ? ` : ${esc(p.title)}` : ''}</a></li>`).join('\n')
+  const body = ps.map((p, i) => `<section id="c${i + 1}">
+<h2>${esc(p.label)}${p.title ? `<br><span>${esc(p.title)}</span>` : ''}</h2>
+${p.scenes.map(s => s.map(para => `<p>${inlineHtml(para)}</p>`).join('\n')).join(`\n<p class="break">${esc(o.sceneBreak)}</p>\n`)}
+</section>`).join('\n')
+  return `<!DOCTYPE html>
+<html lang="${lang}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${esc(book.meta.title)}</title>
+<style>
+:root { color-scheme: light dark; --bg: #fbf8f1; --fg: #25221d; --muted: #7a7366; }
+@media (prefers-color-scheme: dark) { :root { --bg: #17160f; --fg: #e4dfd2; --muted: #968f80; } }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 1.15rem/1.7 Georgia, 'Times New Roman', serif; }
+main { max-width: 36rem; margin: 0 auto; padding: 3rem 1.25rem 6rem; }
+h1 { font-size: 2.2rem; text-align: center; margin: 3rem 0 .25rem; }
+.author { text-align: center; color: var(--muted); margin-bottom: 3rem; }
+nav { margin: 0 0 4rem; } nav ul { list-style: none; padding: 0; } nav a { color: var(--fg); text-decoration: none; border-bottom: 1px solid var(--muted); }
+h2 { text-align: center; font-size: 1.4rem; margin: 5rem 0 2rem; } h2 span { font-weight: normal; color: var(--muted); font-size: 1.1rem; }
+p { margin: 0; text-align: justify; hyphens: auto; } p + p { text-indent: 1.4em; } p.break { text-indent: 0; text-align: center; margin: 1.5rem 0; color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+${o.titlePage ? `<h1>${esc(book.meta.title)}</h1>\n${book.meta.author ? `<div class="author">${esc(book.meta.author)}</div>` : ''}` : ''}
+<nav><ul>
+${toc}
+</ul></nav>
+${body}
+</main>
+</body>
+</html>
+`
 }
 
 // --- EPUB 3 (with an NCX for older readers and KDP) -------------------------------------

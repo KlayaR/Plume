@@ -2,7 +2,7 @@
 // into an inline proposal, and keeps Retry / Stop / Accept / Discard in one place.
 import { create } from 'zustand'
 import type { EditorView } from '@codemirror/view'
-import type { ActionId } from '../lib/types'
+import { isRewrite, type ActionId } from '../lib/types'
 import { buildContext, type Built, type Override } from '../lib/context'
 import { checkRules, fixDirection, type Check } from '../lib/voice'
 import { ask, effective, isCheap } from '../ai'
@@ -38,7 +38,7 @@ export function currentContext(action: ActionId, instruction: string, overrides:
   const doc = view.state.doc
   const sel = view.state.selection.main
   // Rewrite and Fill replace the selection (Fill: the placeholder); the others write at the cursor.
-  const rewrite = action === 'rewrite' || action === 'fill'
+  const rewrite = isRewrite(action) || action === 'fill'
   const from = rewrite ? sel.from : sel.to
   const to = sel.to
   // Cheap mode: half the story window and half the bible budget.
@@ -51,7 +51,7 @@ export function currentContext(action: ActionId, instruction: string, overrides:
     action,
     instruction,
     before: doc.sliceString(0, from),
-    selection: action === 'rewrite' ? doc.sliceString(from, to) : '',
+    selection: isRewrite(action) ? doc.sliceString(from, to) : '',
     after: rewrite ? doc.sliceString(to, Math.min(doc.length, to + 3000)) : '',
     overrides,
     scene: found.scene,
@@ -64,7 +64,7 @@ export async function runAction(action: ActionId, instruction: string, overrides
   if (!view || !st.book || useAI.getState().running) return
   if (!st.claudeExe) return st.notify('error', t('The claude command line was not found. Set its path in Settings.'))
   if (view.state.field(proposalField)) return st.notify('warn', t('Accept or discard the current proposal first.'))
-  if (action === 'rewrite' && view.state.selection.main.empty) return st.notify('warn', t('Select the passage to rewrite first.'))
+  if (isRewrite(action) && view.state.selection.main.empty) return st.notify('warn', t('Select the passage to rewrite first.'))
   if (action === 'beats' && !instruction.trim()) return st.notify('warn', t('Write the beats first, one per line.'))
   const ctx = currentContext(action, instruction, overrides)
   if (!ctx) return
@@ -145,7 +145,7 @@ export async function retry(extra = '') {
 export async function alternatives(action: ActionId, instruction: string, overrides: Record<string, Override>, n = 3): Promise<{ texts: string[]; from: number; to: number } | null> {
   const st = useStore.getState()
   if (!view || !st.book) return null
-  if (action === 'rewrite' && view.state.selection.main.empty) { st.notify('warn', t('Select the passage to rewrite first.')); return null }
+  if (isRewrite(action) && view.state.selection.main.empty) { st.notify('warn', t('Select the passage to rewrite first.')); return null }
   const ctx = currentContext(action, instruction, overrides)
   if (!ctx) return null
   const s = st.book.meta.ai.actions[action]

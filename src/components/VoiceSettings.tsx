@@ -10,7 +10,10 @@ import { allPrompts, loadPrompts, PRESETS, promptText, savePrompts, SCENE_RULES,
 import { profile } from '../lib/analysis'
 import { newId } from '../lib/text'
 import { ask } from '../ai'
-import { applyFantasyDefaults, refreshSnapshots } from '../library'
+import { applyFantasyDefaults, readTextFile, refreshSnapshots } from '../library'
+import { open as openFile } from '@tauri-apps/plugin-dialog'
+import { addReference, measure, removeReference, toggleReference, useRefs } from '../lib/references'
+import type { Lang } from '../lib/types'
 import { numLocale, useT } from '../i18n'
 
 const n = (x: number, d = 0) => x.toLocaleString(numLocale(), { maximumFractionDigits: d, minimumFractionDigits: d })
@@ -65,6 +68,7 @@ export default function VoiceSettings() {
       </SettingsSection>
 
       <StyleProfile />
+      <ReferenceBooks />
     </>
   )
 }
@@ -183,6 +187,44 @@ function StyleProfile() {
         <textarea className="sk-input" rows={4} value={voice.taste} placeholder={t('Learned from the proposals you accept and discard. Use "Learn from my choices" in the Claude panel.')}
           onChange={e => useStore.getState().updateMeta({ voice: { ...voice, taste: e.target.value } })} />
       </div>
+    </SettingsSection>
+  )
+}
+
+/** Novels you admire, measured here: only the numbers are kept, and Review compares you with them. */
+function ReferenceBooks() {
+  const book = useStore(s => s.book)!
+  const list = useRefs(s => s.list)
+  const t = useT()
+  const [lang, setLang] = useState<Lang>(book.meta.language)
+  const [busy, setBusy] = useState(false)
+  const add = async () => {
+    const file = await openFile({ title: t('Choose a novel'), filters: [{ name: 'Novel', extensions: ['epub', 'docx', 'md', 'txt'] }] })
+    if (typeof file !== 'string') return
+    setBusy(true)
+    try {
+      const text = await readTextFile(file)
+      await new Promise(r => setTimeout(r, 50)) // let the "measuring" state show
+      addReference(measure(file.split(/[\\/]/).pop()!.replace(/\.[^.]+$/, ''), text, lang, book))
+    } catch (e) { useStore.getState().notify('error', t('Could not measure it: {e}', { e: String(e) })) }
+    setBusy(false)
+  }
+  return (
+    <SettingsSection title={t('Reference books')} description={t('Novels you admire (EPUB, Word, text), measured on this computer: Plume keeps only the numbers, never the text. Review then compares your chapters with them instead of with its default targets.')}>
+      {list.map(r => (
+        <SettingRow key={r.id} label={r.name} description={`${r.lang === 'fr' ? 'Français' : 'English'} · ${n(r.words)} ${t('words')} · ${t('sentences of')} ${n(r.avgSentence, 1)} ${t('words')} · ${n(r.dialogueShare * 100)} % ${t('dialogue')}`}>
+          <span className="pl-row">
+            <Switch checked={r.on} onChange={v => toggleReference(r.id, v)} label={t('Use as targets')} />
+            <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm sk-btn-icon" aria-label={t('Delete')} onClick={() => removeReference(r.id)}><Trash2 size={13} /></button>
+          </span>
+        </SettingRow>
+      ))}
+      <SettingRow label={t('Add a novel')} description={t('Language of the novel')}>
+        <span className="pl-row">
+          <select className="sk-select" value={lang} onChange={e => setLang(e.target.value as Lang)}><option value="fr">Français</option><option value="en">English</option></select>
+          <button type="button" className="sk-btn sk-btn-sm" disabled={busy} onClick={add}><Plus size={13} /> {busy ? t('Measuring…') : t('Choose…')}</button>
+        </span>
+      </SettingRow>
     </SettingsSection>
   )
 }

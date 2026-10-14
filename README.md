@@ -7,6 +7,22 @@ in with your Claude subscription. No API key.
 Plan: [Plume — Roadmap](https://claude.ai/code/artifact/1bbb8ac1-8e0c-4a44-bed0-fcd2de1d195d) (0.2.0 → 0.9.0) ·
 first spec: [Plume — Step 1 Spec](https://claude.ai/code/artifact/f1897651-066d-49a1-ae39-1357421b88be)
 
+## What 1.0.0 adds
+- **Fantasy by default.** A new book starts with a fantasy preset (Settings -> Voice -> "Fantasy defaults"): deep point of view, the world shown through action, magic with a cost and a price, scenes that want something, no info-dumps, subtext in dialogue, no cliches. It sets the prompt, the scene rules, your measurable rules and two word lists (AI tics, fantasy cliches). Your tense, adult setting, voice description and taste are never overwritten; an older book gets it once on first open, and the Apply button redoes it.
+- **Italics and bold** (Ctrl+I / Ctrl+B, stored as Markdown `*italic*` / `**bold**`): in the editor, Page view and every export.
+- **Find and replace** across the whole book (Ctrl+Shift+F): case/accents, whole word, regular expressions, each scene keeps its old text in its history.
+- **More reports** in Review: sticky sentences, vague words, alliteration, name spellings.
+- **Reference books** (Settings -> Voice): add novels you admire (.epub, .docx, .md, .txt); Plume measures them on your computer, keeps only the numbers, and Review uses them as targets instead of its defaults.
+- **Who says what** (Review): lines per character, words per line, voice-card tics, and where a character says something their card says they never say. Zero tokens.
+- **Dashboard** (Plan -> Dashboard): chapter by chapter charts of any metric, with your average and your reference books' line; words by POV; scenes by status.
+- **Quick actions** under the AI panel: Expand, Shorten, Show it, Sharpen dialogue (on the selection) and Describe (at the cursor).
+- **Outline from a premise** (Plan -> Board) and **Synonyms in context** (Ctrl+Shift+Y, Haiku).
+- **Tension curve** (Plan -> Structure): Claude rates each scene 0-10, click the chart to correct, structure beats drawn on top.
+- **Snapshots** (... menu): name a copy of the whole book, compare it scene by scene, restore a scene.
+- **Revision passes** (Plan -> Revision, and checkboxes in a scene's Notes): structure, line edit, proofread, with the next scene to do.
+- Settings: **typewriter scrolling**, and **LanguageTool while writing** (off by default).
+- **HTML export** for beta readers: one self-contained page, light/dark, with a table of contents.
+
 ## What 0.9.2 changes
 - **Scrollbar:** the page area now ends where a pinned pane begins, so its scrollbar is no longer hidden behind the pane.
 - **LanguageTool** in Review mode (Settings → Écriture → Orthographe et grammaire): spelling and grammar in the book's own language, French or English (US / UK / CA / AU). Underlines in the text (red spelling, blue grammar, yellow style); hover for the explanation, one-click fixes, "Add to dictionary" (per book) and "Ignore this rule". Bible names are never flagged. It uses the public server (free, about 20 checks a minute, the scene's text is sent to it), your own server (a local LanguageTool server keeps everything private) or your Premium key.
