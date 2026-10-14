@@ -7,6 +7,9 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.15.1
+- Releases are now built on the maintainer's PC and published with `npm run release` (faster than GitHub's build). The GitHub workflow stays as a backup and does nothing when a release already has its installer. No change in the app itself.
+
 ## 0.15.0
 **Right-click menus everywhere** (Plume's own, instead of the web view's Back / Reload / Inspect; text fields keep the system menu, and Shift + right-click always gives it).
 - **In the text:** Cut, Copy, Paste, Paste as plain text, Select all; Italic, Bold; **Ask Claude** (Rewrite, Expand, Shorten, Show it, Sharpen dialogue, Synonyms on a selection; Continue from here and Describe here without one); Comment on this, Cut to the darlings drawer, Drop a placeholder, Read aloud, Search the book for this, New bible entry from this. On a **bible name:** Open it, Open it beside, Add the selection as an alias. On a **name the bible doesn't know:** Add it to the bible as (any type), Ignore. On a **margin comment:** Show it in Notes, Delete it. During a **proposal:** Accept, Retry, Discard. (In Review with the Windows spellchecker, the system menu stays, for its spelling suggestions.)

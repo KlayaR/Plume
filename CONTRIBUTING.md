@@ -65,6 +65,10 @@ a few lines that reproduce the problem are enough.
 ## Releases (maintainer)
 
 Add the version's section to `CHANGELOG.md`, bump the three version files,
-commit, then tag and push: `git tag v0.12.0 && git push origin v0.12.0`. The
-Release workflow builds the Windows installer and publishes a release (a
-pre-release while Plume is in 0.x) with the changelog section.
+commit, then run `npm run release` on a Windows PC (`--dry` builds without
+publishing). It runs the tests and checks, builds the installer, pushes, and
+publishes the GitHub release (a pre-release while Plume is in 0.x) with the
+changelog section as notes. Without Windows, push a tag instead
+(`git tag v0.16.0 && git push origin v0.16.0`): the Release workflow builds
+the installer on GitHub. Run that workflow by hand with "replace" to rebuild a
+release's installer from a clean checkout.
