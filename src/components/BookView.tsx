@@ -10,6 +10,7 @@ import { findScene, useStore } from '../store'
 import { pageSizeFor } from '../lib/fonts'
 import { chapterLabels } from '../lib/chapters'
 import type { Chapter, Scene } from '../lib/types'
+import { balanceSplit, parseInline } from '../lib/inline'
 import { useT } from '../i18n'
 
 interface Block {
@@ -42,6 +43,27 @@ const headOf = (c: Chapter, label: string): Head => ({ label, title: c.title && 
 const dropAt = (b: Block) => (b.drop && !b.cont && /^\p{L}/u.test(b.text) ? 1 : 0)
 const paraClass = (b: Block) => `pl-bk-p${b.first || b.cont ? ' pl-bk-noindent' : ''}${b.split ? ' pl-bk-split' : ''}`
 
+/** Italics and bold as DOM (the same <em> and <strong> the page renders). */
+function inlineNodes(text: string): Node[] {
+  return parseInline(text).map(r => {
+    const node = document.createTextNode(r.t)
+    if (!r.i && !r.b) return node
+    let el: HTMLElement = document.createElement(r.i ? 'em' : 'strong')
+    el.append(node)
+    if (r.i && r.b) { const outer = document.createElement('strong'); outer.append(el); el = outer }
+    return el
+  })
+}
+
+/** A paragraph's text with its italics and bold. */
+export function Inline({ text }: { text: string }) {
+  return <>{parseInline(text).map((r, i) => {
+    if (!r.i && !r.b) return r.t
+    const inner = r.i ? <em key={i}>{r.t}</em> : r.t
+    return r.b ? <strong key={i}>{inner}</strong> : inner
+  })}</>
+}
+
 /** The same DOM the page renders, for measuring. */
 function fillPara(el: HTMLElement, b: Block) {
   el.className = paraClass(b)
@@ -50,8 +72,8 @@ function fillPara(el: HTMLElement, b: Block) {
     const span = document.createElement('span')
     span.className = 'pl-bk-drop'
     span.textContent = b.text[0]
-    el.append(span, b.text.slice(1))
-  } else el.textContent = b.text
+    el.append(span, ...inlineNodes(b.text.slice(1)))
+  } else el.append(...inlineNodes(b.text))
 }
 
 function headDom(label: string, title: string) {
@@ -112,7 +134,7 @@ async function paginate(parts: Part[], host: HTMLElement, cancelled: () => boole
     let lo = 1, hi = words.length - 1, best = 0
     while (lo <= hi) {
       const mid = (lo + hi) >> 1
-      fillPara(el, { ...b, text: words.slice(0, mid).join(' '), split: true })
+      fillPara(el, { ...b, text: balanceSplit(words.slice(0, mid).join(' '), '')[0], split: true })
       if (fits()) { best = mid; lo = mid + 1 } else hi = mid - 1
     }
     if (best === 0) {
@@ -122,9 +144,11 @@ async function paginate(parts: Part[], host: HTMLElement, cancelled: () => boole
       queue.unshift(b)
       continue
     }
-    cur.blocks.push({ ...b, text: words.slice(0, best).join(' '), split: true })
+    // A cut inside italics closes them on this page and opens them again on the next.
+    const [headText, tailText] = balanceSplit(words.slice(0, best).join(' '), words.slice(best).join(' '))
+    cur.blocks.push({ ...b, text: headText, split: true })
     open(null)
-    queue.unshift({ ...b, text: words.slice(best).join(' '), cont: true, first: false, drop: false })
+    queue.unshift({ ...b, text: tailText, cont: true, first: false, drop: false })
   }
   }
   host.textContent = ''
@@ -192,7 +216,7 @@ export default function BookView({ scopeOverride }: { scopeOverride?: 'book' } =
                   ? <div key={j} className="pl-bk-break">{b.text}</div>
                   : (
                     <p key={j} className={paraClass(b)} onDoubleClick={() => edit(b.sceneId)}>
-                      {dropAt(b) ? <><span className="pl-bk-drop">{b.text[0]}</span>{b.text.slice(1)}</> : b.text}
+                      {dropAt(b) ? <><span className="pl-bk-drop">{b.text[0]}</span><Inline text={b.text.slice(1)} /></> : <Inline text={b.text} />}
                     </p>
                   ))}
               </div>

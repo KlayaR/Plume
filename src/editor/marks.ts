@@ -7,6 +7,7 @@ import { Decoration, EditorView, ViewPlugin, WidgetType, hoverTooltip, keymap, t
 import type { EntryType } from '../lib/types'
 import { findMentions, type Matcher } from '../lib/context'
 import { foldText } from '../lib/text'
+import { inlineSpans } from '../lib/inline'
 import { t } from '../i18n'
 
 // --- Unknown names ------------------------------------------------------------
@@ -258,4 +259,54 @@ export const trackedChangesExt = [
       return true
     },
   }),
+]
+
+// --- Italics and bold ---------------------------------------------------------------
+
+const cls = (i: boolean, b: boolean) => [i ? 'cm-it' : '', b ? 'cm-bd' : ''].filter(Boolean).join(' ')
+const mdMark = Decoration.mark({ class: 'cm-md-mark' })
+
+const inlinePlugin = ViewPlugin.fromClass(class {
+  decorations: DecorationSet
+  constructor(view: EditorView) { this.decorations = this.build(view) }
+  update(u: ViewUpdate) { if (u.docChanged || u.viewportChanged) this.decorations = this.build(u.view) }
+  build(view: EditorView) {
+    const b = new RangeSetBuilder<Decoration>()
+    for (const { from, to } of view.visibleRanges) {
+      for (let pos = from; pos <= to;) {
+        const line = view.state.doc.lineAt(pos)
+        for (const s of inlineSpans(line.text)) {
+          const a = line.from + s.from, z = line.from + s.to
+          b.add(a, a + s.marker, mdMark)
+          b.add(a + s.marker, z - s.marker, Decoration.mark({ class: cls(s.i, s.b) }))
+          b.add(z - s.marker, z, mdMark)
+        }
+        pos = line.to + 1
+      }
+    }
+    return b.finish()
+  }
+}, { decorations: v => v.decorations })
+
+/** Wraps the selection in the marker, or takes it off if it is already wrapped. */
+function toggleInline(view: EditorView, mark: string): boolean {
+  const { from, to } = view.state.selection.main
+  const doc = view.state.doc
+  const n = mark.length
+  const before = doc.sliceString(Math.max(0, from - n), from)
+  const after = doc.sliceString(to, Math.min(doc.length, to + n))
+  if (from !== to && before === mark && after === mark) {
+    view.dispatch({ changes: [{ from: from - n, to: from }, { from: to, to: to + n }], selection: { anchor: from - n, head: to - n } })
+  } else {
+    view.dispatch({ changes: [{ from, insert: mark }, { from: to, insert: mark }], selection: { anchor: from + n, head: to + n } })
+  }
+  return true
+}
+
+export const inlineExt = [
+  inlinePlugin,
+  keymap.of([
+    { key: 'Mod-i', run: v => toggleInline(v, '*') },
+    { key: 'Mod-b', run: v => toggleInline(v, '**') },
+  ]),
 ]

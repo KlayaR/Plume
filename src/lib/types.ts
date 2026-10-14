@@ -180,6 +180,8 @@ export interface Voice {
   taste: string
   /** Copies of the prompts this book uses, so it works on a computer that lacks your library. */
   snapshots: Record<string, { name: string; text: string }>
+  /** Which default preset this voice was set up from (so it is applied once, not again). */
+  defaults?: string
 }
 
 export const DEFAULT_VOICE: Voice = {

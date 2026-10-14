@@ -3,6 +3,7 @@
 import { invoke } from '@tauri-apps/api/core'
 import type { Book, BookMeta, Chapter, Entry, EntryType, Lang, Scene } from './types'
 import { DEFAULT_AI, DEFAULT_RULES, DEFAULT_VOICE, typeInfo } from './types'
+import { FANTASY_LISTS, FANTASY_STYLE, fantasyVoice } from './defaults'
 import { joinFrontmatter, parseEntry, parseScene, serializeEntry, serializeScene, splitFrontmatter } from './bible'
 import { newId, slugify } from './text'
 
@@ -178,7 +179,8 @@ export function makeScene(chapter: Chapter, title: string): Scene {
   return { id: newId(), path: `manuscript/${chapter.folder}/${file}.md`, title, pov: null, status: 'draft', text: '', extra: {} }
 }
 
-const STYLE: Record<Lang, string> = {
+/** The empty style guide of the first versions: a book that still has it gets the fantasy one. */
+export const STOCK_STYLE: Record<Lang, string> = {
   fr: '### Voix\n\n### Temps\nPassé simple.\n\n### Point de vue\n\n### Mots à éviter\n',
   en: '### Voice\n\n### Tense\nPast tense.\n\n### POV rules\n\n### Words to avoid\n',
 }
@@ -186,12 +188,18 @@ const STYLE: Record<Lang, string> = {
 export async function createBook(root: string, title: string, author: string, language: Lang): Promise<Book> {
   if (await isBook(root)) throw new Error('This folder already holds a book.')
   const meta = normalizeMeta({ title, author, language })
-  const style: Entry = { slug: 'style', type: 'style', path: 'bible/style.md', name: language === 'fr' ? 'Guide de style' : 'Style guide', aliases: [], include: 'always', links: [], short: '', full: STYLE[language], facts: [], extra: {} }
+  meta.voice = fantasyVoice(language) // new books start with the fantasy voice
+  const style: Entry = { slug: 'style', type: 'style', path: 'bible/style.md', name: language === 'fr' ? 'Guide de style' : 'Style guide', aliases: [], include: 'always', links: [], short: '', full: FANTASY_STYLE[language], facts: [], extra: {} }
   const book: Book = { root, meta, entries: [style], chapters: [] }
   const ch = makeChapter(book, language === 'fr' ? 'Chapitre 1' : 'Chapter 1')
   ch.scenes.push(makeScene(ch, language === 'fr' ? 'Scène 1' : 'Scene 1'))
   book.chapters.push(ch)
   await saveEntry(root, style)
+  for (const l of FANTASY_LISTS[language]) {
+    const e = { ...makeEntry(book, 'wordlist', l.name), full: l.full }
+    book.entries.push(e)
+    await saveEntry(root, e)
+  }
   await saveChapter(root, ch)
   await saveScene(root, ch.scenes[0])
   await saveMeta(book)

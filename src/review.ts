@@ -176,7 +176,7 @@ export async function readAloud(text: string, lang: string) {
   if (!paras.length) return
   useReview.setState({ speaking: true })
   paras.forEach((p, i) => {
-    const u = new SpeechSynthesisUtterance(p.replace(/^[—–]\s*/, ''))
+    const u = new SpeechSynthesisUtterance(p.replace(/^[—–]\s*/, '').replace(/\*+/g, ''))
     u.lang = lang === 'fr' ? 'fr-FR' : 'en-US'
     if (voice) u.voice = voice
     u.rate = 0.95

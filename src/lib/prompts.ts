@@ -26,7 +26,8 @@ Règles :
 - Respecte la voix, le temps et le point de vue de l'auteur, tels qu'ils apparaissent dans le texte et le guide de style.
 - Respecte chaque fait de la bible (<bible>). Ne le contredis jamais. N'invente pas de fait majeur qui n'y figure pas.
 - Réponds uniquement avec la prose : pas de titre, pas de préambule, pas de commentaire, pas de Markdown, pas de guillemets autour de la réponse.
-- Typographie française : guillemets « », tiret cadratin (—) pour les dialogues, points de suspension (…).`
+- Typographie française : guillemets « », tiret cadratin (—) pour les dialogues, points de suspension (…).
+- Les italiques s'écrivent *comme ceci* (pensées, mots étrangers, insistance) : conserve ceux du texte et n'en mets qu'avec parcimonie.`
   }
   return `You are a fiction co-writer inside Plume, a novel-writing app. You write prose for the book "${title}", in English.
 
@@ -34,7 +35,8 @@ Rules:
 - Match the author's voice, tense and point of view, as shown in the story text and the style guide.
 - Respect every fact in the bible (<bible>). Never contradict it. Don't invent major facts that aren't there.
 - Reply with the prose only: no title, no preamble, no notes, no Markdown, no quotation marks around the reply.
-- Typography: curly quotes, em dashes, ellipsis character (…).`
+- Typography: curly quotes, em dashes, ellipsis character (…).
+- Italics are written *like this* (thoughts, foreign words, emphasis): keep the ones in the text and use them sparingly.`
 }
 
 interface Story { before: string; selection: string; after: string }

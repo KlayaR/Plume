@@ -253,7 +253,7 @@ export const useStore = create<State>((set, get) => {
       import('./writing').then(m => m.loadNotes(book))
       import('./agents').then(m => m.loadAgents())
       // Library and safety: the lock for synced folders, today's backup, progress, the shelf card.
-      import('./library').then(m => { m.takeLock(book); m.autoBackup(book); m.recordProgress(get().book!); m.noteOnShelf(get().book!); m.refreshSnapshots(get().book!) })
+      import('./library').then(m => { m.takeLock(book); m.autoBackup(book); m.recordProgress(get().book!); m.noteOnShelf(get().book!); m.refreshSnapshots(get().book!); m.applyFantasyDefaults(get().book!) })
     },
     close: () => {
       const b = get().book

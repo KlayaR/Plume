@@ -9,6 +9,9 @@ import { bookCounts } from './lib/stats'
 import { createBook, makeChapter, makeScene, saveChapter, saveMeta, saveScene, seriesRootOf } from './lib/project'
 import { fromBase64, fromUtf8, makeZip, readZip, toBase64 } from './lib/zip'
 import { allPrompts, usedPromptIds } from './lib/voice'
+import { FANTASY_LISTS, FANTASY_STYLE, FANTASY_VERSION, fantasyVoice } from './lib/defaults'
+import { STOCK_STYLE } from './lib/project'
+import { DEFAULT_RULES } from './lib/types'
 import { useStore } from './store'
 import { t } from './i18n'
 
@@ -148,6 +151,36 @@ export function refreshSnapshots(book: Book) {
     useStore.getState().updateMeta({ voice: { ...book.meta.voice, snapshots } })
   }
 }
+
+// --- The fantasy defaults ------------------------------------------------------------
+
+const isStockStyle = (full: string) => full.replace(/###[^\n]*/g, '').replace(/Passé simple\.|Past tense\./g, '').trim() === '' || full === STOCK_STYLE.fr || full === STOCK_STYLE.en
+
+/**
+ * Sets the book up with the fantasy voice: prompt, scene rules, rules, the two
+ * word lists, and the style guide when it is still the empty one. Automatic once
+ * for a book with no voice yet; `force` (the button in Settings → Voice) does it
+ * again, keeping your tense, adult setting, description and taste.
+ */
+export function applyFantasyDefaults(book: Book, force = false): boolean {
+  const v = book.meta.voice
+  const pristine = !v.prompt && !v.sceneRules.length && !v.description.trim() && JSON.stringify(v.rules) === JSON.stringify(DEFAULT_RULES)
+  if (!force && (v.defaults || !pristine)) return false
+  const st = useStore.getState()
+  const lang = book.meta.language
+  st.updateMeta({ voice: { ...fantasyVoice(lang), tense: v.tense, adult: v.adult, description: v.description, taste: v.taste, snapshots: v.snapshots } })
+  for (const l of FANTASY_LISTS[lang]) {
+    if (st.book!.entries.some(e => e.type === 'wordlist' && e.name === l.name)) continue
+    const e = useStore.getState().addEntry('wordlist', l.name)
+    useStore.getState().updateEntry(e.slug, { full: l.full })
+  }
+  const style = useStore.getState().book!.entries.find(e => e.type === 'style')
+  if (style && isStockStyle(style.full)) useStore.getState().updateEntry(style.slug, { full: FANTASY_STYLE[lang] })
+  refreshSnapshots(useStore.getState().book!)
+  if (!force) useStore.getState().notify('ok', t('Fantasy voice settings applied. Change them in Settings → Voice.'))
+  return true
+}
+export const FANTASY_APPLIED = FANTASY_VERSION
 
 // --- Safe sync: who has the book open ---------------------------------------------------
 

@@ -13,7 +13,7 @@ import { languageToolExt, refreshLT } from './lt'
 import { enterStartsScene } from '../lib/chapters'
 import { proposalField, sceneExtensions, setNames } from './cm'
 import { accept, discard, fillPlaceholder, getEditorView, runAction, setEditorView, syncProposalState, useAI } from './actions'
-import { marksExt, placeholderExt, setHighlights, trackedChangesExt, unknownNamesExt, type Highlight } from './marks'
+import { inlineExt, marksExt, placeholderExt, setHighlights, trackedChangesExt, unknownNamesExt, type Highlight } from './marks'
 import type { Comment, EntryType } from '../lib/types'
 import { cutToDarlings } from '../writing'
 import { useReview } from '../review'
@@ -128,6 +128,7 @@ function makeState(s: Scene, lang: Lang) {
       // The plan card's note, in grey, until the scene has text.
       placeholder(s.note?.trim() ? s.note.trim() : t('Start writing…')),
       marksExt,
+      inlineExt,
       trackedChangesExt,
       unknown,
       placeholderExt((view, from, to, note) => fillPlaceholder(view, from, to, note)),

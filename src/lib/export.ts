@@ -7,6 +7,7 @@ import { chapterLabels } from './chapters'
 import { fixTypography } from './typography'
 import { countWords, newId } from './text'
 import { makeZip, utf8 } from './zip'
+import { inlineDocx, inlineHtml } from './inline'
 
 export type ExportFormat = 'epub' | 'docx' | 'md' | 'pdf'
 export type DocxLayout = 'book' | 'submission'
@@ -62,7 +63,7 @@ ${body}
     title: p.title ? `${p.label} : ${p.title}` : p.label,
     html: page(p.label, `<section epub:type="chapter">
 <h1><span class="num">${esc(p.label)}</span>${p.title ? `<br/><span class="title">${esc(p.title)}</span>` : ''}</h1>
-${p.scenes.map(s => s.map((para, j) => `<p${j === 0 ? ' class="first"' : ''}>${esc(para)}</p>`).join('\n')).join(`\n<p class="break">${esc(o.sceneBreak)}</p>\n`)}
+${p.scenes.map(s => s.map((para, j) => `<p${j === 0 ? ' class="first"' : ''}>${inlineHtml(para)}</p>`).join('\n')).join(`\n<p class="break">${esc(o.sceneBreak)}</p>\n`)}
 </section>`),
   }))
   const toc = lang === 'fr' ? 'Table des matières' : 'Contents'
@@ -134,7 +135,7 @@ export async function toDocx(book: Book, o: ExportOptions): Promise<Uint8Array> 
   const words = book.chapters.reduce((n, c) => n + c.scenes.reduce((m, s) => m + countWords(s.text), 0), 0)
   const run = (text: string) => `<w:r><w:t xml:space="preserve">${esc(text)}</w:t></w:r>`
   const para = (text: string, style: string, first = false) =>
-    `<w:p><w:pPr><w:pStyle w:val="${style}"/>${first ? '<w:ind w:firstLine="0"/>' : ''}</w:pPr>${run(text)}</w:p>`
+    `<w:p><w:pPr><w:pStyle w:val="${style}"/>${first ? '<w:ind w:firstLine="0"/>' : ''}</w:pPr>${inlineDocx(text, esc)}</w:p>`
   const body: string[] = []
   if (o.titlePage) {
     if (sub && !fr) body.push(para(book.meta.author || '—', 'Plain'), para(`${Math.round(words / 1000) * 1000} words`, 'Plain'))

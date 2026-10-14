@@ -3,9 +3,14 @@
 // proposal against your measurable rules, locally (zero tokens).
 import { invoke } from '@tauri-apps/api/core'
 import type { ActionId, Book, Entry, Lang, Rules, SceneRule } from './types'
+import { FANTASY_ID, FANTASY_PROMPT } from './defaults'
 import { adverbs, dialogue, passives, phrases, sentences, words } from './analysis'
 
-export interface PromptSet { id: string; name: string; text: string; preset?: boolean }
+/** `fr` is the French text of a preset; your own prompts have one text. */
+export interface PromptSet { id: string; name: string; text: string; fr?: string; preset?: boolean }
+
+/** The prompt's text for the book's language. */
+export const promptText = (p: PromptSet, lang: Lang) => (lang === 'fr' && p.fr ? p.fr : p.text)
 
 const PROMPTS_KEY = 'plume.prompts'
 
@@ -13,7 +18,7 @@ const PROMPTS_KEY = 'plume.prompts'
 export const PRESETS: PromptSet[] = [
   { id: 'preset-literary', name: 'Literary', preset: true, text: 'Write literary prose in {book.language}, in {book.tense}. Favour concrete sensory detail over abstraction, subtext over stated emotion, and varied sentence rhythm. Let silences and gestures carry meaning. Avoid clichés and the words in {list.all}.' },
   { id: 'preset-thriller', name: 'Thriller', preset: true, text: 'Write a tight thriller in {book.language}, in {book.tense}. Short paragraphs, short sentences in action, a question or threat open at the end of every scene. Every scene raises the stakes. No recap, no long description. Avoid the words in {list.all}.' },
-  { id: 'preset-fantasy', name: 'Fantasy', preset: true, text: 'Write epic fantasy in {book.language}, in {book.tense}. The world is lived in, not explained: no info-dumps, reveal lore through action and dialogue. Respect the rules of magic in the bible exactly. Avoid the words in {list.all}.' },
+  { id: FANTASY_ID, name: 'Fantasy', preset: true, text: FANTASY_PROMPT.en, fr: FANTASY_PROMPT.fr },
   { id: 'preset-romance', name: 'Romance', preset: true, text: 'Write romance in {book.language}, in {book.tense}, from {scene.pov}’s point of view. Tension in every exchange, emotions shown in the body and in what is not said. Banter with rhythm. Avoid the words in {list.all}.' },
   { id: 'preset-noir', name: 'Noir', preset: true, text: 'Write noir in {book.language}, in {book.tense}. Dry, wry, cynical narration; hard images; dialogue that cuts. No sentimentality. Avoid the words in {list.all}.' },
 ]

@@ -21,8 +21,8 @@ export function fixTypography(text: string, lang: Lang): string {
     t = out
       .replace(/«[   ]*/g, `«${NBSP}`)
       .replace(/[   ]*»/g, `${NBSP}»`)
-      .replace(/(?<=[\p{L}\p{N}»)\]…’])[   ]*([;!?]+)/gu, `${NNBSP}$1`)
-      .replace(/(?<=[\p{L}»)\]…’])[   ]*:/gu, `${NBSP}:`)
+      .replace(/(?<=[\p{L}\p{N}»)\]…’*])[   ]*([;!?]+)/gu, `${NNBSP}$1`)
+      .replace(/(?<=[\p{L}»)\]…’*])[   ]*:/gu, `${NBSP}:`)
     return t
   }
   t = t.replace(/--/g, '—')
@@ -54,11 +54,11 @@ export function typingRule(lang: Lang, before: string, ch: string): { remove: nu
     if (ch === ' ' && /^[ \t]*[-–—]$/.test(before)) return { remove: 1, insert: `—${NBSP}` }
     if (';!?'.includes(ch)) {
       if (prev === ' ' || prev === NBSP) return { remove: 1, insert: NNBSP + ch }
-      if (/[\p{L}\p{N}»…’]/u.test(prev)) return { remove: 0, insert: NNBSP + ch }
+      if (/[\p{L}\p{N}»…’*]/u.test(prev)) return { remove: 0, insert: NNBSP + ch }
     }
     if (ch === ':') {
       if (prev === ' ') return { remove: 1, insert: NBSP + ':' }
-      if (/[\p{L}»…’]/u.test(prev)) return { remove: 0, insert: NBSP + ':' }
+      if (/[\p{L}»…’*]/u.test(prev)) return { remove: 0, insert: NBSP + ':' }
     }
     return null
   }

@@ -12,7 +12,7 @@ import Editor from '../editor/Editor'
 import { useAI } from '../editor/actions'
 import ContextPanel from './ContextPanel'
 import ReviewPanel from './ReviewPanel'
-import BookView from './BookView'
+import BookView, { Inline } from './BookView'
 import ChatPanel, { ResizeHandle } from './ChatPanel'
 import { ManuscriptToolbar } from './BottomBar'
 import NotesPanel from './NotesPanel'
@@ -301,7 +301,7 @@ function LazyEditor({ scene, active }: { scene: Scene; active: boolean }) {
   return (
     <div ref={box} className="pl-editor pl-lazy">
       <div className="cm-scroller"><div className="cm-content">
-        {scene.text.split('\n').map((l, i) => <div key={i} className="cm-line">{l || '\u00a0'}</div>)}
+        {scene.text.split('\n').map((l, i) => <div key={i} className="cm-line">{l ? <Inline text={l} /> : '\u00a0'}</div>)}
       </div></div>
     </div>
   )

@@ -6,11 +6,11 @@ import { Copy, Plus, Sparkles, Trash2 } from 'lucide-react'
 import { SettingRow, SettingsSection, Switch } from '../studio-kit/shell.js'
 import { useStore } from '../store'
 import type { Rules, SceneRule, Voice } from '../lib/types'
-import { allPrompts, loadPrompts, PRESETS, savePrompts, SCENE_RULES, VARIABLES, type PromptSet } from '../lib/voice'
+import { allPrompts, loadPrompts, PRESETS, promptText, savePrompts, SCENE_RULES, VARIABLES, type PromptSet } from '../lib/voice'
 import { profile } from '../lib/analysis'
 import { newId } from '../lib/text'
 import { ask } from '../ai'
-import { refreshSnapshots } from '../library'
+import { applyFantasyDefaults, refreshSnapshots } from '../library'
 import { numLocale, useT } from '../i18n'
 
 const n = (x: number, d = 0) => x.toLocaleString(numLocale(), { maximumFractionDigits: d, minimumFractionDigits: d })
@@ -28,6 +28,9 @@ export default function VoiceSettings() {
       <PromptLibrary />
 
       <SettingsSection title={t('This book’s voice')} description={t('Sent with every request for this book.')}>
+        <SettingRow label={t('Fantasy defaults')} description={t('Plume’s fantasy preset: deep point of view, the world shown through action, magic with a cost, no info-dumps, no clichés. Sets the prompt, scene rules, your rules and two word lists (your tense, adult setting, voice description and taste are kept).')}>
+          <button type="button" className="sk-btn sk-btn-sm" onClick={() => { applyFantasyDefaults(useStore.getState().book!, true); useStore.getState().notify('ok', t('Fantasy voice settings applied.')) }}>{t('Apply')}</button>
+        </SettingRow>
         <SettingRow label={t('Tense and person')} description={t('Also fills {book.tense} in your prompts')}>
           <input className="sk-input pl-wide" value={voice.tense} placeholder={book.meta.language === 'fr' ? 'passé simple, troisième personne' : 'past tense, third person'} onChange={e => set({ tense: e.target.value })} />
         </SettingRow>
@@ -79,7 +82,7 @@ function PromptLibrary() {
     setTimeout(() => refreshSnapshots(useStore.getState().book!), 0)
   }
   const add = (from?: PromptSet) => {
-    const p = { id: newId(), name: from ? `${t(from.name)} (${t('copy')})` : t('My prompt'), text: from?.text ?? '' }
+    const p = { id: newId(), name: from ? `${t(from.name)} (${t('copy')})` : t('My prompt'), text: from ? promptText(from, book.meta.language) : '' }
     save([...mine, p])
     setEditing(p.id)
   }

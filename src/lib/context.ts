@@ -5,7 +5,7 @@ import type { ActionId, Book, Entry, Lang, Scene } from './types'
 import { factApplies } from './bible'
 import { estimateTokens, fold, lastWords, firstWords } from './text'
 import { taskMessage, systemRules } from './prompts'
-import { expandVariables, promptFor } from './voice'
+import { expandVariables, promptFor, promptText } from './voice'
 import { passageKind } from './analysis'
 
 /** Entry types that are never looked for in the text. */
@@ -241,7 +241,7 @@ export function buildContext(input: ContextInput): Built {
   const excerpts = input.action === 'rewrite' ? [] : pickExcerpts(book, input.before)
   const system = [
     rules,
-    prompt ? `<author_instructions>\n${expandVariables(prompt.text, vars)}\n</author_instructions>` : '',
+    prompt ? `<author_instructions>\n${expandVariables(promptText(prompt, lang), vars)}\n</author_instructions>` : '',
     voice.description.trim() ? `<author_voice>\n${voice.description.trim()}\n</author_voice>` : '',
     voice.taste.trim() ? `<author_taste>\n${voice.taste.trim()}\n</author_taste>` : '',
     styleText ? `<style_guide>\n${expandVariables(styleText, vars)}\n</style_guide>` : '',

@@ -2,7 +2,7 @@
 import { countWords } from './text'
 
 /** Signs as French publishers count them: every character, spaces included, not line breaks. */
-export const countSigns = (s: string) => s.replace(/\r?\n/g, '').length
+export const countSigns = (s: string) => s.replace(/\r?\n/g, '').replace(/\*/g, '').length
 
 export const feuillets = (signs: number) => signs / 1500
 

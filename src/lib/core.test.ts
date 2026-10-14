@@ -17,6 +17,7 @@ import { bookCounts, sceneCounts } from './stats'
 import { darlingSpot, diffWords } from '../writing'
 import { parseJSON } from '../ai'
 import { chunks, kindOf, ltLanguage } from './languagetool'
+import { balanceSplit, inlineHtml, parseInline, stripInline } from './inline'
 import { splitManuscript } from '../library'
 import { toMarkdown } from './export'
 
@@ -360,5 +361,30 @@ describe('LanguageTool client', () => {
     expect(ltLanguage('fr', 'en-GB')).toBe('fr')
     expect(ltLanguage('en', 'en-GB')).toBe('en-GB')
     expect(ltLanguage('en', '')).toBe('en-US')
+  })
+})
+
+describe('italics and bold', () => {
+  it('reads *italic*, **bold** and ***both***', () => {
+    expect(parseInline('Il *pensa* que **non** et ***jamais***.')).toEqual([
+      { t: 'Il ' }, { t: 'pensa', i: true, b: false }, { t: ' que ' }, { t: 'non', i: false, b: true }, { t: ' et ' }, { t: 'jamais', i: true, b: true }, { t: '.' },
+    ])
+    expect(stripInline('un *mot* seul')).toBe('un mot seul')
+  })
+  it('leaves stray asterisks alone', () => {
+    expect(stripInline('5 * 3 * 2')).toBe('5 * 3 * 2')
+    expect(stripInline('* * *')).toBe('* * *')
+  })
+  it('keeps a span whole across a page break', () => {
+    const [head, tail] = balanceSplit('Il *se dit que', 'rien ne changerait* jamais.')
+    expect(head).toBe('Il *se dit que*')
+    expect(tail).toBe('*rien ne changerait* jamais.')
+    expect(balanceSplit('Rien *ici* du tout', 'la suite')).toEqual(['Rien *ici* du tout', 'la suite'])
+  })
+  it('writes <em> and <strong> and escapes the rest', () => {
+    expect(inlineHtml('A & *B* <i>')).toBe('A &amp; <em>B</em> &lt;i&gt;')
+  })
+  it('does not count the markers as signs', () => {
+    expect(countSigns('un *mot*')).toBe(countSigns('un mot'))
   })
 })

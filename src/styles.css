@@ -642,3 +642,8 @@ body.pl-typing .pl-toolbar { opacity: 0.08; }
 .cm-lt-style { text-decoration-color: #d39b3a; text-decoration-style: dotted; }
 .cm-ltcard { max-width: 24rem; }
 .pl-lt-status { display: flex; flex-direction: column; gap: 6px; }
+
+/* Italics and bold in the text: the markers fade, the words change. */
+.cm-it { font-style: italic; }
+.cm-bd { font-weight: 700; }
+.cm-md-mark { opacity: 0.3; }
