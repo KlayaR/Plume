@@ -2,6 +2,7 @@
   "name": "plume",
   "version": "1.1.0",
   "description": "Novel writing app with a story bible, on the Claude command line",
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "sync-kit": "node ../../audio/StudioKit/scripts/sync.mjs .",
@@ -11,7 +12,8 @@
     "dev": "tauri dev",
     "build": "tauri build",
     "tauri": "tauri",
-    "test": "vitest run"
+    "test": "vitest run",
+    "check": "node scripts/check-i18n.mjs && node scripts/check-versions.mjs"
   },
   "dependencies": {
     "@codemirror/commands": "^6.8.0",

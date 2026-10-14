@@ -1,0 +1,20 @@
+name: Idea
+description: Something Plume could do, or do better.
+labels: [idea]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: The writing problem first; the solution can come after.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would help
+  - type: textarea
+    id: others
+    attributes:
+      label: How other tools do it
+      description: Scrivener, novelcrafter, AutoCrit, NEO… if relevant.

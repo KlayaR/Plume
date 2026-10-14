@@ -1,0 +1,41 @@
+name: Bug report
+description: Something in Plume doesn't work as it should.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open a book in French
+        2. In the Manuscript, select a passage
+        3. ...
+  - type: input
+    id: version
+    attributes:
+      label: Plume version
+      placeholder: "1.1.0 (Settings → About)"
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+      placeholder: Windows 11 24H2
+  - type: dropdown
+    id: area
+    attributes:
+      label: Where
+      options: [Manuscript, Writing with Claude, Bible, Plan, Review, Export, Settings, Other]
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else
+      description: Screenshots or a few lines of text that reproduce it. Please don't attach your manuscript.
