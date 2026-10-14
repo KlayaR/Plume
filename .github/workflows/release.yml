@@ -2,6 +2,9 @@ name: Release
 
 # Push a tag like v0.12.0: builds the Windows installer and publishes a
 # release with that version's CHANGELOG.md section, published at once.
+# The installer is signed for the updater (TAURI_SIGNING_PRIVATE_KEY and
+# its password), and latest.json on the `updater` release then points
+# installed copies of Plume to it.
 on:
   push:
     tags: ['v*']
@@ -25,7 +28,12 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run check
-      - run: npm run build
+      - name: Build the signed installer
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: npm run build -- --config '{"bundle":{"createUpdaterArtifacts":true}}'
       - name: Draft the release
         shell: bash
         env:
@@ -33,6 +41,11 @@ jobs:
         run: |
           version="${GITHUB_REF_NAME#v}"
           node scripts/release-notes.mjs "$version" > notes.md
+          node scripts/updater-manifest.mjs "$version" notes.md > latest.json
           pre=""; case "$version" in 0.*) pre="--prerelease";; esac
           gh release create "$GITHUB_REF_NAME" $pre --title "Plume $version" --notes-file notes.md \
             src-tauri/target/release/bundle/nsis/*.exe
+          # Only once the installer is out: installed copies now see the new version.
+          gh release view updater >/dev/null 2>&1 || gh release create updater --prerelease \
+            --title "Automatic updates" --notes "latest.json for Plume's automatic updates. Keep this release."
+          gh release upload updater latest.json --clobber

@@ -63,7 +63,8 @@ Plume runs on Windows 10 and 11.
 
 1. Download `Plume_<version>_x64-setup.exe` from the Releases page and run it.
    The installer isn't code-signed yet, so Windows SmartScreen may warn about an
-   unknown publisher: choose *More info*, then *Run anyway*.
+   unknown publisher: choose *More info*, then *Run anyway*. From then on,
+   Plume offers each new version when it starts (Settings › About).
 2. For the AI features, install the [Claude Code](https://claude.com/claude-code)
    command line and sign in once with your Claude subscription. Plume finds it
    on its own (or set its path in Settings). Everything else works without it.

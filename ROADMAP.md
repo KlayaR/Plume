@@ -18,7 +18,6 @@ or changes features.
 - Test every feature in daily use on real books and fix what breaks.
 - Undo for deletions and renames in the Plan and the Bible (moves already undo).
 - Code-signed installer, so Windows stops warning about an unknown publisher.
-- Automatic updates (Tauri updater) once releases are public.
 
 ## Later
 - UK single quotes as an option for English books. *help wanted*

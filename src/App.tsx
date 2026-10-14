@@ -10,6 +10,7 @@ import { applyPrefs } from './lib/fonts'
 import { setClaudeTranslator } from './lib/claude'
 import { restorePrompts } from './lib/voice'
 import { restoreReferences } from './lib/references'
+import { checkAtStartup } from './updates'
 import { shellStrings, translate, useT } from './i18n'
 import StartScreen from './components/StartScreen'
 import WritingView from './components/WritingView'
@@ -38,7 +39,7 @@ export default function App() {
   setShellStrings(shellStrings(prefs.ui))
   setClaudeTranslator((text, vars) => translate(useStore.getState().prefs.ui, text, vars))
 
-  useEffect(() => { useStore.getState().detectClaude(); restorePrompts(); restoreReferences() }, [])
+  useEffect(() => { useStore.getState().detectClaude(); restorePrompts(); restoreReferences(); checkAtStartup() }, [])
   // The first time a book opens, a short tour of where things are.
   useEffect(() => {
     if (!book) return
@@ -107,7 +108,7 @@ function Toasts() {
   const toast = useStore(s => s.toast)
   const t = useT()
   useEffect(() => {
-    if (!toast) return
+    if (!toast || toast.sticky) return
     const timer = setTimeout(() => useStore.setState({ toast: null }), toast.kind === 'error' ? 9000 : 5000)
     return () => clearTimeout(timer)
   }, [toast])

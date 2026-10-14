@@ -68,3 +68,9 @@ Add the version's section to `CHANGELOG.md`, bump the three version files,
 commit, then tag and push: `git tag v0.12.0 && git push origin v0.12.0`. The
 Release workflow builds the Windows installer and publishes a release (a
 pre-release while Plume is in 0.x) with the changelog section.
+
+Installers are signed for the updater with the `TAURI_SIGNING_PRIVATE_KEY` and
+`TAURI_SIGNING_PRIVATE_KEY_PASSWORD` repository secrets; the public key is in
+`tauri.conf.json`. The workflow then replaces `latest.json` on the `updater`
+release, which installed copies read to offer the new version. Keep the
+private key backed up: without it, installed copies can no longer update.

@@ -130,6 +130,12 @@ const FR: Record<string, string> = {
   'Reset the manuscript look': 'Rétablir l’aspect par défaut', 'Display': 'Affichage',
   'Display: font, size, justify, what the page shows': 'Affichage : police, taille, justification, ce que montre la page',
   'More in Settings…': 'Plus dans les Paramètres…', 'Appearance': 'Apparence', 'This book': 'Ce livre', 'About': 'À propos', 'Close': 'Fermer',
+  // Updates
+  'Check for updates at startup': 'Chercher les mises à jour au démarrage', 'Updates': 'Mises à jour', 'Check now': 'Vérifier maintenant',
+  'Plume asks before installing a new version, and saves your work first.': 'Plume demande avant d’installer une nouvelle version, et enregistre votre travail d’abord.',
+  'Plume is up to date.': 'Plume est à jour.', 'Could not check for updates: {e}': 'Impossible de vérifier les mises à jour : {e}',
+  'Plume {v} is available.': 'Plume {v} est disponible.', 'Install and restart': 'Installer et redémarrer',
+  'Downloading Plume {v}…': 'Téléchargement de Plume {v}…', 'The update failed: {e}': 'La mise à jour a échoué : {e}',
   'How the manuscript looks on this computer. The quick ones are also under Aa in the bottom bar.': 'L’aspect du manuscrit sur cet ordinateur. Les réglages rapides sont aussi sous Aa, dans la barre du bas.',
   'Auto follows the Windows setting': 'Auto suit le réglage de Windows',
   'Chapters pane': 'Panneau des chapitres', 'Pinned open, or sliding in from the left edge': 'Toujours ouvert, ou glissant depuis le bord gauche',

@@ -10,6 +10,7 @@
     "core:window:allow-destroy",
     "dialog:allow-open",
     "dialog:allow-ask",
-    "dialog:allow-save"
+    "dialog:allow-save",
+    "updater:default"
   ]
 }
