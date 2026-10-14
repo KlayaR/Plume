@@ -3,6 +3,7 @@
 // beats, the pacing view, beats suggested from the bible), Timeline (story time
 // and dated facts, with what doesn't add up), Story lines (which scene moves which line).
 import { useMemo, useState } from 'react'
+import { ask as askDialog } from '@tauri-apps/plugin-dialog'
 import { AlertTriangle, GripVertical, Lightbulb, PenLine, Plus, Sparkles, Trash2, X } from 'lucide-react'
 import { useStore, type PlanTab } from '../store'
 import type { Chapter, LooseCard, Scene, SceneStatus } from '../lib/types'
@@ -221,8 +222,8 @@ function Structure() {
   const scenes = book.chapters.flatMap(c => c.scenes)
   const pos = useMemo(() => scenePositions(book), [book])
 
-  const choose = (id: string) => {
-    if (beats.some(b => b.note.trim() || b.sceneId) && !confirm(t('Replace the current beats? Their notes will be lost.'))) return
+  const choose = async (id: string) => {
+    if (beats.some(b => b.note.trim() || b.sceneId) && !(await askDialog(t('Replace the current beats? Their notes will be lost.'), { title: t('Structure'), kind: 'warning' }))) return
     set({ template: id, beats: id && id !== 'custom' ? templateBeats(id, lang) : [] })
   }
   const suggest = async () => {

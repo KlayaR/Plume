@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react'
 import { save } from '@tauri-apps/plugin-dialog'
 import { invoke } from '@tauri-apps/api/core'
-import { Bot, Check, FileOutput, ListChecks, Search, Square, Undo2 } from 'lucide-react'
+import { Bot, Check, Compass, FileOutput, ListChecks, Search, Square, Undo2 } from 'lucide-react'
 import { Dialog } from '../studio-kit/shell.js'
 import { useStore } from '../store'
 import { toDocx, toEpub, toMarkdown, type DocxLayout, type ExportFormat } from '../lib/export'
@@ -180,6 +180,29 @@ export function AgentDialog({ onClose }: { onClose: () => void }) {
           </div>
         ))}
       </div>
+    </Dialog>
+  )
+}
+
+const TOUR: [string, string][] = [
+  ['The three spaces', 'Bible (what the book knows), Plan (what happens) and Manuscript (the text), in the bar at the bottom.'],
+  ['Write, then ask', 'In the Manuscript the right pane has Assistant (Continue, Rewrite, Beats), Chat and Notes. Claude only gets the bible entries your text mentions.'],
+  ['See what it costs', 'The size meter shows the request before you send it. The dot and the percentages in the bar show your plan\'s usage.'],
+  ['The toolbar above the page', 'Write / Review, Sheet / Page, Scene / Chapter / Book, the split view and Aa (fonts, paper) are all up there.'],
+  ['Brainstorm', 'The chat tab thinks with you and knows your bible. "Turn into entries" drafts entries for the review list; the clock button brings back old conversations.'],
+  ['Make the panes yours', 'Drag the edge of the side panes to resize them; double-click the edge to reset.'],
+  ['Your voice', 'Settings (Ctrl+,) → Voice: your prompts, your rules, your style. Every proposal is checked against your rules.'],
+  ['Nothing is lost', 'A history of every scene, a daily backup, and removed files go to the book\'s trash folder. The ⋯ menu has export, agent tasks and this tour.'],
+]
+
+export function TourDialog({ onClose }: { onClose: () => void }) {
+  const t = useT()
+  return (
+    <Dialog title={t('Quick tour')} icon={Compass} onClose={onClose} footer={<button type="button" className="sk-btn sk-btn-primary" onClick={onClose}>{t('Got it')}</button>}>
+      <ol className="pl-tour">
+        {TOUR.map(([h, p]) => <li key={h}><b>{t(h)}</b><span>{t(p)}</span></li>)}
+      </ol>
+      <p className="sk-hint">{t('You can open this again from the ⋯ menu.')}</p>
     </Dialog>
   )
 }

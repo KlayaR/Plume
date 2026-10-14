@@ -12,6 +12,11 @@ import { checkRules, expandVariables } from './voice'
 import { review } from './review'
 import { parseStoryTime } from './structures'
 import { makeZip, readZip, utf8, fromUtf8 } from './zip'
+import { scenePositions, timeFlags } from './structures'
+import { bookCounts, sceneCounts } from './stats'
+import { darlingSpot, diffWords } from '../writing'
+import { parseJSON } from '../ai'
+import { splitManuscript } from '../library'
 import { toMarkdown } from './export'
 
 const entry = (over: Partial<Entry>): Entry => ({
@@ -254,5 +259,79 @@ describe('export', () => {
     const md = toMarkdown(book, { format: 'md', layout: 'book', titlePage: true, sceneBreak: '* * *' })
     expect(md).toContain('## Chapitre 1 : Le bal')
     expect(md).not.toContain('⟦')
+  })
+})
+
+describe('French checks on real prose', () => {
+  it('catches a short passive participle and ignores adjectives', () => {
+    expect(passives('Elle a été vue par le garde.', 'fr').length).toBe(1)
+    expect(passives('Le ciel était gris et la porte était fermée.', 'fr').map(f => 'x').length).toBe(1) // fermée only
+    expect(passives('Il est né à Lyon. Elle est partie vite.', 'fr').length).toBe(0)
+  })
+  it('does not call être forms echoes', () => {
+    expect(echoes('Les lettres furent brûlées. Les murs furent détruits.', 'fr').length).toBe(0)
+  })
+})
+
+describe('plan helpers', () => {
+  const mk = (scenes: { id: string; time?: string; place?: string; pov?: string; text?: string }[]): Book => ({
+    root: '', entries: [],
+    meta: { format: 1, title: 'T', author: '', language: 'en', order: [], ai: { ...DEFAULT_AI }, voice: DEFAULT_VOICE, structure: { template: '', beats: [] }, loose: [], history: {}, goal: { book: 0, daily: 0 }, series: null, map: null, ignored: [] },
+    chapters: [{ id: 'c', folder: 'c', kind: 'chapter', title: '', notes: '', scenes: scenes.map(x => ({ id: x.id, path: x.id, title: x.id, pov: x.pov ?? null, status: 'draft' as const, text: x.text ?? 'word '.repeat(10), time: x.time, place: x.place ?? null, extra: {} })) }],
+  })
+  it('flags story time running backwards', () => {
+    const flags = timeFlags(mk([{ id: 'a', time: 'Day 3, 22:00' }, { id: 'b', time: 'Day 2' }]), false)
+    expect(flags.map(f => f.sceneId)).toEqual(['b'])
+    expect(timeFlags(mk([{ id: 'a', time: 'Day 1, 10:00' }, { id: 'b', time: 'Day 1, 09:00' }]), false).length).toBe(1)
+    expect(timeFlags(mk([{ id: 'a', time: 'Day 1' }, { id: 'b', time: 'Day 2' }]), false).length).toBe(0)
+  })
+  it('places scenes by their share of the words', () => {
+    const pos = scenePositions(mk([{ id: 'a', text: 'a b c d' }, { id: 'b', text: 'a b c d' }]))
+    expect(Math.round(pos.get('b')!.start)).toBe(50)
+  })
+  it('caches counts per scene object', () => {
+    const sc = { text: 'un deux trois' }
+    expect(sceneCounts(sc).words).toBe(3)
+    expect(bookCounts([{ scenes: [sc, { text: 'quatre' }] }]).words).toBe(4)
+  })
+})
+
+describe('writing tools', () => {
+  it('puts a darling back where it came from', () => {
+    const d = { id: 'x', sceneId: 's', sceneTitle: '', text: ' et pleura', before: 'Elle ouvrit la porte', after: '. Puis elle sortit', date: '' }
+    const now = 'Elle ouvrit la porte. Puis elle sortit dans la nuit.'
+    expect(darlingSpot(now, d)).toBe('Elle ouvrit la porte'.length)
+    expect(darlingSpot('rien à voir', d)).toBe(null)
+  })
+  it('compares two versions word by word', () => {
+    const parts = diffWords('Il marchait vite dans la rue.', 'Il marchait lentement dans la rue.')
+    expect(parts.filter(p => p.kind === 'del').map(p => p.text.trim())).toEqual(['vite'])
+    expect(parts.filter(p => p.kind === 'add').map(p => p.text.trim())).toEqual(['lentement'])
+  })
+  it('reads a JSON reply wrapped in prose or a code fence', () => {
+    expect(parseJSON<number[]>('Voici :\n```json\n[1, 2]\n```')).toEqual([1, 2])
+    expect(parseJSON<{ a: number }>('ok {"a": 1} fin')).toEqual({ a: 1 })
+    expect(parseJSON('rien')).toBe(null)
+  })
+})
+
+describe('import', () => {
+  it('splits a manuscript into chapters and scenes', () => {
+    const r = splitManuscript([
+      { text: 'Mon Roman', heading: true }, { text: 'Chapitre 1 : Le bal', heading: false },
+      { text: 'Il vint.', heading: false }, { text: '* * *', heading: false }, { text: 'Elle partit.', heading: false },
+      { text: 'Chapitre 2', heading: false }, { text: 'La nuit.', heading: false },
+    ], 'x')
+    expect(r.title).toBe('Mon Roman')
+    expect(r.chapters.length).toBe(2)
+    expect(r.chapters[0].scenes).toEqual(['Il vint.', 'Elle partit.'])
+    expect(r.chapters[0].title).toBe('Le bal')
+  })
+})
+
+describe('facts from Claude', () => {
+  it('parses facts with and without a chapter', () => {
+    expect(parseFact('- [ch 3+] Blind.')).toEqual({ from: 3, to: null, text: 'Blind.' })
+    expect(parseFact('Paul is the twin.')).toEqual({ from: null, to: null, text: 'Paul is the twin.' })
   })
 })

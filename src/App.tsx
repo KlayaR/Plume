@@ -8,6 +8,7 @@ import { useStore } from './store'
 import { useAppVersion } from './lib/useAppVersion'
 import { applyPrefs } from './lib/fonts'
 import { setClaudeTranslator } from './lib/claude'
+import { restorePrompts } from './lib/voice'
 import { shellStrings, translate, useT } from './i18n'
 import StartScreen from './components/StartScreen'
 import WritingView from './components/WritingView'
@@ -15,7 +16,7 @@ import BibleView from './components/BibleView'
 import PlanView from './components/PlanView'
 import SettingsView from './components/SettingsView'
 import BottomBar from './components/BottomBar'
-import { AgentDialog, ExportDialog, PrintView } from './components/BookDialogs'
+import { AgentDialog, ExportDialog, PrintView, TourDialog } from './components/BookDialogs'
 
 export default function App() {
   const book = useStore(s => s.book)
@@ -30,7 +31,13 @@ export default function App() {
   setShellStrings(shellStrings(prefs.ui))
   setClaudeTranslator((text, vars) => translate(useStore.getState().prefs.ui, text, vars))
 
-  useEffect(() => { useStore.getState().detectClaude() }, [])
+  useEffect(() => { useStore.getState().detectClaude(); restorePrompts() }, [])
+  // The first time a book opens, a short tour of where things are.
+  useEffect(() => {
+    if (!book) return
+    try { if (localStorage.getItem('plume.toured')) return; localStorage.setItem('plume.toured', '1') } catch { return }
+    useStore.setState({ dialog: 'tour' })
+  }, [!!book])
   useEffect(() => { applyPrefs(prefs, lang) }, [prefs, lang])
 
   // Focus mode: the controls come back as soon as the mouse moves.
@@ -67,6 +74,7 @@ export default function App() {
       {book && <BottomBar />}
       {showSettings && <SettingsView version={version} />}
       {book && dialog === 'export' && <ExportDialog onClose={() => useStore.setState({ dialog: null })} />}
+      {book && dialog === 'tour' && <TourDialog onClose={() => useStore.setState({ dialog: null })} />}
       {book && dialog === 'agents' && <AgentDialog onClose={() => useStore.setState({ dialog: null })} />}
       {book && printing && <PrintView />}
       <Toasts />

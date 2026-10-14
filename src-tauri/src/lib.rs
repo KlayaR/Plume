@@ -41,6 +41,26 @@ fn write_text(root: String, rel: String, content: String) -> Result<(), String> 
     std::fs::rename(&tmp, &path).map_err(|e| format!("{rel}: {e}"))
 }
 
+/// Plume's own small data files (the prompt library), in its folder on this computer.
+fn app_file(app: &AppHandle, name: &str) -> Result<PathBuf, String> {
+    if name.is_empty() || name.contains('/') || name.contains('\\') || name.contains("..") {
+        return Err(format!("Bad file name: {name}"));
+    }
+    let dir = app.path().app_local_data_dir().map_err(|e| e.to_string())?.join("data");
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    Ok(dir.join(name))
+}
+
+#[tauri::command]
+fn app_read(app: AppHandle, name: String) -> Result<String, String> {
+    std::fs::read_to_string(app_file(&app, &name)?).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn app_write(app: AppHandle, name: String, content: String) -> Result<(), String> {
+    std::fs::write(app_file(&app, &name)?, content).map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 fn path_exists(root: String, rel: String) -> bool {
     if rel.is_empty() {
@@ -353,6 +373,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             read_text,
             write_text,
+            app_read,
+            app_write,
             path_exists,
             list_files,
             move_to_trash,

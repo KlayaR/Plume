@@ -56,6 +56,9 @@ export interface Prefs {
   cheapAt: number
   /** The chat pane in Bible and Plan: pinned open. */
   chatOpen: boolean
+  /** Widths of the left and right panes, in px (dragged by their edges). */
+  paneL: number
+  paneR: number
   rightTab: RightTab
   /** Split view in the Manuscript: a second scene or a bible entry beside the text. */
   split: string | null
@@ -82,6 +85,8 @@ export const DEFAULT_PREFS: Prefs = {
   pageNumbers: true,
   cheapAt: 0,
   chatOpen: false,
+  paneL: 280,
+  paneR: 380,
   rightTab: 'write',
   split: null,
   readVoice: '',
@@ -132,7 +137,7 @@ interface State {
   bibleTab: BibleTab
   planTab: PlanTab
   /** The book's big dialogs, and the PDF print view. */
-  dialog: 'export' | 'agents' | null
+  dialog: 'export' | 'agents' | 'tour' | null
   printing: boolean
 
   open: (root: string) => Promise<void>
@@ -236,7 +241,7 @@ export const useStore = create<State>((set, get) => {
       import('./writing').then(m => m.loadNotes(book))
       import('./agents').then(m => m.loadAgents())
       // Library and safety: the lock for synced folders, today's backup, progress, the shelf card.
-      import('./library').then(m => { m.takeLock(book); m.autoBackup(book); m.recordProgress(get().book!); m.noteOnShelf(get().book!) })
+      import('./library').then(m => { m.takeLock(book); m.autoBackup(book); m.recordProgress(get().book!); m.noteOnShelf(get().book!); m.refreshSnapshots(get().book!) })
     },
     close: () => {
       const b = get().book

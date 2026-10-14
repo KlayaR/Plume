@@ -1,7 +1,7 @@
 // Manuscript: the scene on a sheet of paper in the middle of the room. The
 // chapters slide in from the left edge and the AI panel (or Review) from the
 // right, on hover, or stay open when pinned.
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ask } from '@tauri-apps/plugin-dialog'
 import { ChevronLeft, FilePlus2, FolderPlus, GripVertical, Pin, PinOff, Trash2 } from 'lucide-react'
 import { findScene, useStore } from '../store'
@@ -13,7 +13,8 @@ import { useAI } from '../editor/actions'
 import ContextPanel from './ContextPanel'
 import ReviewPanel from './ReviewPanel'
 import BookView from './BookView'
-import ChatPanel from './ChatPanel'
+import ChatPanel, { ResizeHandle } from './ChatPanel'
+import { ManuscriptToolbar } from './BottomBar'
 import NotesPanel from './NotesPanel'
 import { EntryEditor } from './BibleView'
 import { countPlaceholders } from '../editor/marks'
@@ -40,6 +41,7 @@ export default function WritingView() {
 
   return (
     <div className="pl-manuscript" data-pin-left={prefs.pinLeft} data-pin-right={prefs.pinRight}>
+      <ManuscriptToolbar />
       <div className={`pl-scroll ${prefs.split !== null ? 'pl-scroll-split' : ''}`}>
         {prefs.split !== null && found && <SplitPane />}
         {found ? (prefs.page ? <BookView key={viewKey} /> : <Sheet key={viewKey} />) :<div className="sk-empty" style={{ paddingTop: 80 }}>{t('Pick or add a scene on the left.')}</div>}
@@ -47,6 +49,7 @@ export default function WritingView() {
 
       {!prefs.pinLeft && <div className="pl-hotzone pl-hotzone-left" onMouseEnter={() => setHoverL(true)} />}
       <aside className="pl-pane pl-pane-left" data-open={openL} data-pinned={prefs.pinLeft} onMouseLeave={() => setHoverL(false)} aria-label={t('Chapters and scenes')}>
+        <ResizeHandle side="left" />
         <div className="pl-pane-head pl-pane-book">
           <button type="button" className="pl-quiet pl-backshelf" onClick={() => useStore.getState().close()} title={t('Switch book')}>
             <ChevronLeft size={15} /><span className="pl-pane-booktitle">{book.meta.title}</span>
@@ -62,9 +65,10 @@ export default function WritingView() {
         <>
           {!prefs.pinRight && <div className="pl-hotzone pl-hotzone-right" onMouseEnter={() => setHoverR(true)} />}
           <aside className="pl-pane pl-pane-right" data-open={openR} data-pinned={prefs.pinRight} onMouseLeave={() => setHoverR(false)}>
+            <ResizeHandle side="right" />
             <PaneHead title={prefs.mode === 'review' ? t('Review') : (
               <span className="pl-switch pl-panetabs" role="group" aria-label="Claude">
-                <button type="button" aria-pressed={prefs.rightTab === 'write'} onClick={() => setPrefs({ rightTab: 'write' })}>{t('Write')}</button>
+                <button type="button" aria-pressed={prefs.rightTab === 'write'} onClick={() => setPrefs({ rightTab: 'write' })}>{t('Assistant')}</button>
                 <button type="button" aria-pressed={prefs.rightTab === 'chat'} onClick={() => setPrefs({ rightTab: 'chat' })}>{t('Chat')}</button>
                 <button type="button" aria-pressed={prefs.rightTab === 'notes'} onClick={() => setPrefs({ rightTab: 'notes' })}>{t('Notes')}</button>
               </span>
@@ -153,7 +157,7 @@ function SheetScene({ scene, first, solo, active, characters, update, t }: {
             )}
             {/* The plan card's note, in grey, above a scene that already has text (an empty scene shows it in place of the text). */}
             {scene.note?.trim() && scene.text.trim() && <div className="pl-scene-note" title={t('Card note (Plan)')}>{scene.note.trim()}</div>}
-            <Editor scene={scene} />
+            <LazyEditor scene={scene} active={active} />
           </section>
   )
 }
@@ -273,6 +277,32 @@ function SplitPane() {
       )}
       {entry && <div className="pl-splitentry"><EntryEditor key={entry.slug} entry={entry} /></div>}
       {!scene && !entry && <p className="sk-hint">{t('Pick a scene to read, or a bible entry to read or edit, while you write.')}</p>}
+    </div>
+  )
+}
+
+/**
+ * In the whole-book view, a scene far from the screen is plain text with the
+ * same look; its editor is built when it gets within a screen or two of view,
+ * or when it is the active scene. Keeps a long book light.
+ */
+function LazyEditor({ scene, active }: { scene: Scene; active: boolean }) {
+  const [near, setNear] = useState(active)
+  const box = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (near || active) { setNear(true); return }
+    const el = box.current
+    if (!el || typeof IntersectionObserver === 'undefined') { setNear(true); return }
+    const io = new IntersectionObserver(entries => { if (entries.some(e => e.isIntersecting)) { setNear(true); io.disconnect() } }, { rootMargin: '1800px 0px' })
+    io.observe(el)
+    return () => io.disconnect()
+  }, [near, active])
+  if (near || active) return <Editor scene={scene} />
+  return (
+    <div ref={box} className="pl-editor pl-lazy">
+      <div className="cm-scroller"><div className="cm-content">
+        {scene.text.split('\n').map((l, i) => <div key={i} className="cm-line">{l || '\u00a0'}</div>)}
+      </div></div>
     </div>
   )
 }

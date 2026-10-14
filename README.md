@@ -7,6 +7,16 @@ in with your Claude subscription. No API key.
 Plan: [Plume — Roadmap](https://claude.ai/code/artifact/1bbb8ac1-8e0c-4a44-bed0-fcd2de1d195d) (0.2.0 → 0.9.0) ·
 first spec: [Plume — Step 1 Spec](https://claude.ai/code/artifact/f1897651-066d-49a1-ae39-1357421b88be)
 
+## What 0.9.1 changes
+- **Resizable panes:** drag the edge of the right (chat, Claude) or left pane; double-click the edge to reset. They never squeeze the page below 440 px.
+- **Old brainstorms:** conversations are kept with the book (`.plume/chats.json`); the clock button lists them to reopen, rename or delete; the + button starts a new one. Each book opens on a fresh conversation.
+- **Toolbar above the page** in the Manuscript (Write / Review, Sheet / Page, Scene / Chapter / Book, split, Aa); the bottom bar keeps counters, goals, usage and a ⋯ menu (agent tasks, export, quick tour). A short **quick tour** opens the first time.
+- **Prompt library** lives in Plume's own data file (`prompts.json`) and each book keeps a copy of the prompts it uses, so it works on another computer.
+- **Long books:** in the whole-book Sheet, scenes far from the screen are plain text until you scroll near them; Page view lays a long book out a few pages at a time; word counts are cached per scene (a 137,000-word test book: 522 pages in ~3 s).
+- **Sync:** a file whose date changed but whose content did not (a cloud-sync tool) is no longer reported as a conflict.
+- **Checks:** French passive voice now catches "a été vue" and ignores "était gris"; forms of être are no longer echoes; "[ch ?]" from Claude is dropped from imported facts.
+- Agent tasks (file audit, web research) were checked against the real `claude` CLI.
+
 ## What 0.3.0 – 0.9.0 add
 Built in one go from the roadmap; expect rough edges.
 

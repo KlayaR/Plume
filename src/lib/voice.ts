@@ -1,6 +1,7 @@
 // Your voice: the prompt library (your own instruction sets and genre presets),
 // variables inside them, scene rules, and the rule checker that scores every
 // proposal against your measurable rules, locally (zero tokens).
+import { invoke } from '@tauri-apps/api/core'
 import type { ActionId, Book, Entry, Lang, Rules, SceneRule } from './types'
 import { adverbs, dialogue, passives, phrases, sentences, words } from './analysis'
 
@@ -17,19 +18,38 @@ export const PRESETS: PromptSet[] = [
   { id: 'preset-noir', name: 'Noir', preset: true, text: 'Write noir in {book.language}, in {book.tense}. Dry, wry, cynical narration; hard images; dialogue that cuts. No sentimentality. Avoid the words in {list.all}.' },
 ]
 
+// The library is kept in Plume's own data file (prompts.json, in its folder on
+// this computer); localStorage is a fast copy of it for the screens to read.
 export function loadPrompts(): PromptSet[] {
   try { const v = JSON.parse(localStorage.getItem(PROMPTS_KEY) ?? '[]'); return Array.isArray(v) ? v : [] } catch { return [] }
 }
 export function savePrompts(list: PromptSet[]) {
-  try { localStorage.setItem(PROMPTS_KEY, JSON.stringify(list.filter(p => !p.preset))) } catch { /* private mode */ }
+  const mine = list.filter(p => !p.preset)
+  try { localStorage.setItem(PROMPTS_KEY, JSON.stringify(mine)) } catch { /* private mode */ }
+  invoke('app_write', { name: 'prompts.json', content: JSON.stringify(mine, null, 1) }).catch(() => {})
+}
+/** At start: if the data file has prompts the browser copy lacks (a reinstall), bring them back. */
+export async function restorePrompts(): Promise<void> {
+  try {
+    const file = JSON.parse(await invoke<string>('app_read', { name: 'prompts.json' })) as PromptSet[]
+    if (Array.isArray(file) && file.length && !loadPrompts().length) localStorage.setItem(PROMPTS_KEY, JSON.stringify(file))
+    else if (!file?.length && loadPrompts().length) savePrompts(loadPrompts())
+  } catch { if (loadPrompts().length) savePrompts(loadPrompts()) }
 }
 export const allPrompts = () => [...PRESETS, ...loadPrompts()]
 
-/** The prompt an action uses: its own override, else the book's. */
+/** The prompts a book points at (its own and the per-action ones). */
+export const usedPromptIds = (book: Book) => [...new Set([book.meta.voice.prompt, ...Object.values(book.meta.voice.actionPrompts)].filter((x): x is string => !!x))]
+
+/** The prompt an action uses: its own override, else the book's; the book's own copy if the library lacks it. */
 export function promptFor(book: Book, action: ActionId): PromptSet | null {
   const v = book.meta.voice
   const id = v.actionPrompts[action] || v.prompt
-  return id ? allPrompts().find(p => p.id === id) ?? null : null
+  if (!id) return null
+  const found = allPrompts().find(p => p.id === id)
+  if (found) return found
+  const copy = v.snapshots?.[id]
+  return copy ? { id, name: copy.name, text: copy.text } : null
 }
 
 export const VARIABLES = ['{book.title}', '{book.author}', '{book.language}', '{book.tense}', '{scene.title}', '{scene.pov}', '{chapter.number}', '{list.all}', '{list.<name>}']

@@ -178,10 +178,12 @@ export interface Voice {
   description: string
   /** What the accepted and rejected proposals taught, in a few lines. */
   taste: string
+  /** Copies of the prompts this book uses, so it works on a computer that lacks your library. */
+  snapshots: Record<string, { name: string; text: string }>
 }
 
 export const DEFAULT_VOICE: Voice = {
-  prompt: '', actionPrompts: {}, tense: '', adult: false, sceneRules: [], rules: DEFAULT_RULES, description: '', taste: '',
+  prompt: '', actionPrompts: {}, tense: '', adult: false, sceneRules: [], rules: DEFAULT_RULES, description: '', taste: '', snapshots: {},
 }
 
 export interface Beat { name: string; at: number; note: string; sceneId: string | null }

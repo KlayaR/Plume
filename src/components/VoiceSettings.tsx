@@ -10,6 +10,7 @@ import { allPrompts, loadPrompts, PRESETS, savePrompts, SCENE_RULES, VARIABLES, 
 import { profile } from '../lib/analysis'
 import { newId } from '../lib/text'
 import { ask } from '../ai'
+import { refreshSnapshots } from '../library'
 import { numLocale, useT } from '../i18n'
 
 const n = (x: number, d = 0) => x.toLocaleString(numLocale(), { maximumFractionDigits: d, minimumFractionDigits: d })
@@ -71,7 +72,12 @@ function PromptLibrary() {
   const t = useT()
   const [mine, setMine] = useState<PromptSet[]>(loadPrompts)
   const [editing, setEditing] = useState<string | null>(null)
-  const save = (list: PromptSet[]) => { setMine(list); savePrompts(list) }
+  const save = (list: PromptSet[]) => {
+    setMine(list)
+    savePrompts(list)
+    // The book keeps its own copy of the prompts it uses.
+    setTimeout(() => refreshSnapshots(useStore.getState().book!), 0)
+  }
   const add = (from?: PromptSet) => {
     const p = { id: newId(), name: from ? `${t(from.name)} (${t('copy')})` : t('My prompt'), text: from?.text ?? '' }
     save([...mine, p])
@@ -83,7 +89,7 @@ function PromptLibrary() {
   return (
     <SettingsSection title={t('Prompt library')} description={t('Your own instruction sets, kept on this computer for all your books. Each book picks one; each action can override it in the Claude panel.')}>
       <SettingRow label={t('This book uses')}>
-        <select className="sk-select" value={voice.prompt} onChange={e => useStore.getState().updateMeta({ voice: { ...voice, prompt: e.target.value } })}>
+        <select className="sk-select" value={voice.prompt} onChange={e => { useStore.getState().updateMeta({ voice: { ...voice, prompt: e.target.value } }); setTimeout(() => refreshSnapshots(useStore.getState().book!), 0) }}>
           <option value="">{t('No prompt')}</option>
           {all.map(p => <option key={p.id} value={p.id}>{p.preset ? `${t(p.name)} (${t('preset')})` : p.name}</option>)}
         </select>

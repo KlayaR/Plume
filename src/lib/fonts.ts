@@ -40,4 +40,7 @@ export function applyPrefs(p: Prefs, lang: Lang) {
   s.setProperty('--pl-page-w', `${page.w}cm`)
   s.setProperty('--pl-page-h', `${page.h}cm`)
   s.setProperty('--pl-zoom', String(p.pageZoom))
+  // The panes never take so much that the page is squeezed: the sheet keeps at least 440px.
+  s.setProperty('--pl-pane-w', `min(${p.paneL}px, 35vw)`)
+  s.setProperty('--pl-pane-r', `min(${p.paneR}px, calc(100vw - min(${p.paneL}px, 35vw) - 440px))`)
 }

@@ -78,6 +78,8 @@ async function invoke(cmd: string, args: any = {}): Promise<unknown> {
       return null
     }
     case 'cancel_claude': return null
+    case 'app_read': { const v = (window as any).__appFiles?.[args.name]; if (v === undefined) throw 'not found'; return v }
+    case 'app_write': (window as any).__appFiles = { ...((window as any).__appFiles ?? {}), [args.name]: args.content }; return null
     // A 2×2 grey picture stands in for every image of the book.
     case 'read_base64': return 'iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFklEQVR42mN89+7dfwYGBgYmBhgAAGWfBCWuH5WgAAAAAElFTkSuQmCC'
     case 'copy_into': files.set(rel(args), '(image)'); return null

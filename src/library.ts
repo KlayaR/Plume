@@ -5,9 +5,10 @@
 import { create } from 'zustand'
 import { invoke } from '@tauri-apps/api/core'
 import type { Book, Lang } from './lib/types'
-import { countWords } from './lib/text'
+import { bookCounts } from './lib/stats'
 import { createBook, makeChapter, makeScene, saveChapter, saveMeta, saveScene, seriesRootOf } from './lib/project'
 import { fromBase64, fromUtf8, makeZip, readZip, toBase64 } from './lib/zip'
+import { allPrompts, usedPromptIds } from './lib/voice'
 import { useStore } from './store'
 import { t } from './i18n'
 
@@ -20,7 +21,7 @@ export function loadShelf(): Record<string, ShelfBook> {
   try { return JSON.parse(localStorage.getItem(SHELF) ?? '{}') } catch { return {} }
 }
 
-export const bookWords = (book: Book) => book.chapters.reduce((n, c) => n + c.scenes.reduce((m, s) => m + countWords(s.text), 0), 0)
+export const bookWords = (book: Book) => bookCounts(book.chapters).words
 
 /** Keeps the shelf's card for this book up to date. */
 export function noteOnShelf(book: Book) {
@@ -130,6 +131,23 @@ export function autoBackup(book: Book) {
 }
 
 export const listBackups = (book: Book) => invoke<string[]>('list_backups', { name: book.meta.title })
+
+// --- Prompts travel with the book ---------------------------------------------------------
+
+/** Keeps a copy of the prompts the book uses inside its plume.json (a different computer may not have your library). */
+export function refreshSnapshots(book: Book) {
+  const used = usedPromptIds(book)
+  const snapshots: Record<string, { name: string; text: string }> = {}
+  for (const id of used) {
+    const p = allPrompts().find(x => x.id === id)
+    const old = book.meta.voice.snapshots?.[id]
+    if (p) snapshots[id] = { name: p.name, text: p.text }
+    else if (old) snapshots[id] = old
+  }
+  if (JSON.stringify(snapshots) !== JSON.stringify(book.meta.voice.snapshots ?? {})) {
+    useStore.getState().updateMeta({ voice: { ...book.meta.voice, snapshots } })
+  }
+}
 
 // --- Safe sync: who has the book open ---------------------------------------------------
 

@@ -85,12 +85,15 @@ async function paginate(parts: Part[], host: HTMLElement, cancelled: () => boole
     pages.push(cur)
   }
   const fits = () => body.scrollHeight <= body.clientHeight + 1
+  let lastYield = -1
 
   for (const part of parts) {
   if (cancelled()) return null
   open(part.head) // every chapter starts on a new page
   const queue = [...part.blocks]
   while (queue.length) {
+    // A long book is laid out a few pages at a time, so the window stays responsive.
+    if (pages.length % 3 === 0 && pages.length !== lastYield) { lastYield = pages.length; await new Promise(r => setTimeout(r, 0)); if (cancelled()) return null }
     const b = queue.shift()!
     const el = document.createElement(b.kind === 'break' ? 'div' : 'p')
     if (b.kind === 'break') { el.className = 'pl-bk-break'; el.textContent = b.text } else fillPara(el, b)

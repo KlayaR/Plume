@@ -16,6 +16,8 @@ const mtime = (root: string, rel: string) => invoke<number>('file_mtime', { root
 // this version goes to a .conflict copy and the caller reloads the newer one.
 
 const known = new Map<string, number>()
+/** What each file held when Plume last read or wrote it: a sync tool that only touches the date changes nothing. */
+const knownText = new Map<string, string>()
 const key = (root: string, rel: string) => `${root}|${rel}`
 
 export class Conflict extends Error {
@@ -24,6 +26,7 @@ export class Conflict extends Error {
 
 async function read(root: string, rel: string): Promise<string> {
   const text = await rawRead(root, rel)
+  knownText.set(key(root, rel), text)
   mtime(root, rel).then(m => known.set(key(root, rel), m))
   return text
 }
@@ -32,7 +35,7 @@ async function guarded(root: string, rel: string, content: string) {
   const k = key(root, rel)
   const before = known.get(k)
   const disk = before === undefined ? 0 : await mtime(root, rel)
-  if (before !== undefined && before > 0 && disk > before + 1500) {
+  if (before !== undefined && before > 0 && disk > before + 1500 && (await rawRead(root, rel).catch(() => null)) !== (knownText.get(k) ?? null) && await exists(root, rel)) {
     const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')
     const copy = rel.replace(/\.md$/, `.conflict-${stamp}.md`)
     await write(root, copy, content)
@@ -40,6 +43,7 @@ async function guarded(root: string, rel: string, content: string) {
     throw new Conflict(rel, copy)
   }
   await write(root, rel, content)
+  knownText.set(k, content)
   known.set(k, await mtime(root, rel))
 }
 
