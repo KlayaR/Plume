@@ -21,7 +21,7 @@ body:
     id: version
     attributes:
       label: Plume version
-      placeholder: "1.1.0 (Settings → About)"
+      placeholder: "0.11.0 (Settings → About)"
     validations:
       required: true
   - type: input

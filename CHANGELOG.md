@@ -3,7 +3,11 @@
 Every version of Plume, newest first. The release workflow copies a version's
 section into its GitHub Release, so write it for readers, not for developers.
 
-## 1.1.0
+Plume stays below 1.0 until every feature works in daily use without known
+bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
+numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
+
+## 0.11.0
 **Bible, tuned for the AI**
 - **AI check** (Bible tab): what makes the AI's context worse, found locally for free: entries without a short version, short versions over ~90 tokens, huge full versions, characters without a voice card, POV characters without "Knows / Doesn't know", entries that answer to the same name, short lower-case aliases that match ordinary words, entries that always appear together but aren't linked, names used in the text but missing from the bible. One-click fixes; "Write the missing short versions" does them all with Haiku.
 - **Short versions written by Haiku** from the full text (button next to the field), with a token count on both versions.
@@ -26,13 +30,13 @@ section into its GitHub Release, so write it for readers, not for developers.
 - "Who says what" jumps to the finding in whichever scene it is.
 - Ctrl+/ lists every keyboard shortcut.
 
-## 1.0.1 — ideas taken from NEO
+## 0.10.1 — ideas taken from NEO
 - **Ctrl+Z right after an autocorrect** (smart quote, ellipsis, dash, capital) gives back exactly what you typed.
 - **Automatic capitals** (Settings -> Writing, on by default): a sentence's first letter, and the English "I", as you type. Not after abbreviations (Mr., etc.), initials, ellipses, or ? and ! (a dialogue tag goes on in lower case).
 - **Clean paste**: from Word, Google Docs or a web page, only italics and bold are kept, one paragraph per line, typography fixed for the book's language.
 - **Front and back matter** (Settings -> This book): copyright, dedication, epigraph, acknowledgments, about the author. **Part pages**: type a part title on a chapter's column in Plan -> Board. Both are printed by every export (EPUB, Word, HTML, Markdown) and shown in Page view of the whole book (so also in the PDF).
 
-## 1.0.0
+## 0.10.0
 - **Fantasy by default.** A new book starts with a fantasy preset (Settings -> Voice -> "Fantasy defaults"): deep point of view, the world shown through action, magic with a cost and a price, scenes that want something, no info-dumps, subtext in dialogue, no cliches. It sets the prompt, the scene rules, your measurable rules and two word lists (AI tics, fantasy cliches). Your tense, adult setting, voice description and taste are never overwritten; an older book gets it once on first open, and the Apply button redoes it.
 - **Italics and bold** (Ctrl+I / Ctrl+B, stored as Markdown `*italic*` / `**bold**`): in the editor, Page view and every export.
 - **Find and replace** across the whole book (Ctrl+Shift+F): case/accents, whole word, regular expressions, each scene keeps its old text in its history.

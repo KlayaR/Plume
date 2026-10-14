@@ -2,8 +2,20 @@
 
 What's planned, roughly in order. Items marked *help wanted* are good places to start.
 
+## Road to 1.0
+Plume stays in 0.x until it is ready to be called finished. 1.0 is released when:
+- every feature listed in the README has been used on a real book in the
+  installed app (not only in the browser preview) and works;
+- there are no open bugs that lose text, corrupt a book or block writing;
+- AI requests behave as documented (context, costs, secret entries never sent);
+- export (EPUB, Word, PDF, HTML) is checked on a full-length book;
+- French and English interfaces are complete.
+
+Until then, each version is a pre-release: 0.x.y, where y fixes bugs and x adds
+or changes features.
+
 ## Next
-- Test 1.x in daily use on real books and fix what breaks.
+- Test every feature in daily use on real books and fix what breaks.
 - Undo for deletions and renames in the Plan and the Bible (moves already undo).
 - Code-signed installer, so Windows stops warning about an unknown publisher.
 - Automatic updates (Tauri updater) once releases are public.

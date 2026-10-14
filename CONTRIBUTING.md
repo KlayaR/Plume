@@ -50,7 +50,9 @@ The CI runs the same on every pull request.
 - **Prompts never include jailbreak text**, even from a persona a user supplies.
 - **Books are the writer's files.** Never delete: move to `.plume/trash/`. Keep
   unknown front-matter keys. Write atomically.
-- **Versions:** a release bumps `package.json`, `src-tauri/tauri.conf.json` and
+- **Versions:** Plume is in 0.x until the "Road to 1.0" in ROADMAP.md is met:
+  a bug-fix release bumps the last number (0.11.1), a feature release the
+  middle one (0.12.0). A release bumps `package.json`, `src-tauri/tauri.conf.json` and
   `src-tauri/Cargo.toml` together and adds a section to `CHANGELOG.md`. You don't
   need to bump the version in a pull request; the maintainer does it on release.
 
