@@ -19,6 +19,7 @@ const GROUPS: [string, [string, string][]][] = [
     ['Ctrl+Shift+Y', 'Synonyms for the selected word'],
   ]],
   ['Book', [
+    ['Ctrl+K', 'Go to any scene or bible entry'],
     ['Ctrl+Shift+F', 'Find and replace in the whole book'],
     ['Ctrl+Shift+B', 'New bible entry from the selected name'],
     ['Ctrl+Z (Plan)', 'Take back the last card or chapter move'],

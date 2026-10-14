@@ -7,6 +7,12 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.13.0
+- **Choose the model in the brainstorm chat:** a preset list under the chat input (Claude or OpenRouter models), and a note of which one answered last. The choice is remembered.
+- **Ctrl+K:** type a few letters and open any scene or bible entry.
+- **New icon:** a gold quill on the dark background, replacing the blue StudioKit one.
+- The bottom bar shows "OpenRouter" when the last answer came from there.
+
 ## 0.12.0
 **Other models, and model presets**
 - **OpenRouter** (Settings -> Claude): add your OpenRouter key and Plume can use hundreds of other models, or keep you writing when your Claude plan runs out. "Use OpenRouter": Never, **When Claude runs out** (the request that failed because of the usage limit is repeated on your fallback model, with a notice; and once the plan's window is full, requests go straight there), or Always. The key stays on your computer, never in a book. "Test" checks it and shows your remaining credit.

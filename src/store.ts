@@ -88,6 +88,8 @@ export interface Prefs {
   fallbackPreset: string
   /** OpenRouter API key: kept on this computer only, never in a book. */
   orKey: string
+  /** The model preset the brainstorm chat uses (empty: Sonnet, low effort). */
+  chatPreset: string
   /** Version of the saved prefs, for one-time upgrades. */
   v?: number
 }
@@ -127,6 +129,7 @@ export const DEFAULT_PREFS: Prefs = {
   fallback: 'off',
   fallbackPreset: '',
   orKey: '',
+  chatPreset: '',
   v: 2,
 }
 
@@ -168,6 +171,8 @@ interface State {
   usage: Usage | null
   day: DayTotal
   limits: Limits | null
+  /** Which backend and model answered last (shown in the bottom bar). */
+  lastBackend: { kind: 'claude' | 'openrouter'; name: string } | null
   toast: Toast | null
   showSettings: boolean
   editorTick: number
@@ -176,7 +181,7 @@ interface State {
   /** A place to go to in a scene: the editor selects it once the scene is open. */
   jump: { sceneId: string; from: number; to: number } | null
   /** The book's big dialogs, and the PDF print view. */
-  dialog: 'export' | 'agents' | 'tour' | 'find' | 'snapshots' | 'outline' | 'synonyms' | 'entry' | 'shortcuts' | null
+  dialog: 'export' | 'agents' | 'tour' | 'find' | 'snapshots' | 'outline' | 'synonyms' | 'entry' | 'shortcuts' | 'jump' | null
   printing: boolean
 
   open: (root: string) => Promise<void>
@@ -264,6 +269,7 @@ export const useStore = create<State>((set, get) => {
     usage: null,
     day: (() => { const d = load<DayTotal>(DAY_KEY, emptyDay()); return d.day === today() ? d : emptyDay() })(),
     limits: null,
+    lastBackend: null,
     toast: null,
     showSettings: false,
     editorTick: 0,

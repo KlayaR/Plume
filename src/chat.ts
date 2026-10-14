@@ -172,7 +172,7 @@ export async function send(text: string) {
   const history = messages.slice(-20)
   try {
     const reply = await ask({
-      model: 'sonnet', effort: 'low',
+      model: 'sonnet', effort: 'low', preset: useStore.getState().prefs.chatPreset || undefined,
       system: systemFor(book, recent, target),
       message: `<conversation>\n${transcript(history.slice(0, -1))}\n</conversation>\n\n${history[history.length - 1].text}`,
       onText: chunk => useChat.setState(s => ({ streaming: (s.streaming ?? '') + chunk })),

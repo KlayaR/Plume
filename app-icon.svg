@@ -1,6 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
-  <rect width="1024" height="1024" rx="224" fill="#3b6fd8"/>
-  <path d="M770 200C540 230 380 395 322 635L282 830" fill="none" stroke="#ffffff" stroke-width="64" stroke-linecap="round"/>
-  <path d="M770 200C788 405 680 576 440 650" fill="none" stroke="#ffffff" stroke-width="64" stroke-linecap="round"/>
-  <path d="M560 330L470 420M640 410L540 500" fill="none" stroke="#ffffff" stroke-opacity="0.55" stroke-width="40" stroke-linecap="round"/>
+  <defs>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ecc96e"/>
+      <stop offset="1" stop-color="#b98a35"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" rx="224" fill="#1b1913"/>
+  <rect x="44" y="44" width="936" height="936" rx="190" fill="none" stroke="#d9b45a" stroke-opacity="0.28" stroke-width="6"/>
+  <path d="M770 200C540 230 380 395 322 635L282 830L440 650C680 576 788 405 770 200Z" fill="url(#gold)"/>
+  <path d="M770 200C560 380 400 560 282 830" fill="none" stroke="#1b1913" stroke-width="20" stroke-linecap="round"/>
+  <path d="M600 330L520 410M660 420L560 510M540 520L470 590" fill="none" stroke="#1b1913" stroke-opacity="0.45" stroke-width="16" stroke-linecap="round"/>
 </svg>

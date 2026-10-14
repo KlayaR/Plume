@@ -8,6 +8,7 @@ import { Check, History, ListPlus, MessageSquarePlus, Pencil, Pin, PinOff, Send,
 import { useStore } from '../store'
 import { deleteChat, endInterview, newChat, openChat, renameChat, send, stopChat, turnIntoEntries, useChat } from '../chat'
 import { useT } from '../i18n'
+import { PresetSelect } from './ModelPresets'
 
 /** A drag handle on the inner edge of a pane: the pane's width follows the pointer. */
 export function ResizeHandle({ side }: { side: 'left' | 'right' }) {
@@ -47,6 +48,9 @@ export default function ChatPanel() {
   const book = useStore(s => s.book)!
   const ui = useStore(s => s.prefs.ui)
   const [text, setText] = useState('')
+  const chatPreset = useStore(s => s.prefs.chatPreset)
+  const setPrefs = useStore(s => s.setPrefs)
+  const lastBackend = useStore(s => s.lastBackend)
   const [list, setList] = useState(false)
   const [renaming, setRenaming] = useState<string | null>(null)
   const [name, setName] = useState('')
@@ -112,6 +116,10 @@ export default function ChatPanel() {
           <textarea className="sk-input pl-chat-input" rows={3} value={text} placeholder={t('Your idea or question… (Ctrl+Enter)')}
             onChange={e => setText(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); go() } }} />
+          <div className="pl-row pl-chat-model">
+            <PresetSelect value={{ model: 'sonnet', effort: 'low', preset: chatPreset || undefined }} onChange={next => setPrefs({ chatPreset: next.preset ?? '' })} />
+            {lastBackend && <span className="sk-hint" title={t('Answered by')}>{lastBackend.kind === 'openrouter' ? `OpenRouter · ${lastBackend.name}` : `Claude · ${lastBackend.name}`}</span>}
+          </div>
           <div className="pl-row">
             {streaming !== null
               ? <button type="button" className="sk-btn sk-btn-danger sk-btn-sm" onClick={stopChat}><Square size={13} /> {t('Stop')}</button>

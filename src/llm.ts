@@ -135,6 +135,7 @@ export async function runLLM(req: LlmRequest, onText: (t: string) => void, onDon
     if (!prefs.orKey) return finish({ ok: false, text: '', error: t('Add your OpenRouter key in Settings → Claude.') })
     const a: Active = { kind: 'openrouter', inner: '', stop: false }
     active.set(outer, a)
+    useStore.setState({ lastBackend: { kind: 'openrouter', name: p.name } })
     a.inner = runOpenRouter(prefs.orKey, p.model, req.system, req.message, onText, finish)
   }
 
@@ -145,6 +146,7 @@ export async function runLLM(req: LlmRequest, onText: (t: string) => void, onDon
     }
     const a: Active = { kind: 'claude', inner: '', stop: false }
     active.set(outer, a)
+    useStore.setState({ lastBackend: { kind: 'claude', name: req.model } })
     a.inner = await runClaude(
       { exe: st.claudeExe, model: req.model, effort: req.effort, system: req.system, message: req.message, tools: req.tools, cwd: req.cwd },
       onText,

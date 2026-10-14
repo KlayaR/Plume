@@ -5,6 +5,7 @@ import { autoCapitalRule, fixTypography, loneI, typingRule } from './typography'
 import { pasteText, wrapMarks } from './paste'
 import { matterPages, FRONT, BACK } from './matter'
 import { checkBible } from './bibleCheck'
+import { jumpItems, rankJump } from './quickjump'
 import { chatBody, DEFAULT_PRESETS, httpMessage, isLimitError, presetFor, readEvent, readModels, searchModels, splitSSE } from './presets'
 import { attention } from './attention'
 import { beatFlags, beatTension } from './structures'
@@ -676,5 +677,17 @@ describe('OpenRouter streaming', () => {
     expect(searchModels(list, 'claude sonnet')).toHaveLength(1)
     expect(searchModels(list, '')).toHaveLength(2)
     expect(readModels(null)).toEqual([])
+  })
+})
+
+describe('quick jump', () => {
+  const book = bookOf([scene('a', 'x', { title: 'The ball' }), scene('b', 'y', { title: 'Escape' })], [entry({ slug: 'elise', name: 'Elise Varenne', aliases: ['Lise'] }), entry({ slug: 'ball-room', name: 'Ballroom', type: 'place' })])
+  it('finds entries and scenes, names first', () => {
+    const items = jumpItems(book)
+    expect(rankJump(items, 'ball').map(i => i.label)).toEqual(['Ballroom', 'The ball'])
+    expect(rankJump(items, 'lise').map(i => i.id)).toEqual(['elise'])
+    expect(rankJump(items, 'ESCAPE')[0].kind).toBe('scene')
+    expect(rankJump(items, 'zzz')).toEqual([])
+    expect(rankJump(items, '').every(i => i.kind === 'scene')).toBe(true)
   })
 })

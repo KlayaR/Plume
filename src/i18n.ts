@@ -855,6 +855,12 @@ const FR: Record<string, string> = {
   'OpenRouter is rate limiting this model. Try again in a moment.': 'OpenRouter limite le débit de ce modèle. Réessayez dans un instant.',
   'Web page (.html)': 'Page web (.html)',
   'One file for beta readers: opens in any browser, phone or computer': 'Un seul fichier pour les bêta-lecteurs : s’ouvre dans n’importe quel navigateur, sur téléphone ou ordinateur',
+  'Answered by': 'Répondu par',
+  'Answered by {name} on OpenRouter': 'Répondu par {name} sur OpenRouter',
+  'Go to…': 'Aller à…',
+  'A scene, a character, a place…': 'Une scène, un personnage, un lieu…',
+  'Nothing matches.': 'Aucun résultat.',
+  'Go to any scene or bible entry': 'Aller à une scène ou une fiche de la bible',
 }
 
 const SHELL = {

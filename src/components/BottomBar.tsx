@@ -28,6 +28,7 @@ export default function BottomBar() {
   const usage = useStore(s => s.usage)
   const day = useStore(s => s.day)
   const limits = useStore(s => s.limits)
+  const lastBackend = useStore(s => s.lastBackend)
   const running = useAI(s => s.running)
   const t = useT()
   const st = useStore.getState
@@ -76,6 +77,7 @@ export default function BottomBar() {
             {limits.week && <>{t('Week')} <b>{pct(limits.week.used)}</b></>}
           </span>
         )}
+        {lastBackend?.kind === 'openrouter' && <span className="pl-count" title={t('Answered by {name} on OpenRouter', { name: lastBackend.name })}>OpenRouter</span>}
         <span className={`pl-dot ${exe === null ? 'pl-dot-off' : running ? 'pl-dot-busy' : ''}`} title={usageTip} aria-label={t(claude)} />
         <MoreMenu />
         <button type="button" className="pl-quiet" onClick={() => useStore.setState({ showSettings: true })} title={t('Settings') + ' (Ctrl+,)'}><Settings size={15} /></button>
