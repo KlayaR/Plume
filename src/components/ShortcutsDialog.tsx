@@ -25,6 +25,7 @@ const GROUPS: [string, [string, string][]][] = [
     ['Ctrl+Z (Plan)', 'Take back the last card or chapter move'],
     ['Ctrl+,', 'Settings'],
     ['Ctrl+/', 'This list'],
+    ['F1', 'Help: how to use Plume'],
   ]],
 ]
 

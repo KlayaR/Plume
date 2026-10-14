@@ -8,6 +8,7 @@ import { checkBible } from './bibleCheck'
 import { jumpItems, rankJump } from './quickjump'
 import { aiBlocks, joinBlocks, parseBlocks } from './blocks'
 import { tidy } from '../contextMenu'
+import { HELP, searchHelp } from './help'
 import { chatBody, DEFAULT_PRESETS, httpMessage, isLimitError, presetFor, readEvent, readModels, searchModels, splitSSE } from './presets'
 import { attention } from './attention'
 import { beatFlags, beatTension } from './structures'
@@ -735,5 +736,15 @@ describe('context menu helper', () => {
   it('drops empty groups and doubled separators', () => {
     const out = tidy([{ separator: true }, { label: 'A' }, false, { separator: true }, { separator: true }, { label: 'B' }, null, { separator: true }])
     expect(out.map(i => i.label ?? '-')).toEqual(['A', '-', 'B'])
+  })
+})
+
+describe('help', () => {
+  it('has the same number of lines in both languages and finds topics by word', () => {
+    for (const h of HELP) expect(h.lines.fr.length).toBe(h.lines.en.length)
+    expect(searchHelp('esc discard', 'en').map(h => h.id)).toContain('claude')
+    expect(searchHelp('rejette', 'fr').map(h => h.id)).toContain('claude')
+    expect(searchHelp('', 'en')).toHaveLength(HELP.length)
+    expect(searchHelp('zzzzzz', 'en')).toEqual([])
   })
 })

@@ -4,7 +4,7 @@
 // The manuscript's own controls (Write / Review, Sheet / Page, Scene / Chapter /
 // Book, split, Aa) live in a toolbar above the page: ManuscriptToolbar.
 import { useEffect, useRef, useState } from 'react'
-import { Bot, BookPlus, Camera, Keyboard, PanelRight, ChevronLeft, Columns2, Compass, Ellipsis, FileOutput, Replace, Search, Settings } from 'lucide-react'
+import { Bot, BookPlus, Camera, CircleHelp, Keyboard, PanelRight, ChevronLeft, Columns2, Compass, Ellipsis, FileOutput, Replace, Search, Settings } from 'lucide-react'
 import ManuscriptOptions from './ManuscriptOptions'
 import GoalsPanel from './GoalsPanel'
 import { findScene, useStore, type Scope, type View } from '../store'
@@ -135,6 +135,7 @@ function MoreMenu() {
       <button type="button" className="pl-quiet" aria-expanded={open} onClick={() => setOpen(o => !o)} title={t('More')}><Ellipsis size={16} /></button>
       {open && (
         <div className="pl-pop pl-menu" role="menu">
+          <button type="button" role="menuitem" className="pl-menuitem" onClick={go(() => useStore.setState({ dialog: 'help' }))}><CircleHelp size={15} /> {t('Help')} (F1)</button>
           <button type="button" role="menuitem" className="pl-menuitem" onClick={go(() => useStore.setState({ dialog: 'agents' }))}><Bot size={15} /> {t('Agent tasks')}</button>
           <button type="button" role="menuitem" className="pl-menuitem" onClick={go(() => useStore.setState({ dialog: 'snapshots' }))}><Camera size={15} /> {t('Snapshots')}</button>
           <button type="button" role="menuitem" className="pl-menuitem" onClick={go(() => useStore.setState({ dialog: 'export' }))}><FileOutput size={15} /> {t('Export the book')}</button>

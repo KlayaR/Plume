@@ -9,7 +9,7 @@ import type { Chapter, Entry, Scene, SceneStatus } from '../lib/types'
 import { countWords } from '../lib/text'
 import { allowedKinds, chapterLabels } from '../lib/chapters'
 import Editor from '../editor/Editor'
-import { useAI } from '../editor/actions'
+import { accept, discard, retry, useAI } from '../editor/actions'
 import ContextPanel from './ContextPanel'
 import ReviewPanel from './ReviewPanel'
 import BookView, { Inline } from './BookView'
@@ -30,6 +30,8 @@ export default function WritingView() {
   const hasProposal = useAI(s => s.hasProposal)
   const running = useAI(s => s.running)
   const chatting = useChat(s => s.streaming !== null)
+  // A new proposal opens the Assistant tab, where its buttons are.
+  useEffect(() => { if (hasProposal && useStore.getState().prefs.rightTab !== 'write') useStore.getState().setPrefs({ rightTab: 'write' }) }, [hasProposal])
   const [hoverL, setHoverL] = useState(false)
   const [hoverR, setHoverR] = useState(false)
   const t = useT()
@@ -44,6 +46,14 @@ export default function WritingView() {
   return (
     <div className="pl-manuscript" data-pin-left={prefs.pinLeft} data-pin-right={prefs.pinRight}>
       <ManuscriptToolbar />
+      {hasProposal && (
+        <div className="pl-propbar" role="group" aria-label={t('Proposal')}>
+          <span>{running ? t('Claude is writing…') : t('Proposal')}</span>
+          <button type="button" className="sk-btn sk-btn-sm sk-btn-primary" disabled={!!running} onClick={() => accept()}>{t('Accept')} <kbd>Tab</kbd></button>
+          <button type="button" className="sk-btn sk-btn-sm" disabled={!!running} onClick={() => retry()}>{t('Retry')}</button>
+          <button type="button" className="sk-btn sk-btn-sm sk-btn-ghost" onClick={() => discard()}>{t('Discard')} <kbd>Esc</kbd></button>
+        </div>
+      )}
       <div className={`pl-scroll ${prefs.split !== null ? 'pl-scroll-split' : ''}`}>
         {prefs.split !== null && found && <SplitPane />}
         {found ? (prefs.page ? <BookView key={viewKey} /> : <Sheet key={viewKey} />) :<div className="sk-empty" style={{ paddingTop: 80 }}>{t('Pick or add a scene on the left.')}</div>}

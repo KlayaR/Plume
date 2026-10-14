@@ -927,6 +927,10 @@ const FR: Record<string, string> = {
   'Delete the message': 'Supprimer le message',
   'Edit this paragraph': 'Modifier ce paragraphe',
   'Go to the scene': 'Aller à la scène',
+  'Help': 'Aide',
+  'Search the help: proposal, secret, export…': 'Chercher dans l’aide : proposition, secret, export…',
+  'Claude is writing…': 'Claude écrit…',
+  'Help: how to use Plume': 'Aide : comment utiliser Plume',
 }
 
 const SHELL = {

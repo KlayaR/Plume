@@ -23,6 +23,7 @@ import ShortcutsDialog from './components/ShortcutsDialog'
 import QuickJump from './components/QuickJump'
 import DualView, { ViewBody } from './components/DualView'
 import ContextMenuHost from './components/ContextMenuHost'
+import HelpDialog from './components/HelpDialog'
 import SnapshotsDialog from './components/SnapshotsDialog'
 
 export default function App() {
@@ -59,6 +60,7 @@ export default function App() {
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === ',') { e.preventDefault(); useStore.setState({ showSettings: true }) }
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'k' && useStore.getState().book) { e.preventDefault(); useStore.setState({ dialog: 'jump' }) }
+      if (e.key === 'F1') { e.preventDefault(); useStore.setState({ dialog: 'help' }) }
       if ((e.ctrlKey || e.metaKey) && e.key === '/' && useStore.getState().book) { e.preventDefault(); useStore.setState({ dialog: 'shortcuts' }) }
       // Ctrl+Z in the Plan, outside any text field: take back the last card or chapter move.
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z' && useStore.getState().view === 'plan' && !(e.target as HTMLElement | null)?.closest?.('input, textarea, select, [contenteditable]')) {
@@ -97,6 +99,7 @@ export default function App() {
       {book && dialog === 'entry' && <EntryFromText onClose={() => useStore.setState({ dialog: null })} />}
       {book && dialog === 'shortcuts' && <ShortcutsDialog onClose={() => useStore.setState({ dialog: null })} />}
       {book && dialog === 'jump' && <QuickJump onClose={() => useStore.setState({ dialog: null })} />}
+      {book && dialog === 'help' && <HelpDialog onClose={() => useStore.setState({ dialog: null })} />}
       {book && dialog === 'tour' && <TourDialog onClose={() => useStore.setState({ dialog: null })} />}
       {book && dialog === 'agents' && <AgentDialog onClose={() => useStore.setState({ dialog: null })} />}
       {book && printing && <PrintView />}

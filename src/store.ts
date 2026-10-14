@@ -188,7 +188,7 @@ interface State {
   /** A place to go to in a scene: the editor selects it once the scene is open. */
   jump: { sceneId: string; from: number; to: number } | null
   /** The book's big dialogs, and the PDF print view. */
-  dialog: 'export' | 'agents' | 'tour' | 'find' | 'snapshots' | 'outline' | 'synonyms' | 'entry' | 'shortcuts' | 'jump' | null
+  dialog: 'export' | 'agents' | 'tour' | 'find' | 'snapshots' | 'outline' | 'synonyms' | 'entry' | 'shortcuts' | 'jump' | 'help' | null
   printing: boolean
 
   open: (root: string) => Promise<void>

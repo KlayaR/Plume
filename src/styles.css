@@ -773,3 +773,12 @@ body.pl-typing .pl-toolbar { opacity: 0.08; }
 .pl-ctx-tick { width: 14px; display: inline-flex; justify-content: center; color: var(--accent); }
 .pl-ctx-sep { height: 1px; margin: 4px 6px; background: var(--border); }
 .pl-ctx-head { padding: 4px 8px 2px; font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-muted); }
+
+/* The proposal's own buttons, next to the text. */
+.pl-propbar { position: absolute; z-index: 60; top: 52px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 10px; background: var(--surface-1); border: 1px solid var(--border-strong); box-shadow: var(--shadow); font-size: var(--fs-sm); }
+.pl-propbar kbd { margin-left: 4px; font: inherit; font-size: 10px; padding: 0 5px; border: 1px solid var(--border); border-radius: 4px; opacity: 0.8; }
+/* The help. */
+.pl-help { display: flex; flex-direction: column; gap: 14px; }
+.pl-help-topic h3 { margin: 0 0 4px; font-size: 1rem; color: var(--accent); }
+.pl-help-topic ul { margin: 0; padding-left: 1.1rem; display: flex; flex-direction: column; gap: 5px; line-height: 1.45; }
+.pl-help code { padding: 0 4px; border-radius: 4px; background: var(--surface-2, var(--border)); font-size: 0.9em; }

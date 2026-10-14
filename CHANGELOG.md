@@ -7,6 +7,10 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.16.0
+- **Help (F1, or the ... menu):** how to use Plume, by topic, with a search box, in French and English: starting, writing, asking Claude, the chat, the bible, the plan, review, export and safety, Claude and OpenRouter. It links to the quick tour and the shortcuts.
+- **Proposals are easier to find and decide:** when Claude proposes text, a small bar appears next to the text with **Accept (Tab)**, **Retry** and **Discard (Esc)**, and the Assistant tab opens on its own (before, the buttons stayed hidden if you were on the Chat or Notes tab, which made the text look locked).
+
 ## 0.15.1
 - Releases are now built on the maintainer's PC and published with `npm run release` (faster than GitHub's build). The GitHub workflow stays as a backup and does nothing when a release already has its installer. No change in the app itself.
 
