@@ -1,9 +1,9 @@
 // Research & Bible: every entry by type, and the entry editor.
 import { useEffect, useMemo, useState } from 'react'
 import { ask } from '@tauri-apps/plugin-dialog'
-import { ImagePlus, MessagesSquare, Plus, Search, Sparkles, Trash2, X } from 'lucide-react'
-import { useStore, type BibleTab } from '../store'
-import { EMPTY_VOICE, ENTRY_TYPES, typeInfo, type Entry, type EntryType, type ExcerptKind, type Include, type VoiceCard } from '../lib/types'
+import { ChevronDown, ChevronRight, ImagePlus, MessagesSquare, Plus, Search, Sparkles, Trash2, X } from 'lucide-react'
+import { MORE_TABS, useStore, type BibleTab } from '../store'
+import { EMPTY_VOICE, FAMILIES, typeInfo, VOICE_TYPES, type Entry, type EntryType, type ExcerptKind, type Include, type VoiceCard } from '../lib/types'
 import { formatFact, parseFact } from '../lib/bible'
 import { buildMatcher, findMentions } from '../lib/context'
 import { estimateTokens, foldText } from '../lib/text'
@@ -19,13 +19,15 @@ import AICheck from './AICheck'
 import { startInterview, useChat } from '../chat'
 import { pickImage, useImage } from '../lib/images'
 
-const TABS: [BibleTab, string][] = [['entry', 'Entry'], ['review', 'To review'], ['aicheck', 'AI check'], ['tracker', 'Tracker'], ['map', 'Map'], ['relations', 'Relations'], ['contradictions', 'Contradictions']]
+const TABS: [BibleTab, string][] = [['entry', 'Entries'], ['review', 'To review'], ['aicheck', 'AI check']]
+const MORE: [BibleTab, string][] = [['tracker', 'Presence'], ['map', 'Map'], ['relations', 'Relations'], ['contradictions', 'Contradictions']]
 
 export default function BibleView() {
   const book = useStore(s => s.book)!
   const slug = useStore(s => s.entrySlug)
   const tab = useStore(s => s.bibleTab)
   const pinned = useStore(s => s.prefs.chatOpen)
+  const closed = useStore(s => s.prefs.famClosed)
   const drafts = useChat(s => s.proposals.length)
   const [query, setQuery] = useState('')
   const [adding, setAdding] = useState<EntryType | null>(null)
@@ -34,7 +36,7 @@ export default function BibleView() {
   const t = useT()
   const q = foldText(query.trim())
   const allTags = [...new Set(book.entries.flatMap(e => e.tags ?? []))].sort((a, b) => a.localeCompare(b))
-  const shown = book.entries.filter(e => (!q || foldText([e.name, ...e.aliases, ...(e.tags ?? [])].join(' ')).includes(q)) && (!tag || e.tags?.includes(tag)))
+  const shown = book.entries.filter(e => !VOICE_TYPES.includes(e.type) && (!q || foldText([e.name, ...e.aliases, ...(e.tags ?? [])].join(' ')).includes(q)) && (!tag || e.tags?.includes(tag)))
   const selected = book.entries.find(e => e.slug === slug) ?? null
 
   const create = () => {
@@ -65,7 +67,11 @@ export default function BibleView() {
           {adding && (
             <div className="pl-newentry">
               <select className="sk-select" value={adding} onChange={e => setAdding(e.target.value as EntryType)}>
-                {ENTRY_TYPES.filter(x => x.type !== 'style').map(x => <option key={x.type} value={x.type}>{t(x.label)}</option>)}
+                {FAMILIES.map(f => (
+                  <optgroup key={f.id} label={t(f.label)}>
+                    {f.types.map(ty => <option key={ty} value={ty}>{t(typeInfo(ty).label)}</option>)}
+                  </optgroup>
+                ))}
               </select>
               <input className="sk-input" placeholder={t('Name')} autoFocus value={name} onChange={e => setName(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') create(); if (e.key === 'Escape') setAdding(null) }} />
@@ -75,23 +81,28 @@ export default function BibleView() {
               </div>
             </div>
           )}
-          {ENTRY_TYPES.map(ty => {
-            const items = shown.filter(e => e.type === ty.type).sort((a, b) => a.name.localeCompare(b.name))
-            if (!items.length && ty.type === 'style') return null
+          {FAMILIES.map(f => {
+            const items = shown.filter(e => f.types.includes(e.type)).sort((a, b) => a.name.localeCompare(b.name))
+            const open = !closed.includes(f.id) || !!q
+            const fold = () => useStore.getState().setPrefs({ famClosed: open ? [...closed, f.id] : closed.filter(x => x !== f.id) })
+            const add = (type: EntryType) => { setAdding(type); setName('') }
             return (
-              <div key={ty.type} className="pl-group">
-                <div className="pl-group-head" onContextMenu={ev => ty.type !== 'style' && showMenu(ev, [{ label: t('New {type}', { type: t(ty.label).toLowerCase() }), onClick: () => { setAdding(ty.type); setName('') } }])}>
-                  <span className="sk-label">{t(ty.plural)}</span>
-                  {ty.type !== 'style' && (
-                    <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm sk-btn-icon" title={t('New {type}', { type: t(ty.label).toLowerCase() })} onClick={() => { setAdding(ty.type); setName('') }}>
-                      <Plus size={13} />
-                    </button>
-                  )}
+              <div key={f.id} className="pl-group">
+                <div className="pl-group-head" onContextMenu={ev => showMenu(ev, f.types.map(ty => ({ label: t('New {type}', { type: t(typeInfo(ty).label).toLowerCase() }), onClick: () => add(ty) })))}>
+                  <button type="button" className="pl-quiet pl-fold" aria-expanded={open} onClick={fold}>
+                    {open ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+                    <span className="sk-label">{t(f.label)}</span>
+                    {items.length > 0 && <span className="sk-num">{items.length}</span>}
+                  </button>
+                  <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm sk-btn-icon" title={t('New {type}', { type: t(typeInfo(f.types[0]).label).toLowerCase() })} onClick={() => add(f.types[0])}>
+                    <Plus size={13} />
+                  </button>
                 </div>
-                {items.map(e => (
+                {open && items.map(e => (
                   <button key={e.slug} type="button" className={`pl-group-item ${e.slug === slug ? 'pl-active' : ''}`} onClick={() => useStore.getState().selectEntry(e.slug)} onContextMenu={ev => showMenu(ev, entryMenu(e.slug))}>
                     <span>{e.name}</span>
-                    {e.include === 'always' && ty.type !== 'style' && <span className="sk-badge sk-badge-accent">{t('always')}</span>}
+                    {f.types.length > 1 && <span className="pl-type">{t(typeInfo(e.type).label)}</span>}
+                    {e.include === 'always' && <span className="sk-badge sk-badge-accent">{t('always')}</span>}
                     {e.include === 'never' && <span className="sk-badge">{t('never')}</span>}
                     {e.include === 'secret' && <span className="sk-badge">{t('secret')}</span>}
                     {e.shared && <span className="sk-badge" title={t('Shared with every book of the series')}>{t('series')}</span>}
@@ -100,6 +111,9 @@ export default function BibleView() {
               </div>
             )
           })}
+          <button type="button" className="pl-quiet pl-voicelink" onClick={() => useStore.setState({ showSettings: true, settingsTab: 'voice' })}>
+            {t('Word lists, excerpts and style guide: Settings → Voice')}
+          </button>
         </nav>
         <div className="pl-bible-main">
           <nav className="pl-switch pl-bible-tabs" aria-label={t('Bible')}>
@@ -108,7 +122,13 @@ export default function BibleView() {
                 {t(label)}{id === 'review' && drafts > 0 ? ` (${drafts})` : ''}
               </button>
             ))}
+            <button type="button" aria-pressed={MORE_TABS.includes(tab)} onClick={() => !MORE_TABS.includes(tab) && useStore.setState({ bibleTab: 'tracker' })}>{t('More')}</button>
           </nav>
+          {MORE_TABS.includes(tab) && (
+            <nav className="pl-switch pl-bible-more" aria-label={t('More')}>
+              {MORE.map(([id, label]) => <button key={id} type="button" aria-pressed={tab === id} onClick={() => useStore.setState({ bibleTab: id })}>{t(label)}</button>)}
+            </nav>
+          )}
           {tab === 'entry' && (selected ? <EntryEditor key={selected.slug} entry={selected} /> : book.entries.some(e => !['style', 'wordlist', 'excerpt'].includes(e.type)) ? <div className="sk-empty">{t('Pick an entry, or add one with New entry.')}</div> : (
             <div className="pl-emptystate">
               <b>{t('Your bible is empty.')}</b>
@@ -140,6 +160,8 @@ export function EntryEditor({ entry }: { entry: Entry }) {
   const plain = isStyle || entry.type === 'wordlist' || entry.type === 'excerpt'
   const t = useT()
   const [writing, setWriting] = useState(false)
+  const advList = useStore(s => s.prefs.advOpen)
+  const advOpen = advList.includes(entry.type)
   const [aliases, setAliases] = useState(entry.aliases.join(', '))
   const [tags, setTags] = useState((entry.tags ?? []).join(', '))
   const [facts, setFacts] = useState(entry.facts.map(formatFact).join('\n'))
@@ -189,11 +211,6 @@ export function EntryEditor({ entry }: { entry: Entry }) {
             <span className="sk-hint">{t('Comma-separated. End one with ! to match its exact capitals (Rose!).')}</span>
           </div>
           <div className="sk-field">
-            <label htmlFor="ee-tags">{t('Tags')}</label>
-            <input id="ee-tags" className="sk-input" value={tags} placeholder={t('villains, act 2, magic users')}
-              onChange={e => { setTags(e.target.value); update({ tags: e.target.value.split(',').map(s => s.trim()).filter(Boolean) }) }} />
-          </div>
-          <div className="sk-field">
             <label htmlFor="ee-include">{t('Sent to the AI')}</label>
             <select id="ee-include" className="sk-select" value={entry.include} onChange={e => update({ include: e.target.value as Include })}>
               <option value="auto">{t('When mentioned')}</option>
@@ -202,25 +219,6 @@ export function EntryEditor({ entry }: { entry: Entry }) {
               <option value="secret">{t('Secret: never, not even @-mentioned')}</option>
             </select>
           </div>
-        </div>
-      )}
-
-      {!plain && (
-        <div className="sk-field">
-          <label>{t('Links')}</label>
-          <div className="pl-chips">
-            {entry.links.map(l => (
-              <span key={l} className="pl-chip">
-                {book.entries.find(e => e.slug === l)?.name ?? l}
-                <button type="button" aria-label={t('Remove link')} onClick={() => update({ links: entry.links.filter(x => x !== l) })}><X size={12} /></button>
-              </span>
-            ))}
-            <select className="sk-select sk-btn-sm" value="" onChange={e => e.target.value && update({ links: [...entry.links, e.target.value] })} aria-label={t('Add a link…')}>
-              <option value="">{t('Add a link…')}</option>
-              {others.filter(o => !entry.links.includes(o.slug)).map(o => <option key={o.slug} value={o.slug}>{o.name}</option>)}
-            </select>
-          </div>
-          <span className="sk-hint">{t('Linked entries are sent too (short version) when this one is.')}</span>
         </div>
       )}
 
@@ -262,22 +260,45 @@ export function EntryEditor({ entry }: { entry: Entry }) {
         {entry.type === 'wordlist' && <span className="sk-hint">{t('Banned from AI text and flagged by the rule checker. In a prompt:')} {`{list.${entry.name}}`}</span>}
       </div>
 
-      {entry.type === 'character' && <VoiceEditor entry={entry} update={update} />}
-
       {!plain && (
-        <div className="sk-field">
-          <label htmlFor="ee-notes">{t('Private notes')}</label>
-          <textarea id="ee-notes" className="sk-input" rows={3} value={entry.notes ?? ''} onChange={e => update({ notes: e.target.value })} placeholder={t('Reminders, ideas, research. Never sent to the AI.')} />
-        </div>
-      )}
-
-      {!plain && (
-        <div className="sk-field">
-          <label htmlFor="ee-facts">{t('Facts')}</label>
-          <textarea id="ee-facts" className="sk-input" rows={4} value={facts} placeholder={'- [ch 3–8] Carries the sword Aube.\n- [ch 12+] Blind in the left eye.'}
-            onChange={e => { setFacts(e.target.value); update({ facts: e.target.value.split('\n').map(parseFact).filter((f): f is NonNullable<typeof f> => !!f) }) }} />
-          <span className="sk-hint">{t('One per line. [ch 3–8], [ch 12+] or [ch 5] limit a fact to those chapters; no bracket = always true.')}</span>
-        </div>
+        <details className="pl-advanced" open={advOpen} onToggle={e => {
+          const on = (e.target as HTMLDetailsElement).open
+          if (on !== advOpen) useStore.getState().setPrefs({ advOpen: on ? [...advList, entry.type] : advList.filter(x => x !== entry.type) })
+        }}>
+          <summary>{t('Advanced')} <span className="sk-hint">{t(entry.type === 'character' ? 'tags, links, voice, facts, private notes' : 'tags, links, facts, private notes')}</span></summary>
+          <div className="sk-field">
+            <label htmlFor="ee-tags">{t('Tags')}</label>
+            <input id="ee-tags" className="sk-input" value={tags} placeholder={t('villains, act 2, magic users')}
+              onChange={e => { setTags(e.target.value); update({ tags: e.target.value.split(',').map(s => s.trim()).filter(Boolean) }) }} />
+          </div>
+          <div className="sk-field">
+            <label>{t('Links')}</label>
+            <div className="pl-chips">
+              {entry.links.map(l => (
+                <span key={l} className="pl-chip">
+                  {book.entries.find(e => e.slug === l)?.name ?? l}
+                  <button type="button" aria-label={t('Remove link')} onClick={() => update({ links: entry.links.filter(x => x !== l) })}><X size={12} /></button>
+                </span>
+              ))}
+              <select className="sk-select sk-btn-sm" value="" onChange={e => e.target.value && update({ links: [...entry.links, e.target.value] })} aria-label={t('Add a link…')}>
+                <option value="">{t('Add a link…')}</option>
+                {others.filter(o => !entry.links.includes(o.slug)).map(o => <option key={o.slug} value={o.slug}>{o.name}</option>)}
+              </select>
+            </div>
+            <span className="sk-hint">{t('Linked entries are sent too (short version) when this one is.')}</span>
+          </div>
+          {entry.type === 'character' && <VoiceEditor entry={entry} update={update} />}
+          <div className="sk-field">
+            <label htmlFor="ee-facts">{t('Facts')}</label>
+            <textarea id="ee-facts" className="sk-input" rows={4} value={facts} placeholder={'- [ch 3–8] Carries the sword Aube.\n- [ch 12+] Blind in the left eye.'}
+              onChange={e => { setFacts(e.target.value); update({ facts: e.target.value.split('\n').map(parseFact).filter((f): f is NonNullable<typeof f> => !!f) }) }} />
+            <span className="sk-hint">{t('One per line. [ch 3–8], [ch 12+] or [ch 5] limit a fact to those chapters; no bracket = always true.')}</span>
+          </div>
+          <div className="sk-field">
+            <label htmlFor="ee-notes">{t('Private notes')}</label>
+            <textarea id="ee-notes" className="sk-input" rows={3} value={entry.notes ?? ''} onChange={e => update({ notes: e.target.value })} placeholder={t('Reminders, ideas, research. Never sent to the AI.')} />
+          </div>
+        </details>
       )}
 
       {!plain && (

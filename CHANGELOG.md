@@ -7,6 +7,13 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.19.0
+**A simpler bible** (UX plan, phase 3)
+- **Five families** in the bible list: People, Places, Things (objects, creatures), Lore (lore and rules, magic, events, factions, themes) and Story lines. Click a family to fold it; the New entry menu is grouped the same way. Nothing changes on disk.
+- **Advanced fold** in each entry: tags, links, facts, private notes and, for characters, the voice card and Knows / Doesn't know. The form now opens on what matters most (name, aliases, sent to the AI, short and full versions). Plume remembers, per entry type, if you leave it open.
+- **Your voice materials** (style guide, word lists, excerpts of your prose) moved to Settings → Voice. They stay in the book's bible folder, so `{list.…}` in prompts and banned words keep working.
+- **Bible tabs:** Entries, To review, AI check and More (Presence, the former Tracker, Map, Relations, Contradictions).
+
 ## 0.18.0
 **One way to do each thing** (UX plan, phase 2)
 - **Choosing the AI is the same everywhere:** under the Assistant and under the Chat, first which AI answers (Claude command line or OpenRouter), then the model. The per-action model rows in Settings → This book are gone (the effort per action stays). Settings → Claude now lists **your OpenRouter models**: the short list offered when you pick OpenRouter.

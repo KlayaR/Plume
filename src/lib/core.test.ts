@@ -16,7 +16,7 @@ import { lastWords, locateQuote, slugify } from './text'
 import { allowedKinds, chapterLabels, enterStartsScene } from './chapters'
 import { countSigns, textStats } from './stats'
 import type { Book, Entry, Scene } from './types'
-import { DEFAULT_AI, DEFAULT_VOICE } from './types'
+import { DEFAULT_AI, DEFAULT_VOICE, ENTRY_TYPES, FAMILIES, VOICE_TYPES, familyOf } from './types'
 import { adverbs, passives, echoes } from './analysis'
 import { checkRules, expandVariables } from './voice'
 import { review } from './review'
@@ -746,5 +746,16 @@ describe('help', () => {
     expect(searchHelp('rejette', 'fr').map(h => h.id)).toContain('claude')
     expect(searchHelp('', 'en')).toHaveLength(HELP.length)
     expect(searchHelp('zzzzzz', 'en')).toEqual([])
+  })
+})
+
+describe('bible families', () => {
+  it('puts every entry type in one family or in the voice materials', () => {
+    for (const { type } of ENTRY_TYPES) {
+      const n = FAMILIES.filter(f => f.types.includes(type)).length + (VOICE_TYPES.includes(type) ? 1 : 0)
+      expect(n, type).toBe(1)
+    }
+    expect(familyOf('creature')).toBe('things')
+    expect(familyOf('wordlist')).toBeNull()
   })
 })

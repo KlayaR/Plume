@@ -5,6 +5,8 @@ import { useMemo, useState } from 'react'
 import { Copy, Plus, Sparkles, Trash2 } from 'lucide-react'
 import { SettingRow, SettingsSection, Switch } from '../studio-kit/shell.js'
 import { useStore } from '../store'
+import { EntryEditor } from './BibleView'
+import { typeInfo, VOICE_TYPES, type EntryType } from '../lib/types'
 import type { Rules, SceneRule, Voice } from '../lib/types'
 import { allPrompts, loadPrompts, PRESETS, promptText, savePrompts, SCENE_RULES, VARIABLES, type PromptSet } from '../lib/voice'
 import { profile } from '../lib/analysis'
@@ -48,6 +50,8 @@ export default function VoiceSettings() {
         ))}
       </SettingsSection>
 
+      <VoiceMaterials />
+
       <SettingsSection title={t('Your rules')} description={t('Every proposal is checked against these, without the AI. A failed rule gets "Retry fixing these".')}>
         <SettingRow label={t('Passive voice, at most')} description={t('% of sentences')}>
           <input className="sk-input pl-num" type="number" min={0} max={50} value={voice.rules.passiveMax} onChange={e => setRule({ passiveMax: Number(e.target.value) || 0 })} />
@@ -64,7 +68,7 @@ export default function VoiceSettings() {
         <SettingRow label={t('Dialogue opens with an em dash')} description={t('No quotation marks, no hyphen')}>
           <Switch checked={voice.rules.dashDialogue} onChange={v => setRule({ dashDialogue: v })} label={t('Dialogue opens with an em dash')} />
         </SettingRow>
-        <p className="sk-hint">{t('Banned words come from the word lists in the bible (Bible → New entry → Word list).')}</p>
+        <p className="sk-hint">{t('Banned words come from your word lists (Your voice materials, above).')}</p>
       </SettingsSection>
 
       <StyleProfile />
@@ -225,6 +229,37 @@ function ReferenceBooks() {
           <button type="button" className="sk-btn sk-btn-sm" disabled={busy} onClick={add}><Plus size={13} /> {busy ? t('Measuring…') : t('Choose…')}</button>
         </span>
       </SettingRow>
+    </SettingsSection>
+  )
+}
+
+/** The style guide, word lists and excerpts of your prose: bible files that shape
+ *  the voice rather than the story, so they are edited here, not in the bible list. */
+function VoiceMaterials() {
+  const entries = useStore(s => s.book!.entries)
+  const t = useT()
+  const [open, setOpen] = useState<string | null>(null)
+  const items = entries.filter(e => VOICE_TYPES.includes(e.type)).sort((a, b) => VOICE_TYPES.indexOf(a.type) - VOICE_TYPES.indexOf(b.type) || a.name.localeCompare(b.name))
+  const current = items.find(e => e.slug === open) ?? null
+  const add = (type: EntryType) => {
+    const name = type === 'wordlist' ? t('Banned words') : t('Excerpt {n}', { n: items.filter(e => e.type === 'excerpt').length + 1 })
+    setOpen(useStore.getState().addEntry(type, name).slug)
+  }
+  return (
+    <SettingsSection title={t('Your voice materials')} description={t('The style guide, word lists and excerpts of your own prose. They are sent with requests to shape how Claude writes, not what happens.')}
+      actions={<>
+        <button type="button" className="sk-btn sk-btn-sm" onClick={() => add('wordlist')}><Plus size={13} /> {t('Word list')}</button>
+        <button type="button" className="sk-btn sk-btn-sm" onClick={() => add('excerpt')}><Plus size={13} /> {t('Excerpt')}</button>
+      </>}>
+      {items.length === 0 && <div className="sk-hint">{t('Nothing yet. An excerpt of a few hundred words of your own prose helps Claude most.')}</div>}
+      <div className="sk-list">
+        {items.map(e => (
+          <button key={e.slug} type="button" className={`sk-list-row pl-recent ${e.slug === open ? 'pl-active' : ''}`} onClick={() => setOpen(e.slug === open ? null : e.slug)}>
+            <span className="sk-grow">{e.name}</span><span className="sk-hint">{t(typeInfo(e.type).label)}</span>
+          </button>
+        ))}
+      </div>
+      {current && <div className="pl-voicemat"><EntryEditor key={current.slug} entry={current} /></div>}
     </SettingsSection>
   )
 }

@@ -63,6 +63,18 @@ export const ENTRY_TYPES: EntryTypeInfo[] = [
 
 export const typeInfo = (t: EntryType) => ENTRY_TYPES.find(x => x.type === t)!
 
+/** How the bible list groups entry types. Voice materials (word lists, excerpts,
+ *  the style guide) are not here: they live in Settings → Voice. */
+export const FAMILIES: { id: string; label: string; types: EntryType[] }[] = [
+  { id: 'people', label: 'People', types: ['character'] },
+  { id: 'places', label: 'Places', types: ['place'] },
+  { id: 'things', label: 'Things', types: ['object', 'creature'] },
+  { id: 'lore', label: 'Lore', types: ['lore', 'magic', 'event', 'faction', 'theme'] },
+  { id: 'storylines', label: 'Story lines', types: ['storyline'] },
+]
+export const VOICE_TYPES: EntryType[] = ['style', 'wordlist', 'excerpt']
+export const familyOf = (t: EntryType) => FAMILIES.find(f => f.types.includes(t))?.id ?? null
+
 /** A fact true only for a range of chapters (of one book of a series); null bounds are open. */
 export interface Fact {
   from: number | null

@@ -345,6 +345,11 @@ html[data-theme="light"] .pl-shelf-books { box-shadow: 0 10px 14px -12px rgba(0,
 .pl-group-item > span:first-child { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pl-group-item:hover { background: var(--surface-2); }
 .pl-group-item.pl-active { border-left-color: var(--accent); color: var(--text); }
+.pl-fold { display: flex; align-items: center; gap: 4px; padding: 2px 0; color: var(--text-dim); }
+.pl-fold .sk-num { font-size: var(--fs-xs); opacity: 0.7; }
+.pl-group-item .pl-type { flex: none; font-size: var(--fs-xs); opacity: 0.6; }
+.pl-voicelink { display: block; margin: 14px 4px 4px; font-size: var(--fs-xs); color: var(--text-dim); text-align: left; }
+.pl-voicelink:hover { color: var(--text); }
 .pl-bible-main { overflow: auto; padding: 40px 48px 80px; }
 .pl-bible-head { display: flex; align-items: center; justify-content: space-between; max-width: 46rem; margin-bottom: 24px; }
 .pl-entryedit { max-width: 46rem; display: flex; flex-direction: column; gap: var(--space-4); }
@@ -410,6 +415,12 @@ html[data-theme="light"] .pl-shelf-books { box-shadow: 0 10px 14px -12px rgba(0,
 .pl-chat-input { flex: none; resize: vertical; }
 .pl-chat-review { color: var(--accent); font-size: var(--fs-sm); text-align: left; }
 .pl-bible-tabs { margin-bottom: 22px; flex-wrap: wrap; }
+.pl-bible-more { margin: -12px 0 22px; flex-wrap: wrap; font-size: var(--fs-sm); }
+.pl-advanced { border-top: 1px solid var(--border); padding-top: 10px; }
+.pl-advanced > summary { cursor: pointer; color: var(--text-dim); font-size: var(--fs-sm); padding: 4px 0; }
+.pl-advanced > summary .sk-hint { margin-left: 6px; }
+.pl-advanced[open] { display: flex; flex-direction: column; gap: 14px; }
+.pl-voicemat { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
 .pl-review, .pl-contra, .pl-tracker, .pl-relations, .pl-mapview { display: flex; flex-direction: column; gap: 12px; max-width: 60rem; }
 .pl-proposal { display: flex; flex-direction: column; gap: 6px; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-1); }
 .pl-tracker-grid { display: grid; gap: 2px 3px; align-items: center; font-size: 12px; }

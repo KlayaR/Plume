@@ -13,6 +13,8 @@ const undos: (() => void)[] = []
 
 export type View = 'bible' | 'plan' | 'manuscript'
 export type BibleTab = 'entry' | 'review' | 'aicheck' | 'tracker' | 'map' | 'relations' | 'contradictions'
+/** Bible tabs grouped under "More". */
+export const MORE_TABS: BibleTab[] = ['tracker', 'map', 'relations', 'contradictions']
 export type PlanTab = 'board' | 'structure' | 'timeline' | 'lines' | 'dashboard' | 'revision'
 /** What the right pane of the Manuscript shows in Write mode. */
 export type RightTab = 'write' | 'chat' | 'notes'
@@ -98,6 +100,9 @@ export interface Prefs {
   assistModel: string
   /** The small bar of actions above selected text. */
   selBar: boolean
+  /** Bible families folded in the list, and entry types whose Advanced fold is open. */
+  famClosed: string[]
+  advOpen: string[]
   /** A second view shown beside the main one (Bible, Plan or Manuscript), and its width in px. */
   dual: View | null
   dualW: number
@@ -146,6 +151,8 @@ export const DEFAULT_PREFS: Prefs = {
   assistBackend: 'claude',
   assistModel: 'sonnet',
   selBar: true,
+  famClosed: [],
+  advOpen: [],
   dual: null,
   dualW: 520,
   v: 2,
@@ -201,6 +208,8 @@ interface State {
   lastBackend: { kind: 'claude' | 'openrouter'; name: string } | null
   toast: Toast | null
   showSettings: boolean
+  /** Settings tab to open on, when something links to one. */
+  settingsTab: string | null
   editorTick: number
   bibleTab: BibleTab
   planTab: PlanTab
@@ -347,6 +356,7 @@ export const useStore = create<State>((set, get) => {
     lastBackend: null,
     toast: null,
     showSettings: false,
+    settingsTab: null,
     editorTick: 0,
     bibleTab: 'entry',
     planTab: 'board',

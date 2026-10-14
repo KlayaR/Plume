@@ -211,7 +211,7 @@ const FR: Record<string, string> = {
   'Longest line of dialogue': 'Réplique la plus longue',
   'Dialogue opens with an em dash': 'Les répliques commencent par un tiret cadratin',
   'No quotation marks, no hyphen': 'Ni guillemets, ni trait d’union',
-  'Banned words come from the word lists in the bible (Bible → New entry → Word list).': 'Les mots interdits viennent des listes de mots de la bible (Bible → Nouvelle fiche → Liste de mots).',
+  'Banned words come from your word lists (Your voice materials, above).': 'Les mots interdits viennent de vos listes de mots (Vos matériaux de voix, plus haut).',
   'copy': 'copie',
   'My prompt': 'Mon prompt',
   'Prompt library': 'Bibliothèque de prompts',
@@ -962,6 +962,19 @@ const FR: Record<string, string> = {
   'Rewrite, Shorten, Expand, Show it, Comment and Synonyms above any selection.': 'Réécrire, Raccourcir, Développer, Le montrer, Commenter et Synonymes au-dessus de toute sélection.',
   'The model is chosen under the Assistant and under the Chat (which AI, then which model).': 'Le modèle se choisit sous l’Assistant et sous le Chat (quelle IA, puis quel modèle).',
   'Comment': 'Commenter',
+  'Word lists, excerpts and style guide: Settings → Voice': 'Listes de mots, extraits et guide de style : Réglages → Voix',
+  'Advanced': 'Avancé',
+  'Excerpt {n}': 'Extrait {n}',
+  'Your voice materials': 'Vos matériaux de voix',
+  'The style guide, word lists and excerpts of your own prose. They are sent with requests to shape how Claude writes, not what happens.': 'Le guide de style, les listes de mots et des extraits de votre prose. Ils accompagnent les demandes pour régler la façon dont Claude écrit, pas ce qui se passe.',
+  'Excerpt': 'Extrait',
+  'Nothing yet. An excerpt of a few hundred words of your own prose helps Claude most.': 'Rien pour l’instant. Un extrait de quelques centaines de mots de votre prose aide Claude plus que tout.',
+  'People': 'Personnes',
+  'Things': 'Choses',
+  'Lore': 'Univers',
+  'Presence': 'Présence',
+  'tags, links, voice, facts, private notes': 'étiquettes, liens, voix, faits, notes privées',
+  'tags, links, facts, private notes': 'étiquettes, liens, faits, notes privées',
 }
 
 const SHELL = {

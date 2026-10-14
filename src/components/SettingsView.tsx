@@ -21,8 +21,8 @@ type Tab = 'appearance' | 'manuscript' | 'writing' | 'voice' | 'claude' | 'book'
 export default function SettingsView({ version }: { version: string }) {
   const book = useStore(s => s.book)
   const t = useT()
-  const [tab, setTab] = useState<Tab>('appearance')
-  const close = () => useStore.setState({ showSettings: false })
+  const [tab, setTab] = useState<Tab>(() => (useStore.getState().settingsTab as Tab | null) ?? 'appearance')
+  const close = () => useStore.setState({ showSettings: false, settingsTab: null })
   const tabs: [Tab, string, typeof Palette][] = [
     ['appearance', 'Appearance', Palette],
     ['manuscript', 'Manuscript', Type],
