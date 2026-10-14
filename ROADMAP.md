@@ -15,6 +15,7 @@ Until then, each version is a pre-release: 0.x.y, where y fixes bugs and x adds
 or changes features.
 
 ## Next
+- The UX plan (five releases, simpler and calmer): see [docs/UX_PLAN.md](docs/UX_PLAN.md).
 - Try OpenRouter with a real key for a while: streaming, long replies, errors.
 - Test every feature in daily use on real books and fix what breaks.
 - Undo for deletions and renames in the Plan and the Bible (moves already undo).
