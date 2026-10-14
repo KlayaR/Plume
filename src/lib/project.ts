@@ -87,13 +87,14 @@ function normalizeMeta(raw: Partial<BookMeta>): BookMeta {
     dictionary: Array.isArray(raw.dictionary) ? raw.dictionary : [],
     ltIgnored: Array.isArray(raw.ltIgnored) ? raw.ltIgnored : [],
     passes: Array.isArray(raw.passes) ? raw.passes : undefined,
+    matter: raw.matter && typeof raw.matter === 'object' ? raw.matter : undefined,
     summary: raw.summary,
   }
 }
 
 async function readChapter(root: string, folder: string, files: string[]): Promise<Chapter> {
   let id = folder, title = folder, notes = ''
-  let summary: string | undefined, summaryOf: string | undefined
+  let summary: string | undefined, summaryOf: string | undefined, part: string | undefined
   let kind: Chapter['kind'] = 'chapter'
   try {
     const { data, body } = splitFrontmatter(await read(root, `manuscript/${folder}/chapter.md`))
@@ -102,13 +103,14 @@ async function readChapter(root: string, folder: string, files: string[]): Promi
     title = String(data.title ?? '')
     if (data.kind === 'prologue' || data.kind === 'epilogue') kind = data.kind
     if (data.summary) { summary = String(data.summary); summaryOf = String(data.summaryOf ?? '') }
+    if (data.part) part = String(data.part)
     notes = body.trim()
   } catch { /* chapter.md missing: keep the folder name */ }
   const scenes: Scene[] = []
   for (const f of files) {
     try { scenes.push(parseScene(`manuscript/${folder}/${f}`, await read(root, `manuscript/${folder}/${f}`))) } catch { /* moved away */ }
   }
-  return { id, folder, kind, title, notes, summary, summaryOf, scenes }
+  return { id, folder, kind, title, notes, summary, summaryOf, part, scenes }
 }
 
 export async function loadBook(root: string): Promise<Book> {
@@ -151,7 +153,7 @@ export const saveMeta = (book: Book) =>
 export const saveScene = (root: string, s: Scene) => guarded(root, s.path, serializeScene(s))
 export const saveEntry = (root: string, e: Entry) => guarded(root, e.path, serializeEntry(e))
 export const saveChapter = (root: string, c: Chapter) =>
-  write(root, `manuscript/${c.folder}/chapter.md`, joinFrontmatter({ id: c.id, title: c.title, kind: c.kind === 'chapter' ? undefined : c.kind, summary: c.summary, summaryOf: c.summaryOf }, c.notes ? `\n${c.notes}\n` : '\n'))
+  write(root, `manuscript/${c.folder}/chapter.md`, joinFrontmatter({ id: c.id, title: c.title, kind: c.kind === 'chapter' ? undefined : c.kind, summary: c.summary, summaryOf: c.summaryOf, part: c.part || undefined }, c.notes ? `\n${c.notes}\n` : '\n'))
 
 const unique = (base: string, taken: Set<string>) => {
   let s = base, i = 2

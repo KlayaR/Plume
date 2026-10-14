@@ -66,3 +66,28 @@ export function typingRule(lang: Lang, before: string, ch: string): { remove: nu
   if (ch === "'") return { remove: 0, insert: opens ? '‘' : '’' }
   return null
 }
+
+/** Abbreviations after which a full stop does not end a sentence (so no capital follows). */
+const ABBREV = new Set(['mr', 'mrs', 'ms', 'dr', 'st', 'jr', 'sr', 'vs', 'etc', 'e.g', 'i.e', 'cf', 'approx', 'no', 'vol', 'pp', 'p', 'fig', 'ca', 'mt', 'ft', 'lt', 'sgt', 'capt', 'col', 'gen', 'prof', 'rev', 'hon', 'inc', 'ltd', 'co', 'ave', 'a.m', 'p.m', 'm', 'mme', 'mlle', 'mm', 'me', 'dr', 'ex', 'env', 'cf'])
+const STARTS = /^[\s\u00a0\u202f"'“‘„«»(\[¿¡—–-]*$/
+const AFTER_STOP = /(?<!\.)\.[\s\u00a0]+["'“‘„«(\[]?[\s\u00a0]*$/
+
+/**
+ * Capital letters as you type: a sentence's first letter (at the start of a line,
+ * or after a full stop that is neither an ellipsis nor an abbreviation or an
+ * initial). Only full stops count, because after ? or ! a dialogue tag goes on in lower case.
+ */
+export function autoCapitalRule(lang: Lang, before: string, ch: string): { remove: number; insert: string } | null {
+  if (ch.length !== 1 || !/\p{L}/u.test(ch) || ch === ch.toLocaleUpperCase(lang)) return null
+  let starts = STARTS.test(before)
+  if (!starts && AFTER_STOP.test(before)) {
+    const word = (before.replace(/\.[\s\u00a0]+["'“‘„«(\[]?[\s\u00a0]*$/, '.').match(/([\p{L}.]+)\.$/u) || [])[1] || ''
+    starts = !ABBREV.has(word.toLowerCase()) && !/^\p{L}$/u.test(word)
+  }
+  return starts ? { remove: 0, insert: ch.toLocaleUpperCase(lang) } : null
+}
+
+/** English: a lone "i" is the pronoun, once the next key shows the word is over. */
+export function loneI(lang: Lang, before: string, ch: string): boolean {
+  return lang === 'en' && /^[\s,;:!?'’")”\]—–-]$/.test(ch) && /(?:^|[^\p{L}\p{M}\d'’.(-])i$/u.test(before)
+}

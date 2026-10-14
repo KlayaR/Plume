@@ -1,10 +1,12 @@
 // CodeMirror pieces for the scene editor: bible names underlined (with a hover
 // card), typography as you type, and AI proposals shown inline until accepted.
-import { Annotation, EditorState, RangeSetBuilder, StateEffect, StateField, type Extension } from '@codemirror/state'
+import { Annotation, EditorState, Prec, RangeSetBuilder, StateEffect, StateField, type Extension } from '@codemirror/state'
 import { Decoration, EditorView, ViewPlugin, WidgetType, hoverTooltip, keymap, type DecorationSet, type ViewUpdate } from '@codemirror/view'
 import type { Entry, Lang } from '../lib/types'
 import { findMentions, type Matcher } from '../lib/context'
-import { fixTypography, typingRule } from '../lib/typography'
+import { autoCapitalRule, fixTypography, loneI, typingRule } from '../lib/typography'
+import { pasteText } from '../lib/paste'
+import { useStore } from '../store'
 import { t } from '../i18n'
 
 // --- Bible names -----------------------------------------------------------
@@ -115,15 +117,56 @@ const dropcapMeasure = ViewPlugin.fromClass(class {
 
 // --- Typography as you type -----------------------------------------------
 
-const typography = (lang: Lang) => EditorView.inputHandler.of((view, from, to, text) => {
-  if (text.length !== 1 || view.state.field(proposalField)) return false
-  const line = view.state.doc.lineAt(from)
-  const rule = typingRule(lang, view.state.doc.sliceString(line.from, from), text)
-  if (!rule) return false
-  const start = from - rule.remove
-  view.dispatch({ changes: { from: start, to, insert: rule.insert }, selection: { anchor: start + rule.insert.length }, userEvent: 'input.type' })
-  return true
+/** The last autocorrect (smart quote, ellipsis, dash, capital), so Ctrl+Z can give back exactly what was typed. */
+interface Auto { start: number; insert: string; original: string }
+const setAuto = StateEffect.define<Auto | null>()
+const autoField = StateField.define<Auto | null>({
+  create: () => null,
+  update(v, tr) {
+    for (const e of tr.effects) if (e.is(setAuto)) return e.value
+    return tr.docChanged || tr.selection ? null : v
+  },
 })
+
+const autoUndo = (view: EditorView): boolean => {
+  const a = view.state.field(autoField)
+  if (!a || view.state.selection.main.head !== a.start + a.insert.length || view.state.sliceDoc(a.start, a.start + a.insert.length) !== a.insert) return false
+  view.dispatch({ changes: { from: a.start, to: a.start + a.insert.length, insert: a.original }, selection: { anchor: a.start + a.original.length }, effects: setAuto.of(null), userEvent: 'input.type' })
+  return true
+}
+
+const typography = (lang: Lang): Extension => [
+  autoField,
+  Prec.high(keymap.of([{ key: 'Mod-z', run: autoUndo }])),
+  EditorView.inputHandler.of((view, from, to, text) => {
+    if (text.length !== 1 || view.state.field(proposalField)) return false
+    const line = view.state.doc.lineAt(from)
+    const before = view.state.doc.sliceString(line.from, from)
+    const capital = useStore.getState().prefs.autoCapital
+    let rule = typingRule(lang, before, text) ?? (capital ? autoCapitalRule(lang, before, text) : null)
+    if (capital && (!rule || rule.remove === 0) && loneI(lang, before, text)) rule = { remove: 1, insert: 'I' + (rule ? rule.insert : text) }
+    if (!rule) return false
+    const start = from - rule.remove
+    const original = view.state.doc.sliceString(start, to) + text
+    view.dispatch({ changes: { from: start, to, insert: rule.insert }, selection: { anchor: start + rule.insert.length }, effects: setAuto.of({ start, insert: rule.insert, original }), userEvent: 'input.type' })
+    return true
+  }),
+  // Pasted text arrives clean: no formatting but italics and bold, one paragraph per line, typography fixed.
+  EditorView.domEventHandlers({
+    paste(e, view) {
+      if (view.state.field(proposalField)) return false
+      const html = e.clipboardData?.getData('text/html') ?? ''
+      const plain = e.clipboardData?.getData('text/plain') ?? ''
+      const sel = view.state.selection.main
+      const line = view.state.doc.lineAt(sel.from)
+      const text = pasteText(html, plain, lang, view.state.doc.sliceString(line.from, sel.from))
+      if (!text) return false
+      e.preventDefault()
+      view.dispatch({ ...view.state.replaceSelection(text), scrollIntoView: true, userEvent: 'input.paste' })
+      return true
+    },
+  }),
+]
 
 // --- AI proposals -----------------------------------------------------------
 

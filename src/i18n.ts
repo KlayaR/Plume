@@ -731,6 +731,12 @@ const FR: Record<string, string> = {
   'Fantasy voice settings applied.': 'Réglages de voix fantasy appliqués.',
   'Apply': 'Appliquer',
   'Fantasy voice settings applied. Change them in Settings → Voice.': 'Réglages de voix fantasy appliqués. Modifiez-les dans Réglages → Voix.',
+  'Starts a part: its title': 'Ouvre une partie : son titre',
+  'A part page goes before this chapter in exports': 'Une page de partie précède ce chapitre dans les exports',
+  'Automatic capitals': 'Majuscules automatiques',
+  'A sentence’s first letter, and the English “I”, are capitalised as you type. Ctrl+Z right after gives back what you typed.': 'La première lettre d’une phrase, et le « I » anglais, passent en majuscule pendant la frappe. Ctrl+Z juste après redonne ce que vous aviez tapé.',
+  'Front and back matter': 'Pages liminaires et finales',
+  'Printed around the chapters in every export and in Page view of the whole book. One paragraph per line; empty pages are left out. A part page goes before a chapter (Plan → Board).': 'Imprimées autour des chapitres dans tous les exports et dans la vue Page du livre entier. Un paragraphe par ligne ; les pages vides sont omises. Une page de partie se place avant un chapitre (Plan → Tableau).',
 }
 
 const SHELL = {

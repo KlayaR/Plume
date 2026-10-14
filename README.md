@@ -7,6 +7,12 @@ in with your Claude subscription. No API key.
 Plan: [Plume — Roadmap](https://claude.ai/code/artifact/1bbb8ac1-8e0c-4a44-bed0-fcd2de1d195d) (0.2.0 → 0.9.0) ·
 first spec: [Plume — Step 1 Spec](https://claude.ai/code/artifact/f1897651-066d-49a1-ae39-1357421b88be)
 
+## What 1.0.1 adds (ideas taken from NEO)
+- **Ctrl+Z right after an autocorrect** (smart quote, ellipsis, dash, capital) gives back exactly what you typed.
+- **Automatic capitals** (Settings -> Writing, on by default): a sentence's first letter, and the English "I", as you type. Not after abbreviations (Mr., etc.), initials, ellipses, or ? and ! (a dialogue tag goes on in lower case).
+- **Clean paste**: from Word, Google Docs or a web page, only italics and bold are kept, one paragraph per line, typography fixed for the book's language.
+- **Front and back matter** (Settings -> This book): copyright, dedication, epigraph, acknowledgments, about the author. **Part pages**: type a part title on a chapter's column in Plan -> Board. Both are printed by every export (EPUB, Word, HTML, Markdown) and shown in Page view of the whole book (so also in the PDF).
+
 ## What 1.0.0 adds
 - **Fantasy by default.** A new book starts with a fantasy preset (Settings -> Voice -> "Fantasy defaults"): deep point of view, the world shown through action, magic with a cost and a price, scenes that want something, no info-dumps, subtext in dialogue, no cliches. It sets the prompt, the scene rules, your measurable rules and two word lists (AI tics, fantasy cliches). Your tense, adult setting, voice description and taste are never overwritten; an older book gets it once on first open, and the Apply button redoes it.
 - **Italics and bold** (Ctrl+I / Ctrl+B, stored as Markdown `*italic*` / `**bold**`): in the editor, Page view and every export.

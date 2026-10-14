@@ -145,6 +145,8 @@ export interface Chapter {
   notes: string
   summary?: string
   summaryOf?: string
+  /** Title of a part of the book that starts with this chapter (exports put a part page before it). */
+  part?: string
   scenes: Scene[]
 }
 
@@ -195,6 +197,8 @@ export const DEFAULT_VOICE: Voice = {
   prompt: '', actionPrompts: {}, tense: '', adult: false, sceneRules: [], rules: DEFAULT_RULES, description: '', taste: '', snapshots: {},
 }
 
+export type MatterKey = 'copyright' | 'dedication' | 'epigraph' | 'acknowledgments' | 'about'
+
 export interface Beat { name: string; at: number; note: string; sceneId: string | null }
 export interface LooseCard { id: string; title: string; note: string }
 
@@ -225,6 +229,8 @@ export interface BookMeta {
   ignored: string[]
   /** Revision passes: what to check on each scene, in order. */
   passes?: { id: string; name: string }[]
+  /** Front and back matter, printed around the chapters in exports. */
+  matter?: Partial<Record<MatterKey, string>>
   /** Words you added to the dictionary, and LanguageTool rules you turned off. */
   dictionary?: string[]
   ltIgnored?: string[]

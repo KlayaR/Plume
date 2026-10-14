@@ -75,6 +75,8 @@ export interface Prefs {
   ltLive: boolean
   /** Typewriter scrolling: the line you write stays in the middle of the screen. */
   typewriter: boolean
+  /** Capital letters as you type (sentence starts, English I); Ctrl+Z right after takes one back. */
+  autoCapital: boolean
   /** Version of the saved prefs, for one-time upgrades. */
   v?: number
 }
@@ -108,6 +110,7 @@ export const DEFAULT_PREFS: Prefs = {
   ltEnglish: 'en-US',
   ltLive: false,
   typewriter: false,
+  autoCapital: true,
   v: 2,
 }
 

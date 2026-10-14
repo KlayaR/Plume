@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { parseEntry, serializeEntry, parseScene, serializeScene, factApplies, parseFact } from './bible'
 import { buildContext, buildMatcher, findMentions } from './context'
-import { fixTypography, typingRule } from './typography'
+import { autoCapitalRule, fixTypography, loneI, typingRule } from './typography'
+import { pasteText, wrapMarks } from './paste'
+import { matterPages, FRONT, BACK } from './matter'
 import { lastWords, slugify } from './text'
 import { allowedKinds, chapterLabels, enterStartsScene } from './chapters'
 import { countSigns, textStats } from './stats'
@@ -495,5 +497,59 @@ describe('html export', () => {
     expect(html).toContain('<title>T</title>')
     expect(html).toContain('href="#c1"')
     expect(html).toContain('<em>no</em>')
+  })
+})
+
+describe('automatic capitals', () => {
+  it('capitalises a line start and a sentence start', () => {
+    expect(autoCapitalRule('en', '', 'a')).toEqual({ remove: 0, insert: 'A' })
+    expect(autoCapitalRule('en', 'He ran. ', 'a')).toEqual({ remove: 0, insert: 'A' })
+    expect(autoCapitalRule('en', 'He ran. \u201c', 'a')).toEqual({ remove: 0, insert: 'A' })
+    expect(autoCapitalRule('fr', '\u2014\u00a0', '\u00e9')).toEqual({ remove: 0, insert: '\u00c9' })
+  })
+  it('leaves abbreviations, initials, ellipses and question marks alone', () => {
+    expect(autoCapitalRule('en', 'Ask Mr. ', 'a')).toBeNull()
+    expect(autoCapitalRule('en', 'J. ', 'r')).toBeNull()
+    expect(autoCapitalRule('en', 'Well.. ', 'a')).toBeNull()
+    expect(autoCapitalRule('fr', '\u2014\u00a0Tu viens ? ', 'd')).toBeNull()
+    expect(autoCapitalRule('en', 'He ', 'a')).toBeNull()
+  })
+  it('turns a lone i into I in English only', () => {
+    expect(loneI('en', 'then i', ' ')).toBe(true)
+    expect(loneI('en', 'a hi', ' ')).toBe(false)
+    expect(loneI('en', 'then i', 'x')).toBe(false)
+    expect(loneI('fr', 'then i', ' ')).toBe(false)
+  })
+})
+
+describe('paste cleaning', () => {
+  it('makes one paragraph per line and fixes the typography', () => {
+    expect(pasteText('', 'He said "no".\r\n\r\n  Then   left...', 'en')).toBe('He said \u201cno\u201d.\nThen left\u2026')
+  })
+  it('closes a quote pasted after an opening one', () => {
+    expect(pasteText('', 'no"', 'en', 'He said \u201c')).toBe('no\u201d')
+  })
+  it('keeps the spaces outside emphasis marks', () => {
+    expect(wrapMarks(' word ', '*')).toBe(' *word* ')
+    expect(wrapMarks('   ', '*')).toBe('   ')
+  })
+})
+
+describe('front and back matter', () => {
+  const base = bookOf([scene('a', 'Text.')])
+  const withMatter: Book = { ...base, meta: { ...base.meta, matter: { dedication: 'For R.', about: 'Born somewhere.\nWrites.', copyright: '  ' } }, chapters: [{ ...base.chapters[0], part: 'Part One' }] }
+  it('keeps only filled pages, headed at the back only', () => {
+    expect(matterPages(withMatter, FRONT)).toEqual([{ key: 'dedication', heading: '', paras: ['For R.'] }])
+    expect(matterPages(withMatter, BACK)).toEqual([{ key: 'about', heading: 'About the author', paras: ['Born somewhere.', 'Writes.'] }])
+  })
+  it('puts them and the part title in the exports', () => {
+    const o = { format: 'md' as const, layout: 'book' as const, titlePage: true, sceneBreak: '* * *' }
+    const md = toMarkdown(withMatter, o)
+    expect(md.indexOf('For R.')).toBeLessThan(md.indexOf('# Part One'))
+    expect(md.indexOf('# Part One')).toBeLessThan(md.indexOf('## Chapter 1'))
+    expect(md.trim().endsWith('Writes.')).toBe(true)
+    const html = toHtml(withMatter, { ...o, format: 'html' })
+    expect(html).toContain('<h2 class="part">Part One</h2>')
+    expect(html).toContain('id="about"')
   })
 })

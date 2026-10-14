@@ -104,6 +104,7 @@ function Board() {
               <span className="pl-col-num">{c.kind === 'chapter' ? labels[ci].number : labels[ci].label}</span>
               <input className="pl-col-title" value={c.title} placeholder={t('Untitled')} onChange={e => st().updateChapter(c.id, { title: e.target.value })} />
             </div>
+            <input className="pl-col-part" value={c.part ?? ''} placeholder={t('Starts a part: its title')} title={t('A part page goes before this chapter in exports')} onChange={e => st().updateChapter(c.id, { part: e.target.value })} />
             {c.scenes.map((s, si) => (
               <Card key={s.id} scene={s} active={selected === s.id}
                 onSelect={() => setSelected(selected === s.id ? null : s.id)}

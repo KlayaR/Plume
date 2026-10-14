@@ -8,6 +8,7 @@ import { fixTypography } from './typography'
 import { countWords, newId } from './text'
 import { makeZip, utf8 } from './zip'
 import { inlineDocx, inlineHtml } from './inline'
+import { BACK, FRONT, matterPages } from './matter'
 
 export type ExportFormat = 'epub' | 'docx' | 'md' | 'pdf' | 'html'
 export type DocxLayout = 'book' | 'submission'
@@ -20,13 +21,14 @@ export function cleanParagraphs(text: string, book: Book): string[] {
   return clean.split('\n').map(p => p.replace(/[ \t]+/g, ' ').trim()).filter(Boolean)
 }
 
-interface Part { label: string; title: string; scenes: string[][] }
+interface Part { label: string; title: string; part?: string; scenes: string[][] }
 
 function parts(book: Book): Part[] {
   const labels = chapterLabels(book.chapters, book.meta.language)
   return book.chapters.map((c: Chapter, i) => ({
     label: labels[i].label,
     title: c.title && c.title !== labels[i].label ? c.title : '',
+    part: c.part?.trim() || undefined,
     scenes: c.scenes.map(s => cleanParagraphs(s.text, book)).filter(s => s.length),
   }))
 }
@@ -37,10 +39,13 @@ const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replac
 
 export function toMarkdown(book: Book, o: ExportOptions): string {
   const out: string[] = [`# ${book.meta.title}`, book.meta.author ? `*${book.meta.author}*` : '']
+  for (const m of matterPages(book, FRONT)) out.push(m.paras.join('\n\n'))
   for (const p of parts(book)) {
+    if (p.part) out.push(`# ${p.part}`)
     out.push(`## ${p.label}${p.title ? ` : ${p.title}` : ''}`)
     out.push(p.scenes.map(s => s.join('\n\n')).join(`\n\n${o.sceneBreak}\n\n`))
   }
+  for (const m of matterPages(book, BACK)) out.push(`## ${m.heading}`, m.paras.join('\n\n'))
   return out.filter(Boolean).join('\n\n') + '\n'
 }
 
@@ -50,11 +55,18 @@ export function toMarkdown(book: Book, o: ExportOptions): string {
 export function toHtml(book: Book, o: ExportOptions): string {
   const lang = book.meta.language
   const ps = parts(book)
-  const toc = ps.map((p, i) => `<li><a href="#c${i + 1}">${esc(p.label)}${p.title ? ` : ${esc(p.title)}` : ''}</a></li>`).join('\n')
+  const front = matterPages(book, FRONT), back = matterPages(book, BACK)
+  const toc = [
+    ...ps.map((p, i) => `<li><a href="#c${i + 1}">${p.part ? `${esc(p.part)} · ` : ''}${esc(p.label)}${p.title ? ` : ${esc(p.title)}` : ''}</a></li>`),
+    ...back.map(m => `<li><a href="#${m.key}">${esc(m.heading)}</a></li>`),
+  ].join('\n')
+  const frontHtml = front.map(m => `<section class="matter">${m.paras.map(p => `<p>${inlineHtml(p)}</p>`).join('\n')}</section>`).join('\n')
+  const backHtml = back.map(m => `<section id="${m.key}"><h2>${esc(m.heading)}</h2>${m.paras.map(p => `<p>${inlineHtml(p)}</p>`).join('\n')}</section>`).join('\n')
   const body = ps.map((p, i) => `<section id="c${i + 1}">
+${p.part ? `<h2 class="part">${esc(p.part)}</h2>` : ''}
 <h2>${esc(p.label)}${p.title ? `<br><span>${esc(p.title)}</span>` : ''}</h2>
 ${p.scenes.map(s => s.map(para => `<p>${inlineHtml(para)}</p>`).join('\n')).join(`\n<p class="break">${esc(o.sceneBreak)}</p>\n`)}
-</section>`).join('\n')
+</section>`).join('\n') + '\n' + backHtml
   return `<!DOCTYPE html>
 <html lang="${lang}">
 <head>
@@ -69,6 +81,7 @@ main { max-width: 36rem; margin: 0 auto; padding: 3rem 1.25rem 6rem; }
 h1 { font-size: 2.2rem; text-align: center; margin: 3rem 0 .25rem; }
 .author { text-align: center; color: var(--muted); margin-bottom: 3rem; }
 nav { margin: 0 0 4rem; } nav ul { list-style: none; padding: 0; } nav a { color: var(--fg); text-decoration: none; border-bottom: 1px solid var(--muted); }
+section.matter { margin: 5rem 0; text-align: center; font-style: italic; } section.matter p { text-align: center; text-indent: 0; margin-bottom: 1rem; } h2.part { font-size: 2rem; margin-top: 8rem; }
 h2 { text-align: center; font-size: 1.4rem; margin: 5rem 0 2rem; } h2 span { font-weight: normal; color: var(--muted); font-size: 1.1rem; }
 p { margin: 0; text-align: justify; hyphens: auto; } p + p { text-indent: 1.4em; } p.break { text-indent: 0; text-align: center; margin: 1.5rem 0; color: var(--muted); }
 </style>
@@ -79,6 +92,7 @@ ${o.titlePage ? `<h1>${esc(book.meta.title)}</h1>\n${book.meta.author ? `<div cl
 <nav><ul>
 ${toc}
 </ul></nav>
+${frontHtml}
 ${body}
 </main>
 </body>
@@ -100,14 +114,23 @@ export async function toEpub(book: Book, o: ExportOptions): Promise<Uint8Array> 
 ${body}
 </body>
 </html>`
-  const chapters = ps.map((p, i) => ({
+  const matterHtml = (m: { paras: string[]; heading: string }) => page(m.heading || book.meta.title, `<section class="matter" epub:type="${m.heading ? 'backmatter' : 'frontmatter'}">${m.heading ? `<h1>${esc(m.heading)}</h1>` : ''}
+${m.paras.map(p => `<p>${inlineHtml(p)}</p>`).join('\n')}
+</section>`)
+  const frontDocs = matterPages(book, FRONT).map((m, i) => ({ file: `front${i + 1}.xhtml`, title: m.heading, toc: false, html: matterHtml(m) }))
+  const backDocs = matterPages(book, BACK).map((m, i) => ({ file: `back${i + 1}.xhtml`, title: m.heading, toc: true, html: matterHtml(m) }))
+  const chapterDocs = ps.flatMap((p, i) => [
+    ...(p.part ? [{ file: `part${String(i + 1).padStart(3, '0')}.xhtml`, title: p.part, toc: true, html: page(p.part, `<section class="partpage" epub:type="part"><h1>${esc(p.part)}</h1></section>`) }] : []),
+    {
     file: `ch${String(i + 1).padStart(3, '0')}.xhtml`,
+    toc: true,
     title: p.title ? `${p.label} : ${p.title}` : p.label,
     html: page(p.label, `<section epub:type="chapter">
 <h1><span class="num">${esc(p.label)}</span>${p.title ? `<br/><span class="title">${esc(p.title)}</span>` : ''}</h1>
 ${p.scenes.map(s => s.map((para, j) => `<p${j === 0 ? ' class="first"' : ''}>${inlineHtml(para)}</p>`).join('\n')).join(`\n<p class="break">${esc(o.sceneBreak)}</p>\n`)}
 </section>`),
-  }))
+  }])
+  const chapters = [...frontDocs, ...chapterDocs, ...backDocs]
   const toc = lang === 'fr' ? 'Table des matières' : 'Contents'
   const files = [
     { name: 'mimetype', data: utf8('application/epub+zip'), store: true },
@@ -123,16 +146,21 @@ p { margin: 0; text-indent: 1.5em; text-align: justify; }
 p.first { text-indent: 0; }
 p.break { text-align: center; text-indent: 0; margin: 1em 0; }
 .titlepage { text-align: center; margin-top: 30%; }
-.titlepage h1 { page-break-before: auto; font-size: 2em; }`) },
+.titlepage h1 { page-break-before: auto; font-size: 2em; }
+.matter { text-align: center; margin-top: 25%; font-style: italic; }
+.matter p { text-indent: 0; text-align: center; margin: 0 0 1em; }
+.matter h1 { font-style: normal; margin-top: 0; }
+.partpage { text-align: center; margin-top: 35%; }
+.partpage h1 { font-size: 2em; letter-spacing: .1em; }`) },
     ...(o.titlePage ? [{ name: 'OEBPS/title.xhtml', data: utf8(page(book.meta.title, `<section class="titlepage" epub:type="titlepage"><h1>${esc(book.meta.title)}</h1>${book.meta.author ? `<p class="first">${esc(book.meta.author)}</p>` : ''}</section>`)) }] : []),
     ...chapters.map(c => ({ name: `OEBPS/${c.file}`, data: utf8(c.html) })),
     { name: 'OEBPS/nav.xhtml', data: utf8(page(toc, `<nav epub:type="toc" id="toc"><h1>${toc}</h1><ol>
-${chapters.map(c => `<li><a href="${c.file}">${esc(c.title)}</a></li>`).join('\n')}
+${chapters.filter(c => c.toc).map(c => `<li><a href="${c.file}">${esc(c.title)}</a></li>`).join('\n')}
 </ol></nav>`)) },
     { name: 'OEBPS/toc.ncx', data: utf8(`<?xml version="1.0" encoding="utf-8"?>
 <ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1"><head><meta name="dtb:uid" content="${id}"/></head>
 <docTitle><text>${esc(book.meta.title)}</text></docTitle><navMap>
-${chapters.map((c, i) => `<navPoint id="n${i + 1}" playOrder="${i + 1}"><navLabel><text>${esc(c.title)}</text></navLabel><content src="${c.file}"/></navPoint>`).join('\n')}
+${chapters.filter(c => c.toc).map((c, i) => `<navPoint id="n${i + 1}" playOrder="${i + 1}"><navLabel><text>${esc(c.title)}</text></navLabel><content src="${c.file}"/></navPoint>`).join('\n')}
 </navMap></ncx>`) },
     { name: 'OEBPS/content.opf', data: utf8(`<?xml version="1.0" encoding="utf-8"?>
 <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="bookid" xml:lang="${lang}">
@@ -184,14 +212,22 @@ export async function toDocx(book: Book, o: ExportOptions): Promise<Uint8Array> 
     body.push(`<w:p><w:pPr><w:pStyle w:val="Title"/><w:spacing w:before="${sub ? 4000 : 3000}"/></w:pPr>${run(book.meta.title)}</w:p>`)
     if (book.meta.author) body.push(para(book.meta.author, 'Subtitle'))
   }
-  parts(book).forEach((p, i) => {
-    body.push(`<w:p><w:pPr><w:pStyle w:val="Heading1"/>${o.titlePage || i > 0 ? '<w:pageBreakBefore/>' : ''}${sub ? '<w:spacing w:before="3600"/>' : ''}</w:pPr>${run(p.label)}</w:p>`)
+  let started = o.titlePage
+  const pageBreak = () => { const b = started ? '<w:pageBreakBefore/>' : ''; started = true; return b }
+  for (const m of matterPages(book, FRONT)) m.paras.forEach((text, j) => body.push(`<w:p><w:pPr><w:pStyle w:val="Center"/>${j === 0 ? `${pageBreak()}<w:spacing w:before="3000"/>` : ''}</w:pPr>${inlineDocx(text, esc)}</w:p>`))
+  parts(book).forEach(p => {
+    if (p.part) body.push(`<w:p><w:pPr><w:pStyle w:val="Title"/>${pageBreak()}<w:spacing w:before="4000"/></w:pPr>${run(p.part)}</w:p>`)
+    body.push(`<w:p><w:pPr><w:pStyle w:val="Heading1"/>${pageBreak()}${sub ? '<w:spacing w:before="3600"/>' : ''}</w:pPr>${run(p.label)}</w:p>`)
     if (p.title) body.push(para(p.title, 'Heading2'))
     p.scenes.forEach((s, si) => {
       if (si > 0) body.push(para(o.sceneBreak, 'Break'))
       s.forEach((text, j) => body.push(para(text, 'Body', j === 0)))
     })
   })
+  for (const m of matterPages(book, BACK)) {
+    body.push(`<w:p><w:pPr><w:pStyle w:val="Heading1"/>${pageBreak()}</w:pPr>${run(m.heading)}</w:p>`)
+    m.paras.forEach((text, j) => body.push(para(text, 'Body', j === 0)))
+  }
   const surname = (book.meta.author || '').trim().split(/\s+/).pop() ?? ''
   const header = sub && !fr ? `${surname} / ${book.meta.title.toUpperCase()} / ` : ''
   const document = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -218,6 +254,7 @@ ${o.titlePage ? '<w:titlePg/>' : ''}
 <w:pPrDefault><w:pPr><w:spacing w:after="0" w:line="${line}" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults>
 <w:style w:type="paragraph" w:default="1" w:styleId="Body"><w:name w:val="Body"/><w:pPr><w:ind w:firstLine="${indent}"/>${sub ? '' : '<w:jc w:val="both"/>'}</w:pPr></w:style>
 <w:style w:type="paragraph" w:styleId="Plain"><w:name w:val="Plain"/></w:style>
+<w:style w:type="paragraph" w:styleId="Center"><w:name w:val="Matter"/><w:pPr><w:jc w:val="center"/><w:spacing w:after="240"/></w:pPr><w:rPr><w:i/></w:rPr></w:style>
 <w:style w:type="paragraph" w:styleId="Break"><w:name w:val="Scene break"/><w:pPr><w:jc w:val="center"/><w:spacing w:before="240" w:after="240"/></w:pPr></w:style>
 <w:style w:type="paragraph" w:styleId="Title"><w:name w:val="Title"/><w:pPr><w:jc w:val="center"/><w:spacing w:after="240"/></w:pPr><w:rPr><w:sz w:val="${sub ? 28 : 44}"/></w:rPr></w:style>
 <w:style w:type="paragraph" w:styleId="Subtitle"><w:name w:val="Subtitle"/><w:pPr><w:jc w:val="center"/></w:pPr></w:style>

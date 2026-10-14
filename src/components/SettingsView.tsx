@@ -4,7 +4,8 @@ import { useState } from 'react'
 import { BookMarked, Bot, Feather, Info, Palette, PenLine, Type, Settings as Gear } from 'lucide-react'
 import { Dialog, SettingRow, SettingsSection, Switch, ThemePicker } from '../studio-kit/shell.js'
 import { useStore } from '../store'
-import type { ActionId, Effort, Model } from '../lib/types'
+import type { ActionId, Effort, MatterKey, Model } from '../lib/types'
+import { BACK, FRONT, MATTER_LABEL } from '../lib/matter'
 import { useT } from '../i18n'
 import ManuscriptOptions from './ManuscriptOptions'
 import VoiceSettings from './VoiceSettings'
@@ -97,6 +98,9 @@ function WritingTab() {
       </SettingRow>
       <SettingRow label={t('Enter, Enter, Enter')} description={t('At the end of a scene, Enter twice starts a new scene, three times a new chapter')}>
         <Switch checked={prefs.enterBreaks} onChange={v => setPrefs({ enterBreaks: v })} label={t('Enter, Enter, Enter')} />
+      </SettingRow>
+      <SettingRow label={t('Automatic capitals')} description={t('A sentence’s first letter, and the English “I”, are capitalised as you type. Ctrl+Z right after gives back what you typed.')}>
+        <Switch checked={prefs.autoCapital} onChange={v => setPrefs({ autoCapital: v })} label={t('Automatic capitals')} />
       </SettingRow>
       <SettingRow label={t('Typewriter scrolling')} description={t('The line you are writing stays in the middle of the screen, so your eyes stay still.')}>
         <Switch checked={prefs.typewriter} onChange={v => setPrefs({ typewriter: v })} label={t('Typewriter scrolling')} />
@@ -212,6 +216,15 @@ function BookTab() {
       <SettingRow label={t('Words a day')}>
         <input className="sk-input pl-num" type="number" min={0} step={100} value={goal.daily} onChange={e => setGoal({ daily: Math.max(0, Number(e.target.value) || 0) })} />
       </SettingRow>
+    </SettingsSection>
+    <SettingsSection title={t('Front and back matter')} description={t('Printed around the chapters in every export and in Page view of the whole book. One paragraph per line; empty pages are left out. A part page goes before a chapter (Plan → Board).')}>
+      {[...FRONT, ...BACK].map((k: MatterKey) => (
+        <div key={k} className="pl-matter">
+          <span className="sk-label">{MATTER_LABEL[k][book.meta.language]}</span>
+          <textarea className="sk-input" rows={k === 'dedication' ? 2 : 4} value={book.meta.matter?.[k] ?? ''}
+            onChange={e => useStore.getState().updateMeta({ matter: { ...useStore.getState().book!.meta.matter, [k]: e.target.value } })} />
+        </div>
+      ))}
     </SettingsSection>
     <SeriesSection />
     <BackupSection />

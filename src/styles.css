@@ -709,3 +709,10 @@ body.pl-typing .pl-toolbar { opacity: 0.08; }
 
 .pl-speakers { display: flex; flex-direction: column; gap: 10px; padding: 6px 0; }
 .pl-speaker { display: flex; flex-direction: column; gap: 3px; }
+
+/* Front matter pages in Page view and print. */
+.pl-bk-center { text-align: center; text-indent: 0; font-style: italic; }
+
+.pl-matter { display: flex; flex-direction: column; gap: 4px; padding: 6px 0; }
+.pl-col-part { border: 0; border-bottom: 1px dashed var(--border); background: transparent; color: var(--text-muted); font-size: 11px; padding: 2px 6px; margin-bottom: 6px; }
+.pl-col-part:placeholder-shown { opacity: 0.5; }

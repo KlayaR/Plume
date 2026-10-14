@@ -8,6 +8,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { findScene, useStore } from '../store'
 import { pageSizeFor } from '../lib/fonts'
+import { BACK, FRONT, matterPages } from '../lib/matter'
 import { chapterLabels } from '../lib/chapters'
 import type { Chapter, Scene } from '../lib/types'
 import { balanceSplit, parseInline } from '../lib/inline'
@@ -21,6 +22,7 @@ interface Block {
   drop?: boolean // the chapter's first paragraph: drop cap
   cont?: boolean // continues a paragraph from the previous page
   split?: boolean // goes on to the next page: last line justified
+  center?: boolean // front matter: centred, no indent
 }
 interface Head { label: string; title: string }
 interface Page { blocks: Block[]; opening: Head | null }
@@ -41,7 +43,7 @@ function partBlocks(scenes: Scene[], dropFirst: boolean): Block[] {
 const headOf = (c: Chapter, label: string): Head => ({ label, title: c.title && c.title !== label ? c.title : '' })
 
 const dropAt = (b: Block) => (b.drop && !b.cont && /^\p{L}/u.test(b.text) ? 1 : 0)
-const paraClass = (b: Block) => `pl-bk-p${b.first || b.cont ? ' pl-bk-noindent' : ''}${b.split ? ' pl-bk-split' : ''}`
+const paraClass = (b: Block) => `pl-bk-p${b.first || b.cont ? ' pl-bk-noindent' : ''}${b.split ? ' pl-bk-split' : ''}${b.center ? ' pl-bk-center' : ''}`
 
 /** Italics and bold as DOM (the same <em> and <strong> the page renders). */
 function inlineNodes(text: string): Node[] {
@@ -169,7 +171,14 @@ export default function BookView({ scopeOverride }: { scopeOverride?: 'book' } =
   // What is laid out: the scene (its chapter's opening only if it's the first scene), the chapter, or every chapter.
   const scope = scopeOverride ?? prefs.scope
   const parts: Part[] = scope === 'book'
-    ? book.chapters.map((c, i) => ({ head: headOf(c, labels[i].label), blocks: partBlocks(c.scenes, true) }))
+    ? [
+      ...matterPages(book, FRONT).map(m => ({ head: null, blocks: m.paras.map(text => ({ kind: 'para' as const, text, sceneId: '', first: true, center: true })) })),
+      ...book.chapters.flatMap((c, i) => [
+        ...(c.part?.trim() ? [{ head: { label: c.part.trim(), title: '' }, blocks: [] as Block[] }] : []),
+        { head: headOf(c, labels[i].label), blocks: partBlocks(c.scenes, true) },
+      ]),
+      ...matterPages(book, BACK).map(m => ({ head: { label: m.heading, title: '' }, blocks: m.paras.map(text => ({ kind: 'para' as const, text, sceneId: '', first: false })) })),
+    ]
     : scope === 'scene'
       ? [{ head: chapter.scenes[0]?.id === scene.id ? headOf(chapter, label) : null, blocks: partBlocks([scene], chapter.scenes[0]?.id === scene.id) }]
       : [{ head: headOf(chapter, label), blocks: partBlocks(chapter.scenes, true) }]
@@ -194,6 +203,7 @@ export default function BookView({ scopeOverride }: { scopeOverride?: 'book' } =
   }, [pages, sceneId])
 
   const edit = (id: string) => {
+    if (!id) return
     useStore.getState().setPrefs({ page: false })
     useStore.getState().selectScene(id)
   }
