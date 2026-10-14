@@ -109,7 +109,16 @@ export default function BibleView() {
               </button>
             ))}
           </nav>
-          {tab === 'entry' && (selected ? <EntryEditor key={selected.slug} entry={selected} /> : <div className="sk-empty">{t('Pick an entry, or add one with New entry.')}</div>)}
+          {tab === 'entry' && (selected ? <EntryEditor key={selected.slug} entry={selected} /> : book.entries.some(e => !['style', 'wordlist', 'excerpt'].includes(e.type)) ? <div className="sk-empty">{t('Pick an entry, or add one with New entry.')}</div> : (
+            <div className="pl-emptystate">
+              <b>{t('Your bible is empty.')}</b>
+              <span>{t('Start with your main character and the place the story opens: Claude reads them every time their name appears.')}</span>
+              <div className="pl-row">
+                <button type="button" className="sk-btn sk-btn-primary" onClick={() => { setAdding('character'); setName('') }}>{t('New character')}</button>
+                <button type="button" className="sk-btn" onClick={() => { setAdding('place'); setName('') }}>{t('New place')}</button>
+              </div>
+            </div>
+          ))}
           {tab === 'review' && <ReviewList />}
           {tab === 'aicheck' && <AICheck />}
           {tab === 'tracker' && <Tracker />}

@@ -60,6 +60,18 @@ export default function App() {
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === ',') { e.preventDefault(); useStore.setState({ showSettings: true }) }
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'k' && useStore.getState().book) { e.preventDefault(); useStore.setState({ dialog: 'jump' }) }
+      // Previous / next scene, and back / forward through what you opened.
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'PageUp' || e.key === 'PageDown') && useStore.getState().book) {
+        e.preventDefault()
+        const st = useStore.getState()
+        const all = st.book!.chapters.flatMap(c => c.scenes)
+        const s = all[all.findIndex(x => x.id === st.sceneId) + (e.key === 'PageUp' ? -1 : 1)]
+        if (s) st.selectScene(s.id)
+      }
+      if (e.altKey && !e.ctrlKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight') && useStore.getState().book) {
+        e.preventDefault(); e.stopPropagation()
+        if (e.key === 'ArrowLeft') useStore.getState().goBack(); else useStore.getState().goForward()
+      }
       if (e.key === 'F1') { e.preventDefault(); useStore.setState({ dialog: 'help' }) }
       if ((e.ctrlKey || e.metaKey) && e.key === '/' && useStore.getState().book) { e.preventDefault(); useStore.setState({ dialog: 'shortcuts' }) }
       // Ctrl+Z in the Plan, outside any text field: take back the last card or chapter move.
@@ -70,8 +82,8 @@ export default function App() {
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'y' && useStore.getState().book) { e.preventDefault(); useStore.setState({ dialog: 'synonyms' }) }
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'f' && useStore.getState().book) { e.preventDefault(); useStore.setState({ dialog: 'find' }) }
     }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
   }, [])
 
   // Save pending edits before the window closes.
@@ -103,8 +115,27 @@ export default function App() {
       {book && dialog === 'tour' && <TourDialog onClose={() => useStore.setState({ dialog: null })} />}
       {book && dialog === 'agents' && <AgentDialog onClose={() => useStore.setState({ dialog: null })} />}
       {book && printing && <PrintView />}
+      {book && !prefs.seen?.includes('basics') && <TipCard />}
       <ContextMenuHost />
       <Toasts />
+    </div>
+  )
+}
+
+/** Shown once: the three things nobody guesses. */
+function TipCard() {
+  const t = useT()
+  const done = () => useStore.getState().setPrefs({ seen: [...(useStore.getState().prefs.seen ?? []), 'basics'] })
+  return (
+    <div className="pl-tipcard" role="note">
+      <b>{t('Three things worth knowing')}</b>
+      <span>{t('Right-click almost anything (text, scenes, cards, entries) to see what you can do with it.')}</span>
+      <span>{t('Ctrl+K opens any scene or bible entry by typing a few letters.')}</span>
+      <span>{t('When Claude proposes text: Tab accepts it, Esc discards it.')}</span>
+      <div className="pl-row">
+        <button type="button" className="sk-btn sk-btn-sm sk-btn-ghost" onClick={() => { done(); useStore.setState({ dialog: 'help' }) }}>{t('Open the help (F1)')}</button>
+        <button type="button" className="sk-btn sk-btn-sm sk-btn-primary" onClick={done}>{t('Got it')}</button>
+      </div>
     </div>
   )
 }
@@ -114,7 +145,7 @@ function Toasts() {
   const t = useT()
   useEffect(() => {
     if (!toast) return
-    const timer = setTimeout(() => useStore.setState({ toast: null }), toast.kind === 'error' ? 9000 : 5000)
+    const timer = setTimeout(() => useStore.setState({ toast: null }), toast.kind === 'error' ? 9000 : toast.action ? 10000 : 5000)
     return () => clearTimeout(timer)
   }, [toast])
   if (!toast) return null

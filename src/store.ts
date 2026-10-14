@@ -90,6 +90,8 @@ export interface Prefs {
   orKey: string
   /** The brainstorm chat: which backend answers, and with which model (haiku, sonnet, opus, or an OpenRouter model id). */
   chatBackend: 'claude' | 'openrouter'
+  /** One-time tips already shown. */
+  seen: string[]
   chatModel: string
   /** A second view shown beside the main one (Bible, Plan or Manuscript), and its width in px. */
   dual: View | null
@@ -134,6 +136,7 @@ export const DEFAULT_PREFS: Prefs = {
   fallbackPreset: '',
   orKey: '',
   chatBackend: 'claude',
+  seen: [],
   chatModel: 'sonnet',
   dual: null,
   dualW: 520,
@@ -178,6 +181,14 @@ interface State {
   usage: Usage | null
   day: DayTotal
   limits: Limits | null
+  /** Whether every change is on disk: shown in the bottom bar. */
+  saving: 'saved' | 'saving' | 'error'
+  saveError: string
+  /** Writes again what failed to save. */
+  retrySave: () => Promise<void>
+  /** Back and forward through the scenes and entries you opened (Alt+Left / Alt+Right). */
+  goBack: () => void
+  goForward: () => void
   /** Which backend and model answered last (shown in the bottom bar). */
   lastBackend: { kind: 'claude' | 'openrouter'; name: string } | null
   toast: Toast | null
@@ -230,11 +241,45 @@ interface State {
 
 // Pending writes, one timer per file.
 const pending = new Map<string, { timer: ReturnType<typeof setTimeout>; run: () => Promise<void> }>()
+// Writes that failed, kept to try again, and the status shown in the bottom bar.
+const failed = new Map<string, () => Promise<void>>()
+const syncSave = () => useStore.setState({ saving: pending.size ? 'saving' : failed.size ? 'error' : 'saved' })
 function later(key: string, run: () => Promise<void>, ms = 700) {
   const p = pending.get(key)
   if (p) clearTimeout(p.timer)
-  const timer = setTimeout(() => { pending.delete(key); run().catch(e => useStore.getState().notify('error', t('Could not save: {e}', { e: String(e) }))) }, ms)
+  const timer = setTimeout(() => {
+    pending.delete(key)
+    run().then(() => { failed.delete(key) }).catch(e => {
+      failed.set(key, run)
+      useStore.setState({ saveError: String(e) })
+      useStore.getState().notify('error', t('Could not save: {e}', { e: String(e) }))
+    }).finally(syncSave)
+  }, ms)
   pending.set(key, { timer, run })
+  syncSave()
+}
+
+// Where you were, for Alt+Left / Alt+Right.
+interface Loc { view: View; sceneId: string | null; entrySlug: string | null }
+const back: Loc[] = []
+const ahead: Loc[] = []
+let travelling = false
+const here = (): Loc => { const s = useStore.getState(); return { view: s.view, sceneId: s.sceneId, entrySlug: s.entrySlug } }
+function rememberPlace(from: Loc) {
+  if (travelling) return
+  const last = back[back.length - 1]
+  if (last && last.view === from.view && last.sceneId === from.sceneId && last.entrySlug === from.entrySlug) return
+  back.push(from)
+  if (back.length > 50) back.shift()
+  ahead.length = 0
+}
+function travel(from: Loc[], to: Loc[]) {
+  const loc = from.pop()
+  if (!loc) return
+  to.push(here())
+  travelling = true
+  useStore.setState({ view: loc.view, sceneId: loc.sceneId, entrySlug: loc.entrySlug })
+  travelling = false
 }
 function cancelLater(key: string) {
   const p = pending.get(key)
@@ -265,7 +310,7 @@ export const useStore = create<State>((set, get) => {
     import('./library').then(m => { const b = get().book; if (b) { m.recordProgress(b); m.noteOnShelf(b) } })
   }
   const metaLater = () => later('plume.json', () => saveMeta(get().book!))
-  const fail = (err: unknown) => get().notify('error', t('Could not save: {e}', { e: String(err) }))
+  const fail = (err: unknown) => { useStore.setState({ saving: 'error', saveError: String(err) }); get().notify('error', t('Could not save: {e}', { e: String(err) })) }
 
   return {
     book: null,
@@ -280,6 +325,17 @@ export const useStore = create<State>((set, get) => {
     usage: null,
     day: (() => { const d = load<DayTotal>(DAY_KEY, emptyDay()); return d.day === today() ? d : emptyDay() })(),
     limits: null,
+    saving: 'saved',
+    saveError: '',
+    retrySave: async () => {
+      const all = [...failed.entries()]
+      failed.clear()
+      useStore.setState({ saving: 'saving' })
+      for (const [key, run] of all) await run().catch(e => { failed.set(key, run); useStore.setState({ saveError: String(e) }) })
+      syncSave()
+    },
+    goBack: () => travel(back, ahead),
+    goForward: () => travel(ahead, back),
     lastBackend: null,
     toast: null,
     showSettings: false,
@@ -312,9 +368,9 @@ export const useStore = create<State>((set, get) => {
       set({ book: null, sceneId: null, entrySlug: null })
     },
     setView: view => set({ view }),
-    selectScene: id => set({ sceneId: id, ...(get().prefs.dual === 'manuscript' ? {} : { view: 'manuscript' as View }), freshSceneId: get().freshSceneId === id ? id : null }),
+    selectScene: id => { if (id !== get().sceneId || get().view !== 'manuscript') rememberPlace(here()); set({ sceneId: id, ...(get().prefs.dual === 'manuscript' ? {} : { view: 'manuscript' as View }), freshSceneId: get().freshSceneId === id ? id : null }) },
     selectEntry: slug => set({ entrySlug: slug, bibleTab: 'entry' }),
-    showEntry: slug => set({ entrySlug: slug, bibleTab: 'entry', ...(get().prefs.dual === 'bible' ? {} : { view: 'bible' as View }) }),
+    showEntry: slug => { rememberPlace(here()); set({ entrySlug: slug, bibleTab: 'entry', ...(get().prefs.dual === 'bible' ? {} : { view: 'bible' as View }) }) },
 
     updateScene: (id, patch) => {
       mutate(b => ({ ...b, chapters: b.chapters.map(c => ({ ...c, scenes: c.scenes.map(s => s.id === id ? { ...s, ...patch } : s) })) }))
@@ -462,10 +518,22 @@ export const useStore = create<State>((set, get) => {
       for (const s of c.scenes) { cancelLater(s.path); await trash(b.root, s.path) }
       cancelLater(`ch:${id}`)
       await trash(b.root, `manuscript/${c.folder}/chapter.md`).catch(() => {})
+      const at = get().book!.chapters.findIndex(x => x.id === id)
       const chapters = get().book!.chapters.filter(x => x.id !== id)
       const keep = get().sceneId && chapters.some(ch => ch.scenes.some(s => s.id === get().sceneId)) ? get().sceneId : chapters.flatMap(ch => ch.scenes)[0]?.id ?? null
       set({ book: { ...get().book!, chapters }, sceneId: keep })
       await saveMeta(get().book!)
+      // Undo writes the chapter back from memory (the trash keeps its own copy).
+      get().notify('ok', t('Chapter moved to the trash.'), { label: t('Undo'), run: async () => {
+        const bk = get().book!
+        if (bk.chapters.some(x => x.id === id)) return
+        const list = [...bk.chapters]
+        list.splice(Math.min(at, list.length), 0, c)
+        set({ book: { ...bk, chapters: list } })
+        await saveChapter(bk.root, c)
+        for (const s of c.scenes) await saveScene(bk.root, s)
+        await saveMeta(get().book!)
+      } })
     },
     removeScene: async id => {
       const found = findScene(get().book, id)
@@ -476,6 +544,14 @@ export const useStore = create<State>((set, get) => {
       const chapters = b.chapters.map(c => ({ ...c, scenes: c.scenes.filter(s => s.id !== id) }))
       set({ book: { ...b, chapters }, sceneId: get().sceneId === id ? chapters.flatMap(c => c.scenes)[0]?.id ?? null : get().sceneId })
       await saveMeta(get().book!)
+      const { scene, chapter, index } = found
+      get().notify('ok', t('Scene moved to the trash.'), { label: t('Undo'), run: async () => {
+        const bk = get().book!
+        if (!bk.chapters.some(c => c.id === chapter.id) || findScene(bk, id)) return
+        set({ book: { ...bk, chapters: bk.chapters.map(c => c.id === chapter.id ? { ...c, scenes: [...c.scenes.slice(0, index), scene, ...c.scenes.slice(index)] } : c) }, sceneId: id })
+        await saveScene(bk.root, scene)
+        await saveMeta(get().book!)
+      } })
     },
 
     addEntry: (type, name) => {
@@ -509,6 +585,12 @@ export const useStore = create<State>((set, get) => {
       cancelLater(e.path)
       await trash(e.shared ? seriesRootOf(b.root, b.meta.series) ?? b.root : b.root, e.path)
       set({ book: { ...b, entries: b.entries.filter(x => x.slug !== slug) }, entrySlug: null })
+      get().notify('ok', t('Entry moved to the trash.'), { label: t('Undo'), run: async () => {
+        const bk = get().book!
+        if (bk.entries.some(x => x.slug === slug)) return
+        set({ book: { ...bk, entries: [...bk.entries, e] }, entrySlug: slug })
+        await saveEntry(e.shared ? seriesRootOf(bk.root, bk.meta.series) ?? bk.root : bk.root, e)
+      } })
     },
     updateMeta: patch => { mutate(b => ({ ...b, meta: { ...b.meta, ...patch } })); metaLater() },
     shareEntry: async (slug, shared) => {

@@ -7,6 +7,14 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.17.0
+**Trust and clarity** (first part of the UX plan, `docs/UX_PLAN.md`)
+- **Saved indicator** in the bottom bar: "Saved", "Saving…", or "Not saved: retry" when a write failed (click to try again).
+- **Undo after deleting** a scene, a chapter or a bible entry: the toast that confirms it has an Undo button for ten seconds. Chapters can now be deleted from their right-click menu.
+- **Where you are:** Book › Chapter › Scene at the left of the toolbar, with arrows to the previous and next scene. **Ctrl+PageUp / PageDown** go to the previous / next scene; **Alt+Left / Alt+Right** go back and forward through the scenes and entries you opened.
+- **Easier to discover:** a one-time card with the three things nobody guesses (right-click, Ctrl+K, Tab/Esc on a proposal); delete buttons are visible instead of appearing only on hover; an empty bible and an empty plan say what to do first.
+- **Clearer words:** the Notes tab is now **Margin**; in French the world map is "carte du monde" so it isn't confused with plan cards. The words used everywhere are listed in `docs/VOCABULARY.md`.
+
 ## 0.16.0
 - **Help (F1, or the ... menu):** how to use Plume, by topic, with a search box, in French and English: starting, writing, asking Claude, the chat, the bible, the plan, review, export and safety, Claude and OpenRouter. It links to the quick tour and the shortcuts.
 - **Proposals are easier to find and decide:** when Claude proposes text, a small bar appears next to the text with **Accept (Tab)**, **Retry** and **Discard (Esc)**, and the Assistant tab opens on its own (before, the buttons stayed hidden if you were on the Chat or Notes tab, which made the text look locked).

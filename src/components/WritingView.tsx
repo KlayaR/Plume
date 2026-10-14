@@ -82,7 +82,7 @@ export default function WritingView() {
               <span className="pl-switch pl-panetabs" role="group" aria-label="Claude">
                 <button type="button" aria-pressed={prefs.rightTab === 'write'} onClick={() => setPrefs({ rightTab: 'write' })}>{t('Assistant')}</button>
                 <button type="button" aria-pressed={prefs.rightTab === 'chat'} onClick={() => setPrefs({ rightTab: 'chat' })}>{t('Chat')}</button>
-                <button type="button" aria-pressed={prefs.rightTab === 'notes'} onClick={() => setPrefs({ rightTab: 'notes' })}>{t('Notes')}</button>
+                <button type="button" aria-pressed={prefs.rightTab === 'notes'} onClick={() => setPrefs({ rightTab: 'notes' })}>{t('Margin')}</button>
               </span>
             )} pinned={prefs.pinRight} onPin={() => setPrefs({ pinRight: !prefs.pinRight })} />
             <div className="pl-pane-body pl-pane-grow">

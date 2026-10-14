@@ -92,7 +92,7 @@ export function editorMenu(view: EditorView, pos: number): MenuItem[] {
   const full = doc.toString()
   const comment = scene?.comments?.find(c => { const at = locateQuote(full, c.quote, c.at); return at >= 0 && pos >= at && pos <= at + c.quote.length })
   if (scene && comment) {
-    items.push({ label: t('Show this comment in Notes'), onClick: () => st.setPrefs({ rightTab: 'notes', mode: 'write' }) }, { label: t('Delete this comment'), danger: true, onClick: () => removeComment(scene.id, comment.id) }, { separator: true })
+    items.push({ label: t('Show this comment in the margin'), onClick: () => st.setPrefs({ rightTab: 'notes', mode: 'write' }) }, { label: t('Delete this comment'), danger: true, onClick: () => removeComment(scene.id, comment.id) }, { separator: true })
   }
 
   items.push(

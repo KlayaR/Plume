@@ -85,6 +85,12 @@ function Board() {
 
   return (
     <div className="pl-board-wrap">
+      {book.chapters.every(c => c.scenes.every(s => !s.text.trim() && !s.note?.trim())) && (
+        <div className="pl-emptystate pl-emptystate-bar">
+          <span>{t('Plan before you write: give each card a note of what happens, or let Claude propose an outline from your premise.')}</span>
+          <button type="button" className="sk-btn sk-btn-sm sk-btn-primary" onClick={() => useStore.setState({ dialog: 'outline' })}>{t('Outline from a premise')}</button>
+        </div>
+      )}
       <div className="pl-row pl-board-bar">
         <span className="pl-label pl-grow">{t('Drag cards to reorder: the text moves with them. Double-click a card to write it.')}</span>
         <select className="sk-select sk-btn-sm" value={colorBy} onChange={e => setColorBy(e.target.value as typeof colorBy)} aria-label={t('Colour the cards by')}>

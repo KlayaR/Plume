@@ -11,14 +11,14 @@ export const HELP: HelpTopic[] = [
       en: [
         'Plume has three spaces, in the bar at the bottom: **Bible** (your world), **Plan** (your outline) and **Manuscript** (where you write).',
         'A book is a folder of Markdown files on your disk. Nothing is hidden: you can open them in any editor, and back them up like any folder. Removed things go to the book\'s trash folder, never deleted.',
-        'In the Manuscript, the left pane lists chapters and scenes; the right pane has **Assistant** (ask Claude), **Chat** (brainstorm) and **Notes** (comments, summary, history).',
+        'In the Manuscript, the left pane lists chapters and scenes; the right pane has **Assistant** (ask Claude), **Chat** (brainstorm) and **Margin** (comments, summary, history).',
         '**Ctrl+K** jumps to any scene or bible entry. **Ctrl+/** lists every shortcut. **Right-click** almost anywhere for what you can do there.',
         'The button at the right of the bottom bar shows a second space beside the first (for example the Bible next to your text).',
       ],
       fr: [
         'Plume a trois espaces, dans la barre du bas : **Bible** (votre univers), **Plan** (votre structure) et **Manuscrit** (là où vous écrivez).',
         'Un livre est un dossier de fichiers Markdown sur votre disque. Rien n\'est caché : vous pouvez les ouvrir dans n\'importe quel éditeur et les sauvegarder comme un dossier. Ce que vous supprimez va dans la corbeille du livre, jamais effacé.',
-        'Dans le Manuscrit, le panneau de gauche liste chapitres et scènes ; celui de droite a **Assistant** (demander à Claude), **Chat** (remue-méninges) et **Notes** (commentaires, résumé, historique).',
+        'Dans le Manuscrit, le panneau de gauche liste chapitres et scènes ; celui de droite a **Assistant** (demander à Claude), **Chat** (remue-méninges) et **Marge** (commentaires, résumé, historique).',
         '**Ctrl+K** va à n\'importe quelle scène ou fiche de la bible. **Ctrl+/** liste tous les raccourcis. **Clic droit** presque partout pour voir ce qu\'on peut faire.',
         'Le bouton à droite de la barre du bas affiche un second espace à côté du premier (par exemple la Bible à côté du texte).',
       ],
@@ -34,7 +34,7 @@ export const HELP: HelpTopic[] = [
         'Typography fixes itself as you type (quotes, dashes, ellipses, French spaces) and sentences start with a capital. **Ctrl+Z right after** gives back what you typed.',
         '**Ctrl+I** italic, **Ctrl+B** bold. Pasting from Word or the web keeps only italics and bold.',
         '**Ctrl+Shift+X** drops a placeholder to fill in later (a red dot shows in the chapter list). **Ctrl+Shift+D** cuts a passage into the **darlings** drawer instead of deleting it: it can be put back.',
-        'In **Notes**: margin comments on a selection, a short summary of the scene (it feeds Claude\'s "story so far"), and the scene\'s version history.',
+        'In the **Margin** tab: margin comments on a selection, a short summary of the scene (it feeds Claude\'s "story so far"), and the scene\'s version history.',
         'The scene card (Plan) has a note, shown in grey above the text; story time, place and point of view are editable above the text.',
       ],
       fr: [
@@ -43,7 +43,7 @@ export const HELP: HelpTopic[] = [
         'La typographie se corrige en tapant (guillemets, tirets, points de suspension, espaces français) et les phrases commencent par une majuscule. **Ctrl+Z juste après** redonne ce que vous aviez tapé.',
         '**Ctrl+I** italique, **Ctrl+B** gras. Coller depuis Word ou le web ne garde que l\'italique et le gras.',
         '**Ctrl+Maj+X** pose un repère à remplir plus tard (un point rouge apparaît dans la liste des chapitres). **Ctrl+Maj+D** coupe un passage vers le tiroir des **chouchous** au lieu de l\'effacer : on peut le remettre.',
-        'Dans **Notes** : commentaires en marge sur une sélection, un court résumé de la scène (il alimente le « résumé de l\'histoire » donné à Claude), et l\'historique des versions de la scène.',
+        'Dans l\'onglet **Marge** : commentaires en marge sur une sélection, un court résumé de la scène (il alimente le « résumé de l\'histoire » donné à Claude), et l\'historique des versions de la scène.',
         'La fiche de scène (Plan) a une note, affichée en gris au-dessus du texte ; moment, lieu et point de vue se modifient au-dessus du texte.',
       ],
     },
@@ -154,13 +154,13 @@ export const HELP: HelpTopic[] = [
     lines: {
       en: [
         '**Export the book** (⋯ menu): EPUB, Word, PDF, web page, Markdown. **Front and back matter** (copyright, dedication, epigraph, acknowledgments, about the author) are written in Settings → This book.',
-        '**Snapshots** (⋯ menu) keep a named copy of the whole book; compare it later scene by scene and restore a scene. Each scene also keeps its own **version history** (Notes).',
+        '**Snapshots** (⋯ menu) keep a named copy of the whole book; compare it later scene by scene and restore a scene. Each scene also keeps its own **version history** (Margin).',
         '**Find and replace** (Ctrl+Shift+F) works on the whole book and keeps the old text in each scene\'s history.',
         'Plume saves as you type, makes a **daily backup** (kept two weeks) in its own folder, and keeps a lock so two copies of the app don\'t overwrite each other.',
       ],
       fr: [
         '**Exporter le livre** (menu ⋯) : EPUB, Word, PDF, page web, Markdown. Les **pages liminaires et finales** (copyright, dédicace, épigraphe, remerciements, à propos de l\'auteur) s\'écrivent dans Paramètres → Ce livre.',
-        '**Instantanés** (menu ⋯) gardent une copie nommée du livre entier ; comparez-la plus tard scène par scène et restaurez une scène. Chaque scène garde aussi son **historique de versions** (Notes).',
+        '**Instantanés** (menu ⋯) gardent une copie nommée du livre entier ; comparez-la plus tard scène par scène et restaurez une scène. Chaque scène garde aussi son **historique de versions** (Marge).',
         '**Rechercher et remplacer** (Ctrl+Maj+F) agit sur tout le livre et garde l\'ancien texte dans l\'historique de chaque scène.',
         'Plume enregistre en tapant, fait une **sauvegarde quotidienne** (gardée deux semaines) dans son propre dossier, et pose un verrou pour que deux copies de l\'application ne s\'écrasent pas.',
       ],

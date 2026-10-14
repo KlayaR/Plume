@@ -29,6 +29,8 @@ export default function BottomBar() {
   const day = useStore(s => s.day)
   const limits = useStore(s => s.limits)
   const lastBackend = useStore(s => s.lastBackend)
+  const saving = useStore(s => s.saving)
+  const saveError = useStore(s => s.saveError)
   const running = useAI(s => s.running)
   const t = useT()
   const st = useStore.getState
@@ -77,6 +79,9 @@ export default function BottomBar() {
             {limits.week && <>{t('Week')} <b>{pct(limits.week.used)}</b></>}
           </span>
         )}
+        {saving === 'error'
+          ? <button type="button" className="pl-saved pl-saved-error" title={saveError} onClick={() => useStore.getState().retrySave()}>{t('Not saved: retry')}</button>
+          : <span className={`pl-saved pl-saved-${saving}`} title={t('Every change is written to your book folder as you type')}>{saving === 'saving' ? t('Saving…') : t('Saved')}</span>}
         {lastBackend?.kind === 'openrouter' && <span className="pl-count" title={t('Answered by {name} on OpenRouter', { name: lastBackend.name })}>OpenRouter</span>}
         <span className={`pl-dot ${exe === null ? 'pl-dot-off' : running ? 'pl-dot-busy' : ''}`} title={usageTip} aria-label={t(claude)} />
         <DualMenu />
@@ -148,12 +153,36 @@ function MoreMenu() {
 }
 
 /** Above the page, in the Manuscript only: how to write and how to see the book. */
+/** Book › Chapter › Scene, at the left of the toolbar; the arrows go to the previous and next scene. */
+function Crumbs() {
+  const book = useStore(s => s.book)!
+  const sceneId = useStore(s => s.sceneId)
+  const t = useT()
+  const found = findScene(book, sceneId)
+  if (!found) return null
+  const all = book.chapters.flatMap(c => c.scenes)
+  const i = all.findIndex(s => s.id === sceneId)
+  const go = (d: number) => { const s = all[i + d]; if (s) useStore.getState().selectScene(s.id) }
+  return (
+    <span className="pl-crumbs" aria-label={t('Where you are')}>
+      <button type="button" className="pl-quiet" disabled={i <= 0} onClick={() => go(-1)} title={t('Previous scene') + ' (Ctrl+PageUp)'}>‹</button>
+      <span className="pl-crumb-book">{book.meta.title}</span>
+      <span className="pl-crumb-sep">›</span>
+      <span>{found.label}{found.chapter.title && found.chapter.title !== found.label ? ` · ${found.chapter.title}` : ''}</span>
+      <span className="pl-crumb-sep">›</span>
+      <span className="pl-crumb-scene">{found.scene.title}</span>
+      <button type="button" className="pl-quiet" disabled={i >= all.length - 1} onClick={() => go(1)} title={t('Next scene') + ' (Ctrl+PageDown)'}>›</button>
+    </span>
+  )
+}
+
 export function ManuscriptToolbar() {
   const prefs = useStore(s => s.prefs)
   const st = useStore.getState
   const t = useT()
   return (
     <div className="pl-toolbar" role="toolbar" aria-label={t('Manuscript')}>
+      <Crumbs />
       <span className="pl-switch" role="group" aria-label={t('Mode')}>
         <button type="button" aria-pressed={prefs.mode === 'write'} onClick={() => st().setPrefs({ mode: 'write' })} title={t('Write: the AI panel, no spellcheck')}>{t('Write')}</button>
         <button type="button" aria-pressed={prefs.mode === 'review'} onClick={() => st().setPrefs({ mode: 'review' })} title={t('Review: spellcheck and text figures')}>{t('Review')}</button>

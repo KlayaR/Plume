@@ -20,6 +20,8 @@ const GROUPS: [string, [string, string][]][] = [
   ]],
   ['Book', [
     ['Ctrl+K', 'Go to any scene or bible entry'],
+    ['Ctrl+PageUp / PageDown', 'Previous / next scene'],
+    ['Alt+Left / Right', 'Back / forward through what you opened'],
     ['Ctrl+Shift+F', 'Find and replace in the whole book'],
     ['Ctrl+Shift+B', 'New bible entry from the selected name'],
     ['Ctrl+Z (Plan)', 'Take back the last card or chapter move'],

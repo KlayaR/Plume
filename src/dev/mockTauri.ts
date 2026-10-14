@@ -48,6 +48,8 @@ async function invoke(cmd: string, args: any = {}): Promise<unknown> {
     case 'plugin:path|resolve_directory': return 'C:\\Users\\Test\\Documents'
     case 'plugin:path|join': return (args.paths as string[]).join('\\')
     case 'plugin:dialog|ask': return true
+    // ask() goes through the message command and compares the answer with its OK label.
+    case 'plugin:dialog|message': return 'Yes'
     case 'plugin:dialog|open': return ROOT
     case 'read_text': {
       const t = files.get(rel(args))
