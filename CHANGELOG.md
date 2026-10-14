@@ -7,6 +7,9 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.14.2
+- **Icon:** the gold quill is larger and has no dark square behind it, so it fills its space like other apps' icons on the Windows taskbar and Start menu.
+
 ## 0.14.1
 - **The brainstorm chat has two choices under the input:** first which AI answers (Claude command line, or OpenRouter), then the model (Haiku, Sonnet or Opus for Claude; for OpenRouter your saved models plus "Search all models"). This replaces the single preset list there.
 
