@@ -214,6 +214,9 @@ export interface BookMeta {
   map: { image: string; pins: { slug: string; x: number; y: number }[] } | null
   /** Capitalised words you told Plume aren't bible names. */
   ignored: string[]
+  /** Words you added to the dictionary, and LanguageTool rules you turned off. */
+  dictionary?: string[]
+  ltIgnored?: string[]
   summary?: string
 }
 

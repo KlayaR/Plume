@@ -16,6 +16,7 @@ import { scenePositions, timeFlags } from './structures'
 import { bookCounts, sceneCounts } from './stats'
 import { darlingSpot, diffWords } from '../writing'
 import { parseJSON } from '../ai'
+import { chunks, kindOf, ltLanguage } from './languagetool'
 import { splitManuscript } from '../library'
 import { toMarkdown } from './export'
 
@@ -333,5 +334,31 @@ describe('facts from Claude', () => {
   it('parses facts with and without a chapter', () => {
     expect(parseFact('- [ch 3+] Blind.')).toEqual({ from: 3, to: null, text: 'Blind.' })
     expect(parseFact('Paul is the twin.')).toEqual({ from: null, to: null, text: 'Paul is the twin.' })
+  })
+})
+
+describe('LanguageTool client', () => {
+  it('cuts a long text at paragraph breaks and keeps the places', () => {
+    const text = ('Un paragraphe de test. '.repeat(20) + '\n').repeat(10)
+    const parts = chunks(text, 1000)
+    expect(parts.length).toBeGreaterThan(3)
+    expect(parts.map(p => p.text).join('')).toBe(text)
+    parts.forEach(p => expect(text.slice(p.offset, p.offset + p.text.length)).toBe(p.text))
+    expect(chunks('court').length).toBe(1)
+  })
+  it('sorts issues into spelling, grammar and style', () => {
+    const rule = (id: string, issueType: string, cat: string) => ({ message: '', offset: 0, length: 1, rule: { id, issueType, category: { id: cat } } })
+    expect(kindOf(rule('MORFOLOGIK_RULE_EN_US', 'misspelling', 'TYPOS'))).toBe('spell')
+    expect(kindOf(rule('HE_VERB_AGR', 'grammar', 'GRAMMAR'))).toBe('grammar')
+    expect(kindOf(rule('FRENCH_WHITESPACE', 'typographical', 'TYPOGRAPHY'))).toBe('style')
+    // French rules have categories like CAT_GRAMMAIRE and no issue type
+    expect(kindOf(rule('ILS_ONT', 'uncategorized', 'CAT_HOMONYMES_PARONYMES'))).toBe('grammar')
+    expect(kindOf(rule('ACCORD_R_PERS_VERBE', 'uncategorized', 'CAT_GRAMMAIRE'))).toBe('grammar')
+    expect(kindOf(rule('FR_SPELLING_RULE', 'misspelling', 'TYPOS'))).toBe('spell')
+  })
+  it('uses the book language', () => {
+    expect(ltLanguage('fr', 'en-GB')).toBe('fr')
+    expect(ltLanguage('en', 'en-GB')).toBe('en-GB')
+    expect(ltLanguage('en', '')).toBe('en-US')
   })
 })

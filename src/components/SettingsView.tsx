@@ -11,6 +11,7 @@ import VoiceSettings from './VoiceSettings'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { useEffect } from 'react'
 import { backupNow, joinSeries, listBackups, seriesName } from '../library'
+import { LT_DEFAULT, ltTest } from '../lib/languagetool'
 
 const ACTIONS: [ActionId, string][] = [['continue', 'Continue'], ['rewrite', 'Rewrite selection'], ['beats', 'Beats to prose']]
 type Tab = 'appearance' | 'manuscript' | 'writing' | 'voice' | 'claude' | 'book' | 'about'
@@ -89,6 +90,7 @@ function WritingTab() {
   const setPrefs = useStore(s => s.setPrefs)
   const t = useT()
   return (
+    <>
     <SettingsSection title={t('Writing')}>
       <SettingRow label={t('Focus mode')} description={t('The controls fade while you type and come back when the mouse moves')}>
         <Switch checked={prefs.focus} onChange={v => setPrefs({ focus: v })} label={t('Focus mode')} />
@@ -102,6 +104,61 @@ function WritingTab() {
       <SettingRow label={t('Claude pane')} description={t('Pinned open, or sliding in from the right edge')}>
         <Switch checked={prefs.pinRight} onChange={v => setPrefs({ pinRight: v })} label={t('Claude pane')} />
       </SettingRow>
+    </SettingsSection>
+    <SpellSection />
+    </>
+  )
+}
+
+/** The spelling and grammar checker used in Review: Windows', LanguageTool, or none. */
+function SpellSection() {
+  const prefs = useStore(s => s.prefs)
+  const setPrefs = useStore(s => s.setPrefs)
+  const book = useStore(s => s.book)
+  const t = useT()
+  const [result, setResult] = useState('')
+  const test = async () => {
+    setResult(t('Testing…'))
+    try { setResult(`✓ ${await ltTest({ server: prefs.ltServer, user: prefs.ltUser, key: prefs.ltKey })}`) } catch (e) { setResult(`✕ ${t((e as Error).message)}`) }
+  }
+  const publicServer = /languagetool(plus)?\.(org|com)/.test(prefs.ltServer || LT_DEFAULT)
+  const words = book?.meta.dictionary ?? []
+  return (
+    <SettingsSection title={t('Spelling and grammar')} description={t('Used in Review mode, never while you write.')}>
+      <SettingRow label={t('Checker')} description={t('Windows’ spellchecker only knows the languages installed in Windows, which may not be the book’s. LanguageTool always checks in the book’s language.')}>
+        <select className="sk-select" value={prefs.spell} onChange={e => setPrefs({ spell: e.target.value as typeof prefs.spell })}>
+          <option value="languagetool">LanguageTool</option>
+          <option value="windows">{t('Windows spellchecker')}</option>
+          <option value="off">{t('None')}</option>
+        </select>
+      </SettingRow>
+      {prefs.spell === 'languagetool' && (
+        <>
+          <SettingRow label={t('LanguageTool server')} description={publicServer ? t('The public server: free, about 20 checks a minute, and the scene’s text is sent to it. A server running on your own computer keeps everything private.') : t('Your own server.')}>
+            <input className="sk-input pl-wide" value={prefs.ltServer} placeholder={LT_DEFAULT} onChange={e => setPrefs({ ltServer: e.target.value })} />
+          </SettingRow>
+          <SettingRow label={t('Premium account')} description={t('Optional: your LanguageTool Premium login and API key.')}>
+            <span className="pl-row">
+              <input className="sk-input" value={prefs.ltUser} placeholder={t('Login')} onChange={e => setPrefs({ ltUser: e.target.value })} />
+              <input className="sk-input" type="password" value={prefs.ltKey} placeholder={t('API key')} onChange={e => setPrefs({ ltKey: e.target.value })} />
+            </span>
+          </SettingRow>
+          <SettingRow label={t('English variant')} description={t('For English books. French books use French.')}>
+            <select className="sk-select" value={prefs.ltEnglish} onChange={e => setPrefs({ ltEnglish: e.target.value })}>
+              <option value="en-US">English (US)</option><option value="en-GB">English (UK)</option>
+              <option value="en-CA">English (Canada)</option><option value="en-AU">English (Australia)</option>
+            </select>
+          </SettingRow>
+          <SettingRow label={t('Test the connection')} description={result}>
+            <button type="button" className="sk-btn sk-btn-sm" onClick={test}>{t('Test')}</button>
+          </SettingRow>
+        </>
+      )}
+      {book && words.length > 0 && (
+        <SettingRow label={t('This book’s dictionary')} description={words.join(', ')}>
+          <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm" onClick={() => useStore.getState().updateMeta({ dictionary: [], ltIgnored: [] })}>{t('Clear')}</button>
+        </SettingRow>
+      )}
     </SettingsSection>
   )
 }

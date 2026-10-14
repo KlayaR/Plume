@@ -152,12 +152,26 @@ export function voicesFor(lang: string): SpeechSynthesisVoice[] {
   return speechSynthesis.getVoices().filter(v => v.lang.toLowerCase().startsWith(lang))
 }
 
-/** Reads the text aloud, paragraph by paragraph. */
-export function readAloud(text: string, lang: string) {
+/** The voices Windows has: they load a moment after the app starts, so wait for them. */
+export function loadVoices(): Promise<SpeechSynthesisVoice[]> {
+  if (typeof speechSynthesis === 'undefined') return Promise.resolve([])
+  if (speechSynthesis.getVoices().length) return Promise.resolve(speechSynthesis.getVoices())
+  return new Promise(resolve => {
+    const done = () => resolve(speechSynthesis.getVoices())
+    speechSynthesis.addEventListener('voiceschanged', done, { once: true })
+    setTimeout(done, 1500)
+  })
+}
+
+/** Reads the text aloud, paragraph by paragraph, with a voice in the book's language. */
+export async function readAloud(text: string, lang: string) {
   if (typeof speechSynthesis === 'undefined') return useStore.getState().notify('error', t('No voice available on this computer.'))
   speechSynthesis.cancel()
+  const mine = (await loadVoices()).filter(v => v.lang.toLowerCase().startsWith(lang))
+  // Never read English with a French voice (or the other way round): say what is missing.
+  if (!mine.length) return useStore.getState().notify('warn', t(lang === 'fr' ? 'No French voice is installed on this computer. Windows Settings → Time & language → Speech → Add voices.' : 'No English voice is installed on this computer. Windows Settings → Time & language → Speech → Add voices.'))
   const name = useStore.getState().prefs.readVoice
-  const voice = voicesFor(lang).find(v => v.name === name) ?? voicesFor(lang)[0]
+  const voice = mine.find(v => v.name === name) ?? mine[0]
   const paras = text.split('\n').map(p => p.trim()).filter(Boolean)
   if (!paras.length) return
   useReview.setState({ speaking: true })

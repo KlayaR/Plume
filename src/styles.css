@@ -128,9 +128,10 @@ body { background: var(--bg); }
 
 /* ---- Manuscript: the paper in the middle, panes on the edges --------------- */
 .pl-manuscript { position: absolute; inset: 0; --pl-tool-h: 40px; }
-.pl-scroll { position: absolute; inset: var(--pl-tool-h, 0px) 0 0 0; overflow-y: auto; transition: padding 0.18s ease; }
-.pl-manuscript[data-pin-left="true"] .pl-scroll { padding-left: var(--pl-pane-w); }
-.pl-manuscript[data-pin-right="true"] .pl-scroll { padding-right: var(--pl-pane-r, 380px); }
+/* The page area ends where a pinned pane begins, so its scrollbar is not hidden behind the pane. */
+.pl-scroll { position: absolute; inset: var(--pl-tool-h, 0px) 0 0 0; overflow-y: auto; transition: left 0.18s ease, right 0.18s ease; }
+.pl-manuscript[data-pin-left="true"] .pl-scroll { left: var(--pl-pane-w); }
+.pl-manuscript[data-pin-right="true"] .pl-scroll { right: var(--pl-pane-r, 380px); }
 
 .pl-hotzone { position: absolute; top: var(--pl-tool-h, 0px); bottom: 0; width: clamp(18px, calc((100% - var(--pl-sheet-w)) / 2 - 40px), 90px); z-index: 60; }
 .pl-hotzone-left { left: 0; }
@@ -633,3 +634,11 @@ body.pl-typing .pl-toolbar { opacity: 0.08; }
 .pl-tour li::marker { color: var(--accent); font-weight: 600; }
 .pl-tour b { display: block; }
 .pl-tour span { color: var(--text-dim); font-size: var(--fs-sm); line-height: 1.5; }
+
+/* LanguageTool underlines. */
+.cm-lt { text-decoration: underline wavy; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+.cm-lt-spell { text-decoration-color: #d0533f; }
+.cm-lt-grammar { text-decoration-color: #5f86b0; }
+.cm-lt-style { text-decoration-color: #d39b3a; text-decoration-style: dotted; }
+.cm-ltcard { max-width: 24rem; }
+.pl-lt-status { display: flex; flex-direction: column; gap: 6px; }

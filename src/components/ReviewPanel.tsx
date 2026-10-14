@@ -8,7 +8,8 @@ import { findScene, useStore } from '../store'
 import { textStats, type TextStats } from '../lib/stats'
 import { CATEGORIES, review, type ReportResult } from '../lib/review'
 import { getEditorView } from '../editor/actions'
-import { betaCost, betaRead, continuityCheck, continuityCost, lineEdit, lineEditCost, PERSONAS, readAloud, stopReading, useReview, voiceCheck, voiceCheckCost, voicesFor } from '../review'
+import { betaCost, betaRead, continuityCheck, continuityCost, lineEdit, lineEditCost, loadVoices, PERSONAS, readAloud, stopReading, useReview, voiceCheck, voiceCheckCost, voicesFor } from '../review'
+import { refreshLT, useLT } from '../editor/lt'
 import { numLocale, useT } from '../i18n'
 
 const n = (x: number, d = 0) => x.toLocaleString(numLocale(), { maximumFractionDigits: d, minimumFractionDigits: d })
@@ -46,6 +47,8 @@ export default function ReviewPanel() {
           <p className="sk-hint">{t('Share of the reports within their target. Targets are Plume’s estimates for published fiction; your style may differ on purpose.')}</p>
         </div>
       </section>
+
+      <SpellingStatus />
 
       {CATEGORIES.filter(c => c.id !== 'readability').map(c => {
         const rs = r.results.filter(x => x.def.category === c.id)
@@ -205,6 +208,7 @@ function ReadAloud() {
   useEffect(() => {
     if (typeof speechSynthesis === 'undefined') return
     const load = () => setVoices(voicesFor(book.meta.language))
+    loadVoices().then(load)
     speechSynthesis.addEventListener('voiceschanged', load)
     return () => { speechSynthesis.removeEventListener('voiceschanged', load); speechSynthesis.cancel() }
   }, [book.meta.language])
@@ -222,12 +226,14 @@ function ReadAloud() {
         {speaking
           ? <button type="button" className="sk-btn sk-btn-sm" onClick={stopReading}><Pause size={13} /> {t('Stop')}</button>
           : <button type="button" className="sk-btn sk-btn-sm" onMouseDown={e => e.preventDefault()} onClick={play}><Play size={13} /> {t('From the cursor')}</button>}
-        <select className="sk-select sk-btn-sm pl-grow" value={voice} onChange={e => useStore.getState().setPrefs({ readVoice: e.target.value })}>
+        <select className="sk-select sk-btn-sm pl-grow" value={voices.some(v => v.name === voice) ? voice : ''} onChange={e => useStore.getState().setPrefs({ readVoice: e.target.value })}>
           <option value="">{t('Default voice')}</option>
           {voices.map(v => <option key={v.name} value={v.name}>{v.name}</option>)}
         </select>
       </div>
-      <span className="sk-hint">{t('Windows voices: free and offline. Hearing the text finds what the eye skips.')}</span>
+      {voices.length === 0
+        ? <span className="sk-hint pl-warn">{t(book.meta.language === 'fr' ? 'No French voice is installed on this computer. Windows Settings → Time & language → Speech → Add voices.' : 'No English voice is installed on this computer. Windows Settings → Time & language → Speech → Add voices.')}</span>
+        : <span className="sk-hint">{t('Windows voices: free and offline. Hearing the text finds what the eye skips.')}</span>}
     </section>
   )
 }
@@ -268,6 +274,40 @@ function Figures({ scene, chapter, label }: { scene: string; chapter: string; la
           <span className="sk-label">{t('The whole book')}</span><Rows s={bookStats} />
         </>
       )}
+    </section>
+  )
+}
+
+/** Which checker is on, and what it found in the open scene. */
+function SpellingStatus() {
+  const spell = useStore(s => s.prefs.spell)
+  const lt = useLT()
+  const t = useT()
+  const set = (v: 'windows' | 'languagetool' | 'off') => useStore.getState().setPrefs({ spell: v })
+  return (
+    <section className="pl-cat pl-lt-status">
+      <div className="sk-label">{t('Spelling and grammar')}</div>
+      {spell === 'languagetool' && (
+        <>
+          <div className="pl-row">
+            <span className={`pl-grow ${lt.state === 'error' ? 'pl-warn' : ''}`}>
+              {lt.state === 'checking' ? t('Checking…')
+                : lt.state === 'error' ? t(lt.error)
+                  : lt.state === 'idle' ? (lt.count ? t('{n} issues ({s} spelling, {g} grammar)', { n: lt.count, s: lt.spell, g: lt.grammar }) : t('No issue found'))
+                    : '…'}
+            </span>
+            <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm" onClick={() => getEditorView()?.dispatch({ effects: refreshLT.of(null) })}>{t('Check again')}</button>
+          </div>
+          <span className="sk-hint">{t('LanguageTool, in the book’s language. Underlined in the text: red spelling, blue grammar, yellow style. Hover one to fix it.')}</span>
+        </>
+      )}
+      {spell === 'windows' && (
+        <>
+          <span className="sk-hint">{t('Windows’ spellchecker only knows the languages installed in Windows, which may not be the book’s. LanguageTool always checks in the book’s language.')}</span>
+          <button type="button" className="sk-btn sk-btn-sm" onClick={() => set('languagetool')}>{t('Use LanguageTool')}</button>
+        </>
+      )}
+      {spell === 'off' && <span className="sk-hint">{t('Spelling and grammar checking is off (Settings → Writing).')}</span>}
     </section>
   )
 }

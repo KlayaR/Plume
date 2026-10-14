@@ -64,6 +64,13 @@ export interface Prefs {
   split: string | null
   /** Read aloud: the Windows voice to use (its name). */
   readVoice: string
+  /** Spelling in Review: Windows' own checker, LanguageTool, or none. */
+  spell: 'windows' | 'languagetool' | 'off'
+  /** LanguageTool: server (the public one, or your own), Premium login, and which English. */
+  ltServer: string
+  ltUser: string
+  ltKey: string
+  ltEnglish: string
   /** Version of the saved prefs, for one-time upgrades. */
   v?: number
 }
@@ -90,6 +97,11 @@ export const DEFAULT_PREFS: Prefs = {
   rightTab: 'write',
   split: null,
   readVoice: '',
+  spell: 'windows',
+  ltServer: 'https://api.languagetool.org',
+  ltUser: '',
+  ltKey: '',
+  ltEnglish: 'en-US',
   v: 2,
 }
 

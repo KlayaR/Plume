@@ -76,7 +76,7 @@ export default function ManuscriptOptions({ full = false }: { full?: boolean }) 
           </SettingRow>
           <div className="pl-row pl-end">
             <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm"
-              onClick={() => set({ ...DEFAULT_PREFS, mode: prefs.mode, page: prefs.page, ui: prefs.ui, pinLeft: prefs.pinLeft, pinRight: prefs.pinRight, paneL: prefs.paneL, paneR: prefs.paneR, focus: prefs.focus, enterBreaks: prefs.enterBreaks })}>
+              onClick={() => set({ ...DEFAULT_PREFS, mode: prefs.mode, page: prefs.page, ui: prefs.ui, pinLeft: prefs.pinLeft, pinRight: prefs.pinRight, paneL: prefs.paneL, paneR: prefs.paneR, spell: prefs.spell, ltServer: prefs.ltServer, ltUser: prefs.ltUser, ltKey: prefs.ltKey, ltEnglish: prefs.ltEnglish, readVoice: prefs.readVoice, focus: prefs.focus, enterBreaks: prefs.enterBreaks })}>
               {t('Reset the manuscript look')}
             </button>
           </div>

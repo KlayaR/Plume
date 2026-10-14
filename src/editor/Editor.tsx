@@ -7,7 +7,9 @@ import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { useStore } from '../store'
 import { t } from '../i18n'
 import type { Entry, Lang, Scene } from '../lib/types'
-import { buildMatcher } from '../lib/context'
+import { buildMatcher, findMentions } from '../lib/context'
+import { ltCheck, ltLanguage } from '../lib/languagetool'
+import { languageToolExt, refreshLT } from './lt'
 import { enterStartsScene } from '../lib/chapters'
 import { proposalField, sceneExtensions, setNames } from './cm'
 import { accept, discard, fillPlaceholder, getEditorView, runAction, setEditorView, syncProposalState, useAI } from './actions'
@@ -70,7 +72,19 @@ const names = (entries: Entry[]) => setNames.of({ matcher: buildMatcher(entries)
 
 // No red lines while writing; Review turns on the Windows spellchecker.
 const spelling = new Compartment()
-const spellingExt = (write: boolean) => EditorView.contentAttributes.of({ spellcheck: write ? 'false' : 'true' })
+const spellingExt = (on: boolean) => EditorView.contentAttributes.of({ spellcheck: on ? 'true' : 'false' })
+/** Windows' own spellchecker: Review mode, and only if it is the chosen engine. */
+const windowsSpell = () => { const p = useStore.getState().prefs; return p.mode === 'review' && p.spell === 'windows' }
+
+/** LanguageTool on one scene's text, without the bible's names and the words you added to the dictionary. */
+async function checkWithLT(text: string) {
+  const { book, prefs } = useStore.getState()
+  if (!book) return []
+  const dict = new Set((book.meta.dictionary ?? []).map(w => w.toLowerCase()))
+  const all = await ltCheck(text, ltLanguage(book.meta.language, prefs.ltEnglish), { server: prefs.ltServer, user: prefs.ltUser, key: prefs.ltKey }, book.meta.ltIgnored ?? [])
+  const names = findMentions(text, buildMatcher(book.entries))
+  return all.filter(m => !(m.kind === 'spell' && (dict.has(text.slice(m.from, m.to).toLowerCase()) || names.some(n => n.from < m.to && n.to > m.from))))
+}
 
 /** Enter twice at the end of a scene starts a new scene; once more, a new chapter. */
 function breakKey(sceneId: string) {
@@ -91,7 +105,14 @@ function makeState(s: Scene, lang: Lang) {
     selection: { anchor: s.text.length }, // writers pick up where the scene stops
     extensions: [
       history(),
-      spelling.of(spellingExt(useStore.getState().prefs.mode === 'write')),
+      spelling.of(spellingExt(windowsSpell())),
+      languageToolExt({
+        // Review mode, LanguageTool chosen, and this is the scene you are in.
+        enabled: () => { const st = useStore.getState(); return st.prefs.mode === 'review' && st.prefs.spell === 'languagetool' && st.sceneId === s.id },
+        check: checkWithLT,
+        addWord: w => { const st = useStore.getState(); st.updateMeta({ dictionary: [...(st.book?.meta.dictionary ?? []), w] }) },
+        ignoreRule: r => { const st = useStore.getState(); st.updateMeta({ ltIgnored: [...(st.book?.meta.ltIgnored ?? []), r] }) },
+      }),
       sceneExtensions(lang, {
         accept: () => accept(),
         escape: () => { if (useAI.getState().hasProposal) { discard(); return true } return false },
@@ -176,7 +197,10 @@ export default function Editor({ scene }: { scene: Scene }) {
     }, report ? 300 : 0)
     return () => clearTimeout(timer)
   }, [report, aiFound, scene.text])
-  useEffect(() => { viewRef.current?.dispatch({ effects: spelling.reconfigure(spellingExt(mode === 'write')) }) }, [mode])
+  const spell = useStore(s => s.prefs.spell)
+  useEffect(() => { viewRef.current?.dispatch({ effects: [spelling.reconfigure(spellingExt(mode === 'review' && spell === 'windows')), refreshLT.of(null)] }) }, [mode, spell])
+  // Another scene became the active one: LanguageTool moves with it.
+  useEffect(() => { viewRef.current?.dispatch({ effects: refreshLT.of(null) }) }, [active])
 
   // Chosen in the tree, or just created: become the active editor, focused and in view.
   useEffect(() => {

@@ -83,6 +83,8 @@ function normalizeMeta(raw: Partial<BookMeta>): BookMeta {
     series: raw.series ?? null,
     map: raw.map ?? null,
     ignored: Array.isArray(raw.ignored) ? raw.ignored : [],
+    dictionary: Array.isArray(raw.dictionary) ? raw.dictionary : [],
+    ltIgnored: Array.isArray(raw.ltIgnored) ? raw.ltIgnored : [],
     summary: raw.summary,
   }
 }
