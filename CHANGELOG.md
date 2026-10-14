@@ -7,6 +7,9 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.14.1
+- **The brainstorm chat has two choices under the input:** first which AI answers (Claude command line, or OpenRouter), then the model (Haiku, Sonnet or Opus for Claude; for OpenRouter your saved models plus "Search all models"). This replaces the single preset list there.
+
 ## 0.14.0
 **Modular bible entries**
 - An entry's full text is now a stack of **blocks** (Appearance, Personality, Secrets, History… whatever you need): add, rename, reorder, delete. Each block has its own switch for the AI: **always sent** (travels with the short version), **with the full entry** (default), or **never sent** (a secret stays in your file but the AI never reads it, in the AI panel, the chat, the checks and the contradiction search). "Edit as text" shows the same content as Markdown with ### headings, so existing entries and files work unchanged.

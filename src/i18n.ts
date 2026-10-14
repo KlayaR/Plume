@@ -883,6 +883,10 @@ const FR: Record<string, string> = {
   'One view only': 'Une seule vue',
   'Swap the two views': 'Échanger les deux vues',
   'Close the second view': 'Fermer la seconde vue',
+  'Which AI answers': 'Quelle IA répond',
+  'Claude (command line)': 'Claude (ligne de commande)',
+  'Pick a model…': 'Choisir un modèle…',
+  'Search all models…': 'Chercher parmi tous les modèles…',
 }
 
 const SHELL = {

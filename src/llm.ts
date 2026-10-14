@@ -19,6 +19,8 @@ export interface LlmRequest {
   message: string
   model: Model
   effort: Effort
+  /** An OpenRouter model id to use for this request, without a saved preset. */
+  orModel?: string
   /** An OpenRouter preset to use for this request (a Claude preset is resolved into model and effort first). */
   preset?: string
   /** Agent tasks that read files: only the claude command line can do these. */
@@ -37,7 +39,7 @@ export function choose(s: { model: Model; effort: Effort; preset?: string }): { 
 /** Can a request be made at all: the claude command line is found, or OpenRouter is set up. */
 export function canRun(): boolean {
   const st = useStore.getState()
-  return !!st.claudeExe || (!!st.prefs.orKey && st.prefs.presets.some(p => p.backend === 'openrouter'))
+  return !!st.claudeExe || !!st.prefs.orKey
 }
 
 const fallbackPreset = (): Preset | null => {
@@ -162,7 +164,8 @@ export async function runLLM(req: LlmRequest, onText: (t: string) => void, onDon
     if (a.stop) cancelClaude(a.inner)
   }
 
-  const chosen = req.preset ? prefs.presets.find(p => p.id === req.preset) : undefined
+  const adhoc: Preset | undefined = req.orModel ? { id: 'adhoc', name: req.orModel, backend: 'openrouter', model: req.orModel, effort: 'low' } : undefined
+  const chosen = adhoc ?? (req.preset ? prefs.presets.find(p => p.id === req.preset) : undefined)
   if (chosen?.backend === 'openrouter') {
     if (agent) finish({ ok: false, text: '', error: t('This task reads files, so it needs the claude command line.') })
     else startOR(chosen)

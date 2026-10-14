@@ -31,7 +31,7 @@ export function PresetSelect({ value, onChange }: { value: ActionSettings; onCha
 }
 
 /** Search OpenRouter's models and pick one. */
-function ModelPicker({ onPick, onClose }: { onPick: (m: ModelInfo) => void; onClose: () => void }) {
+export function ModelPicker({ onPick, onClose }: { onPick: (m: ModelInfo) => void; onClose: () => void }) {
   const t = useT()
   const [list, setList] = useState<ModelInfo[] | null>(null)
   const [error, setError] = useState('')
@@ -56,6 +56,52 @@ function ModelPicker({ onPick, onClose }: { onPick: (m: ModelInfo) => void; onCl
         </div>
       </div>
     </Dialog>
+  )
+}
+
+/**
+ * The brainstorm chat's two choices: which backend answers (the claude command
+ * line or OpenRouter), then which model. OpenRouter's list is your saved models
+ * plus a search of all of them.
+ */
+export function BackendModelSelect() {
+  const prefs = useStore(s => s.prefs)
+  const setPrefs = useStore(s => s.setPrefs)
+  const t = useT()
+  const [picking, setPicking] = useState(false)
+  const saved = [...new Set([...prefs.presets.filter(p => p.backend === 'openrouter').map(p => p.model), ...(prefs.chatBackend === 'openrouter' && prefs.chatModel ? [prefs.chatModel] : [])])]
+  const nameOf = (id: string) => prefs.presets.find(p => p.backend === 'openrouter' && p.model === id)?.name ?? id
+  const setBackend = (b: 'claude' | 'openrouter') => setPrefs(b === 'claude'
+    ? { chatBackend: 'claude', chatModel: CLAUDE_MODELS.includes(prefs.chatModel as Model) ? prefs.chatModel : 'sonnet' }
+    : { chatBackend: 'openrouter', chatModel: saved[0] ?? '' })
+  const pick = (m: ModelInfo) => {
+    if (!prefs.presets.some(p => p.backend === 'openrouter' && p.model === m.id)) setPrefs({ presets: [...prefs.presets, { id: newId(), name: m.name, backend: 'openrouter', model: m.id, effort: 'low' }] })
+    setPrefs({ chatBackend: 'openrouter', chatModel: m.id })
+    setPicking(false)
+  }
+  return (
+    <>
+      <select className="sk-select sk-btn-sm" value={prefs.chatBackend} aria-label={t('Which AI answers')} onChange={e => setBackend(e.target.value as 'claude' | 'openrouter')}>
+        <option value="claude">{t('Claude (command line)')}</option>
+        <option value="openrouter">OpenRouter</option>
+      </select>
+      {prefs.chatBackend === 'claude'
+        ? (
+          <select className="sk-select sk-btn-sm" value={prefs.chatModel} aria-label={t('Model')} onChange={e => setPrefs({ chatModel: e.target.value })}>
+            {CLAUDE_MODELS.map(m => <option key={m} value={m}>{m[0].toUpperCase() + m.slice(1)}</option>)}
+          </select>
+        )
+        : (
+          <select className="sk-select sk-btn-sm" value={prefs.chatModel} aria-label={t('Model')}
+            onChange={e => e.target.value === '@search' ? setPicking(true) : setPrefs({ chatModel: e.target.value })}>
+            {!prefs.chatModel && <option value="">{t('Pick a model…')}</option>}
+            {saved.map(id => <option key={id} value={id}>{nameOf(id)}</option>)}
+            <option value="@search">{t('Search all models…')}</option>
+          </select>
+        )}
+      {prefs.chatBackend === 'openrouter' && !prefs.orKey && <span className="sk-hint pl-warn">{t('Add your OpenRouter key in Settings → Claude.')}</span>}
+      {picking && <ModelPicker onPick={pick} onClose={() => setPicking(false)} />}
+    </>
   )
 }
 

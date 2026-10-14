@@ -88,8 +88,9 @@ export interface Prefs {
   fallbackPreset: string
   /** OpenRouter API key: kept on this computer only, never in a book. */
   orKey: string
-  /** The model preset the brainstorm chat uses (empty: Sonnet, low effort). */
-  chatPreset: string
+  /** The brainstorm chat: which backend answers, and with which model (haiku, sonnet, opus, or an OpenRouter model id). */
+  chatBackend: 'claude' | 'openrouter'
+  chatModel: string
   /** A second view shown beside the main one (Bible, Plan or Manuscript), and its width in px. */
   dual: View | null
   dualW: number
@@ -132,7 +133,8 @@ export const DEFAULT_PREFS: Prefs = {
   fallback: 'off',
   fallbackPreset: '',
   orKey: '',
-  chatPreset: '',
+  chatBackend: 'claude',
+  chatModel: 'sonnet',
   dual: null,
   dualW: 520,
   v: 2,

@@ -4,7 +4,7 @@
 // questions to fill the gaps of one entry. Both are saved in .plume/ of the book.
 import { create } from 'zustand'
 import { invoke } from '@tauri-apps/api/core'
-import type { Book, Entry, EntryType } from './lib/types'
+import type { Book, Effort, Entry, EntryType, Model } from './lib/types'
 import { ENTRY_TYPES } from './lib/types'
 import { aiBlocks, aiFull } from './lib/blocks'
 import { parseFact } from './lib/bible'
@@ -13,6 +13,13 @@ import { buildMatcher, findMentions } from './lib/context'
 import { ask, parseJSON, stopAsk } from './ai'
 import { useStore } from './store'
 import { t } from './i18n'
+
+/** What the chat asks for: a Claude model, or an OpenRouter model id, as chosen under the input. */
+function chatChoice(): { model: Model; effort: Effort; orModel?: string } {
+  const { chatBackend, chatModel } = useStore.getState().prefs
+  if (chatBackend === 'openrouter' && chatModel) return { model: 'sonnet', effort: 'low', orModel: chatModel }
+  return { model: (['haiku', 'sonnet', 'opus'].includes(chatModel) ? chatModel : 'sonnet') as Model, effort: 'low' }
+}
 
 export interface Message { role: 'user' | 'assistant'; text: string }
 
@@ -173,7 +180,7 @@ export async function send(text: string) {
   const history = messages.slice(-20)
   try {
     const reply = await ask({
-      model: 'sonnet', effort: 'low', preset: useStore.getState().prefs.chatPreset || undefined,
+      ...chatChoice(),
       system: systemFor(book, recent, target),
       message: `<conversation>\n${transcript(history.slice(0, -1))}\n</conversation>\n\n${history[history.length - 1].text}`,
       onText: chunk => useChat.setState(s => ({ streaming: (s.streaming ?? '') + chunk })),

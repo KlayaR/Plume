@@ -13,6 +13,8 @@ export interface AskOptions {
   effort?: Effort
   /** A model preset id (Settings → Claude); overrides model and effort. */
   preset?: string
+  /** An OpenRouter model id (used as is, no saved preset needed). */
+  orModel?: string
   /** Text as it streams in. */
   onText?: (text: string) => void
   /** Agent tasks only: tools the CLI may use, and the folder it works in (read-only tools). */
@@ -42,7 +44,7 @@ export function ask(o: AskOptions): Promise<string> {
   const { model, effort } = effective(c.model, c.effort)
   return new Promise((resolve, reject) => {
     runLLM(
-      { model, effort, preset: c.preset, system: o.system, message: o.message, tools: o.tools, cwd: o.cwd },
+      { model, effort, preset: c.preset, orModel: o.orModel, system: o.system, message: o.message, tools: o.tools, cwd: o.cwd },
       text => o.onText?.(text),
       r => {
         current = null
