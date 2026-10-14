@@ -10,6 +10,7 @@ import { accept, alternatives, currentContext, discard, pickAlternative, retry, 
 import { diffWords, learnTaste, useNotes } from '../writing'
 import { getEditorView } from '../editor/actions'
 import { allPrompts } from '../lib/voice'
+import { PresetSelect } from './ModelPresets'
 import { isCheap } from '../ai'
 import { numLocale, useT } from '../i18n'
 
@@ -94,12 +95,7 @@ export default function ContextPanel() {
       />
 
       <div className="pl-row">
-        <select className="sk-select sk-btn-sm" value={settings.model} onChange={e => setSetting({ model: e.target.value as Model })} aria-label={t('Model')}>
-          <option value="haiku">Haiku</option><option value="sonnet">Sonnet</option><option value="opus">Opus</option>
-        </select>
-        <select className="sk-select sk-btn-sm" value={settings.effort} onChange={e => setSetting({ effort: e.target.value as Effort })} aria-label={t('Effort')}>
-          <option value="low">{t('Low')}</option><option value="medium">{t('Medium')}</option><option value="high">{t('High')}</option>
-        </select>
+        <PresetSelect value={settings} onChange={setSetting} />
       </div>
       <div className="pl-row">
         <select className="sk-select sk-btn-sm" value={voice.actionPrompts[action as ActionId] ?? ''} onChange={e => setActionPrompt(e.target.value)} aria-label={t('Prompt')} title={t('Instructions from your prompt library for this action')}>

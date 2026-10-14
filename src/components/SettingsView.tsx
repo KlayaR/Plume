@@ -8,6 +8,7 @@ import type { ActionId, Effort, MatterKey, Model } from '../lib/types'
 import { BACK, FRONT, MATTER_LABEL } from '../lib/matter'
 import { useT } from '../i18n'
 import ManuscriptOptions from './ManuscriptOptions'
+import { ModelPresetsSection, PresetSelect } from './ModelPresets'
 import VoiceSettings from './VoiceSettings'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { useEffect } from 'react'
@@ -182,6 +183,7 @@ function ClaudeTab() {
   const t = useT()
   const save = () => useStore.getState().setSettings({ claudePath: path.trim() })
   return (
+    <>
     <SettingsSection title="Claude" description={t('Plume uses the claude command line, signed in with your subscription.')}>
       <SettingRow label={t('Command line')} description={exe === undefined ? t('Looking…') : exe ? t('Found: {path}', { path: exe }) : t('Not found. Install Claude Code, or set the path to claude.exe.')}>
         <div className="pl-row">
@@ -196,6 +198,8 @@ function ClaudeTab() {
         </span>
       </SettingRow>
     </SettingsSection>
+    <ModelPresetsSection />
+    </>
   )
 }
 
@@ -239,14 +243,7 @@ function BookTab() {
     <SettingsSection title={t('AI for this book')}>
       {ACTIONS.map(([id, label]) => (
         <SettingRow key={id} label={t(label)}>
-          <div className="pl-row">
-            <select className="sk-select" value={ai.actions[id].model} onChange={e => setAi({ actions: { ...ai.actions, [id]: { ...ai.actions[id], model: e.target.value as Model } } })}>
-              <option value="haiku">Haiku</option><option value="sonnet">Sonnet</option><option value="opus">Opus</option>
-            </select>
-            <select className="sk-select" value={ai.actions[id].effort} onChange={e => setAi({ actions: { ...ai.actions, [id]: { ...ai.actions[id], effort: e.target.value as Effort } } })}>
-              <option value="low">{t('Low effort')}</option><option value="medium">{t('Medium effort')}</option><option value="high">{t('High effort')}</option>
-            </select>
-          </div>
+          <PresetSelect value={ai.actions[id]} onChange={next => setAi({ actions: { ...ai.actions, [id]: next } })} />
         </SettingRow>
       ))}
       <SettingRow label={t('Bible budget')} description={t('Most tokens of bible entries sent per request')}>

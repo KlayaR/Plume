@@ -59,7 +59,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
         {FORMATS.map(([id, label, hint]) => (
           <label key={id} className={`pl-format ${format === id ? 'pl-active' : ''}`}>
             <input type="radio" name="fmt" checked={format === id} onChange={() => setFormat(id)} />
-            <span><b>{label}</b><br /><span className="sk-hint">{t(hint)}</span></span>
+            <span><b>{t(label)}</b><br /><span className="sk-hint">{t(hint)}</span></span>
           </label>
         ))}
       </div>

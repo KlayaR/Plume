@@ -176,6 +176,8 @@ export type Effort = 'low' | 'medium' | 'high'
 export interface ActionSettings {
   model: Model
   effort: Effort
+  /** A model preset (Settings → Claude); when set it decides the model, and OpenRouter ones run there. */
+  preset?: string
 }
 
 /** Measurable rules the proposals are checked against, without the AI. */

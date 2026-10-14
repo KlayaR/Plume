@@ -2,6 +2,7 @@
 import { create } from 'zustand'
 import type { Book, Chapter, Entry, EntryType, Scene } from './lib/types'
 import type { Limits, Usage } from './lib/claude'
+import { DEFAULT_PRESETS, type Fallback, type Preset } from './lib/presets'
 import { findClaude, setLimitsListener } from './lib/claude'
 import { chapterLabels } from './lib/chapters'
 import { Conflict, loadBook, makeChapter, makeEntry, makeScene, reread, saveChapter, saveEntry, saveMeta, saveScene, seriesRootOf, trash } from './lib/project'
@@ -81,6 +82,12 @@ export interface Prefs {
   typewriter: boolean
   /** Capital letters as you type (sentence starts, English I); Ctrl+Z right after takes one back. */
   autoCapital: boolean
+  /** Model presets (a named backend, model and effort), and when OpenRouter takes over from the claude command line. */
+  presets: Preset[]
+  fallback: Fallback
+  fallbackPreset: string
+  /** OpenRouter API key: kept on this computer only, never in a book. */
+  orKey: string
   /** Version of the saved prefs, for one-time upgrades. */
   v?: number
 }
@@ -116,6 +123,10 @@ export const DEFAULT_PREFS: Prefs = {
   ltLive: false,
   typewriter: false,
   autoCapital: true,
+  presets: DEFAULT_PRESETS,
+  fallback: 'off',
+  fallbackPreset: '',
+  orKey: '',
   v: 2,
 }
 

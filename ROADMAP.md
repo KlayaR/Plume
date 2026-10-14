@@ -15,6 +15,7 @@ Until then, each version is a pre-release: 0.x.y, where y fixes bugs and x adds
 or changes features.
 
 ## Next
+- Try OpenRouter with a real key for a while: streaming, long replies, errors.
 - Test every feature in daily use on real books and fix what breaks.
 - Undo for deletions and renames in the Plan and the Bible (moves already undo).
 - Code-signed installer, so Windows stops warning about an unknown publisher.

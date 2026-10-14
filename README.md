@@ -8,6 +8,9 @@ rewrite a passage or check your continuity, Plume picks the few bible entries
 that scene needs and sends only those. It works with your own Claude
 subscription through the `claude` command line: no API key, no account with us,
 and a request costs about 830 tokens of overhead instead of tens of thousands.
+When your plan runs out, Plume can carry on with any model on
+[OpenRouter](https://openrouter.ai) (your own key), and named model presets
+keep the choice to one short list.
 
 Your books are plain folders of Markdown files on your disk. Open them in any
 editor, back them up however you like.
@@ -75,6 +78,9 @@ To build it yourself, see [CONTRIBUTING.md](CONTRIBUTING.md).
 - Your books never leave your computer, except the passages and bible entries
   sent to Claude when you ask for something, through your own `claude` CLI.
 - Secret bible entries and private notes are never sent.
+- If you turn on OpenRouter, the passages and entries of a request go to
+  OpenRouter and the model you chose instead of Claude. Your key stays on your
+  computer, never in a book.
 - LanguageTool (optional, off unless chosen) sends the scene you check to the
   server you set; a server on your own computer keeps it all local.
 

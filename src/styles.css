@@ -728,3 +728,8 @@ body.pl-typing .pl-toolbar { opacity: 0.08; }
 
 .pl-shortcuts { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
 .pl-shortcuts kbd { min-width: 9.5rem; font: inherit; font-size: 12px; padding: 2px 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface-1); }
+
+/* Model presets. */
+.pl-preset { display: grid; grid-template-columns: minmax(8rem, 1fr) 7.5rem 8.5rem 2rem; gap: 8px; align-items: center; padding: 3px 0; }
+.pl-preset-model { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; grid-column: span 2; text-align: left; font-size: 12px; }
+.pl-model-row { width: 100%; text-align: left; }

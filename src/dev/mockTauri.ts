@@ -63,6 +63,11 @@ async function invoke(cmd: string, args: any = {}): Promise<unknown> {
       const id = args.id
       const line = (o: unknown) => emit('claude-line', { id, line: JSON.stringify(o) })
       ;(window as any).__lastClaude = { system: args.system, message: args.message, model: args.model, effort: args.effort }
+      // window.__mockLimit = true: the plan is used up (to try the OpenRouter fallback).
+      if ((window as any).__mockLimit) {
+        setTimeout(() => { line({ type: 'result', is_error: true, result: 'Usage limit reached: resets at 5pm' }); emit('claude-done', { id, code: 1, stderr: '' }) }, 80)
+        return null
+      }
       let i = 0
       const words = REPLY.split(/(?<= )/)
       const timer = setInterval(() => {

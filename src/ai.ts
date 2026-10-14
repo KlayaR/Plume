@@ -1,8 +1,8 @@
 // One-shot Claude tasks outside the editor's proposals: voice description,
 // summaries, bible drafts, checks, chat, agent tasks. Each uses the lean CLI
 // call, records real usage, and resolves with the reply text.
-import { cancelClaude, runClaude } from './lib/claude'
 import type { Effort, Model } from './lib/types'
+import { canRun, cancelLLM, choose, runLLM } from './llm'
 import { useStore } from './store'
 import { t } from './i18n'
 
@@ -11,6 +11,8 @@ export interface AskOptions {
   message: string
   model?: Model
   effort?: Effort
+  /** A model preset id (Settings → Claude); overrides model and effort. */
+  preset?: string
   /** Text as it streams in. */
   onText?: (text: string) => void
   /** Agent tasks only: tools the CLI may use, and the folder it works in (read-only tools). */
@@ -35,11 +37,12 @@ let current: string | null = null
 
 export function ask(o: AskOptions): Promise<string> {
   const st = useStore.getState()
-  if (!st.claudeExe) return Promise.reject(new Error(t('The claude command line was not found. Set its path in Settings.')))
-  const { model, effort } = effective(o.model ?? 'sonnet', o.effort ?? 'low')
+  if (!canRun()) return Promise.reject(new Error(t('The claude command line was not found. Set its path in Settings.')))
+  const c = choose({ model: o.model ?? 'sonnet', effort: o.effort ?? 'low', preset: o.preset })
+  const { model, effort } = effective(c.model, c.effort)
   return new Promise((resolve, reject) => {
-    runClaude(
-      { exe: st.claudeExe!, model, effort, system: o.system, message: o.message, tools: o.tools, cwd: o.cwd },
+    runLLM(
+      { model, effort, preset: c.preset, system: o.system, message: o.message, tools: o.tools, cwd: o.cwd },
       text => o.onText?.(text),
       r => {
         current = null
@@ -52,7 +55,7 @@ export function ask(o: AskOptions): Promise<string> {
 }
 
 /** Stops the task running now, if any. */
-export const stopAsk = () => { if (current) cancelClaude(current) }
+export const stopAsk = () => { if (current) cancelLLM(current) }
 
 /** The first JSON array or object in a reply (Claude sometimes wraps it in prose or a code fence). */
 export function parseJSON<T>(text: string): T | null {

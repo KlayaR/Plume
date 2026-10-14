@@ -7,6 +7,15 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.12.0
+**Other models, and model presets**
+- **OpenRouter** (Settings -> Claude): add your OpenRouter key and Plume can use hundreds of other models, or keep you writing when your Claude plan runs out. "Use OpenRouter": Never, **When Claude runs out** (the request that failed because of the usage limit is repeated on your fallback model, with a notice; and once the plan's window is full, requests go straight there), or Always. The key stays on your computer, never in a book. "Test" checks it and shows your remaining credit.
+- **Model presets:** a preset is a named choice of model and effort ("Quick", "Writing", "Deep" to start with). The AI panel and Settings -> This book now show one short list of presets instead of a model list plus an effort list. Add your own Claude presets, or **OpenRouter models picked from a searchable list** (462 at the time of writing, with context size and price) so you never scroll the whole list again.
+- Agent tasks that read files still need the Claude command line; everything else (continue, rewrite, quick actions, chat, summaries, checks) can run on OpenRouter.
+
+**Tested and fixed**
+- The whole app was walked through (every tab, dialog and export, find and replace, comments, moving cards between chapters, chat, the AI panel) with no errors found. Two small fixes: the HTML export format showed in English in the French interface, and front matter pages (dedication, epigraph) showed a page number in Page view.
+
 ## 0.11.0
 **Bible, tuned for the AI**
 - **AI check** (Bible tab): what makes the AI's context worse, found locally for free: entries without a short version, short versions over ~90 tokens, huge full versions, characters without a voice card, POV characters without "Knows / Doesn't know", entries that answer to the same name, short lower-case aliases that match ordinary words, entries that always appear together but aren't linked, names used in the text but missing from the bible. One-click fixes; "Write the missing short versions" does them all with Haiku.

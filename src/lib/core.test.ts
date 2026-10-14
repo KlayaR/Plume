@@ -5,6 +5,7 @@ import { autoCapitalRule, fixTypography, loneI, typingRule } from './typography'
 import { pasteText, wrapMarks } from './paste'
 import { matterPages, FRONT, BACK } from './matter'
 import { checkBible } from './bibleCheck'
+import { chatBody, DEFAULT_PRESETS, httpMessage, isLimitError, presetFor, readEvent, readModels, searchModels, splitSSE } from './presets'
 import { attention } from './attention'
 import { beatFlags, beatTension } from './structures'
 import { lastWords, locateQuote, slugify } from './text'
@@ -628,5 +629,52 @@ describe('comment anchors', () => {
     expect(locateQuote(text, 'no', 12)).toBe(9)
     expect(locateQuote(text, 'no', 20)).toBe(18)
     expect(locateQuote(text, 'maybe', 0)).toBe(-1)
+  })
+})
+
+describe('model presets', () => {
+  const or = { id: 'r1', name: 'Cheap writer', backend: 'openrouter' as const, model: 'deepseek/deepseek-chat', effort: 'low' as const }
+  it('finds the preset an action stands for', () => {
+    expect(presetFor({ model: 'sonnet', effort: 'low' }, DEFAULT_PRESETS)?.id).toBe('writing')
+    expect(presetFor({ model: 'opus', effort: 'high' }, DEFAULT_PRESETS)?.id).toBe('deep')
+    expect(presetFor({ model: 'haiku', effort: 'high' }, DEFAULT_PRESETS)).toBeNull()
+    expect(presetFor({ model: 'sonnet', effort: 'low', preset: 'r1' }, [...DEFAULT_PRESETS, or])).toBe(or)
+    expect(presetFor({ model: 'sonnet', effort: 'low', preset: 'gone' }, DEFAULT_PRESETS)?.id).toBe('writing')
+  })
+  it('recognises a used-up plan', () => {
+    expect(isLimitError('Usage limit reached: resets at 5pm')).toBe(true)
+    expect(isLimitError("You've hit your weekly limit")).toBe(true)
+    expect(isLimitError('Claude is not signed in.')).toBe(false)
+    expect(isLimitError(undefined)).toBe(false)
+  })
+})
+
+describe('OpenRouter streaming', () => {
+  it('cuts events across chunks and reads text, comments, errors and the end', () => {
+    const a = splitSSE(': OPENROUTER PROCESSING\n\ndata: {"choices":[{"delta":{"content":"Hel"}}]}\n\ndata: {"choices":[{"del')
+    expect(a.events).toHaveLength(2)
+    expect(readEvent(a.events[0])).toEqual({})
+    expect(readEvent(a.events[1])).toEqual({ text: 'Hel' })
+    const b = splitSSE(a.rest + 'ta":{"content":"lo"}}]}\n\ndata: [DONE]\n\n')
+    expect(readEvent(b.events[0])).toEqual({ text: 'lo' })
+    expect(readEvent(b.events[1])).toEqual({ done: true })
+    expect(readEvent('data: {"error":{"message":"No credits"}}')).toEqual({ error: 'No credits' })
+  })
+  it('builds the request and explains failures', () => {
+    expect(chatBody('m/x', 'Rules', 'Hi').messages).toEqual([{ role: 'system', content: 'Rules' }, { role: 'user', content: 'Hi' }])
+    expect(chatBody('m/x', '  ', 'Hi').messages).toHaveLength(1)
+    expect(httpMessage(402, '')).toContain('no credit')
+    expect(httpMessage(500, '{"error":{"message":"Boom"}}')).toBe('OpenRouter: Boom')
+  })
+  it('reads and searches the model list', () => {
+    const list = readModels({ data: [
+      { id: 'deepseek/deepseek-chat', name: 'DeepSeek V3', context_length: 64000, pricing: { prompt: '0.0000003', completion: '0.0000012' } },
+      { id: 'anthropic/claude-sonnet', name: 'Claude Sonnet', context_length: 200000, pricing: { prompt: '0.000003', completion: '0.000015' } },
+    ] })
+    expect(list.map(m => m.id)).toEqual(['anthropic/claude-sonnet', 'deepseek/deepseek-chat'])
+    expect(list[1].promptPrice).toBeCloseTo(0.3)
+    expect(searchModels(list, 'claude sonnet')).toHaveLength(1)
+    expect(searchModels(list, '')).toHaveLength(2)
+    expect(readModels(null)).toEqual([])
   })
 })

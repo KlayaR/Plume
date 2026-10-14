@@ -48,7 +48,8 @@ before anything is sent.
 - `src/lib/`: pure logic, no React: types, book files, the context engine,
   analysis and review reports, voice rules, structures, export, typography,
   find, the bible check. Tested in `src/lib/core.test.ts`.
-- `src/*.ts` at the top: stores and AI tasks (`ai.ts` one-shot calls and
+- `src/*.ts` at the top: stores and AI tasks (`llm.ts` sends every AI request
+  to the claude command line or to OpenRouter, `ai.ts` one-shot calls and
   cheap mode, `chat.ts`, `writing.ts`, `review.ts`, `library.ts`, `agents.ts`,
   `bibleAI.ts`).
 - `src/editor/`: CodeMirror pieces: typography as you type, AI proposals,

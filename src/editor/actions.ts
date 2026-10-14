@@ -7,7 +7,7 @@ import { buildContext, type Built, type Override } from '../lib/context'
 import { checkRules, fixDirection, type Check } from '../lib/voice'
 import { ask, effective, isCheap } from '../ai'
 import { noteTaste } from '../writing'
-import { cancelClaude, runClaude } from '../lib/claude'
+import { canRun, cancelLLM, choose, runLLM } from '../llm'
 import { findScene, useStore } from '../store'
 import { t } from '../i18n'
 import { acceptProposal, appendProposal, discardProposal, endStream, proposalField, setProposal } from './cm'
@@ -62,18 +62,19 @@ export function currentContext(action: ActionId, instruction: string, overrides:
 export async function runAction(action: ActionId, instruction: string, overrides: Record<string, Override>) {
   const st = useStore.getState()
   if (!view || !st.book || useAI.getState().running) return
-  if (!st.claudeExe) return st.notify('error', t('The claude command line was not found. Set its path in Settings.'))
+  if (!canRun()) return st.notify('error', t('The claude command line was not found. Set its path in Settings.'))
   if (view.state.field(proposalField)) return st.notify('warn', t('Accept or discard the current proposal first.'))
   if (isRewrite(action) && view.state.selection.main.empty) return st.notify('warn', t('Select the passage to rewrite first.'))
   if (action === 'beats' && !instruction.trim()) return st.notify('warn', t('Write the beats first, one per line.'))
   const ctx = currentContext(action, instruction, overrides)
   if (!ctx) return
-  const settings = effective(st.book.meta.ai.actions[action].model, st.book.meta.ai.actions[action].effort)
+  const chosen = choose(st.book.meta.ai.actions[action])
+  const settings = effective(chosen.model, chosen.effort)
   const v = view
   v.dispatch({ effects: setProposal.of({ from: ctx.from, to: ctx.to, text: '', streaming: true }) })
   useAI.setState({ last: { action, instruction, overrides }, hasProposal: true, running: 'starting', checks: [] })
-  const id = await runClaude(
-    { exe: st.claudeExe, model: settings.model, effort: settings.effort, system: ctx.system, message: ctx.message },
+  const id = await runLLM(
+    { model: settings.model, effort: settings.effort, preset: chosen.preset, system: ctx.system, message: ctx.message },
     // The reply goes to the scene it was asked for, even if another scene is active by now.
     text => { if (v.dom.isConnected) v.dispatch({ effects: appendProposal.of(text) }) },
     r => {
@@ -102,7 +103,7 @@ export function fillPlaceholder(v: EditorView, from: number, to: number, note: s
 
 export function stopAction() {
   const id = useAI.getState().running
-  if (id && id !== 'starting') cancelClaude(id)
+  if (id && id !== 'starting') cancelLLM(id)
 }
 
 const proposalText = () => (view?.state.field(proposalField, false) as { text?: string } | null | undefined)?.text ?? ''
@@ -151,7 +152,7 @@ export async function alternatives(action: ActionId, instruction: string, overri
   const s = st.book.meta.ai.actions[action]
   useAI.setState({ running: 'alternatives', last: { action, instruction, overrides } })
   try {
-    const texts = await Promise.all(Array.from({ length: n }, () => ask({ model: s.model, effort: s.effort, system: ctx.system, message: ctx.message }).catch(() => '')))
+    const texts = await Promise.all(Array.from({ length: n }, () => ask({ model: s.model, effort: s.effort, preset: s.preset, system: ctx.system, message: ctx.message }).catch(() => '')))
     return { texts: texts.map(x => x.trim()).filter(Boolean), from: ctx.from, to: ctx.to }
   } finally { useAI.setState({ running: null }) }
 }

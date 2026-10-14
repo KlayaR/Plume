@@ -230,7 +230,7 @@ export default function BookView({ scopeOverride }: { scopeOverride?: 'book' } =
                     </p>
                   ))}
               </div>
-              {prefs.pageNumbers && !pg.opening && <div className="pl-bk-folio">{i + 1}</div>}
+              {prefs.pageNumbers && !pg.opening && !pg.blocks[0]?.center && <div className="pl-bk-folio">{i + 1}</div>}
             </div>
           </div>
         ))}
