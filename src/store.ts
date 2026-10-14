@@ -81,6 +81,8 @@ export interface Prefs {
   typewriter: boolean
   /** Capital letters as you type (sentence starts, English I); Ctrl+Z right after takes one back. */
   autoCapital: boolean
+  /** Look for a new version of Plume at startup. */
+  autoUpdate: boolean
   /** Version of the saved prefs, for one-time upgrades. */
   v?: number
 }
@@ -116,6 +118,7 @@ export const DEFAULT_PREFS: Prefs = {
   ltLive: false,
   typewriter: false,
   autoCapital: true,
+  autoUpdate: true,
   v: 2,
 }
 
@@ -129,7 +132,7 @@ function loadPrefs(): Prefs {
   return p
 }
 
-export interface Toast { kind: 'error' | 'warn' | 'ok'; msg: string; action?: { label: string; run: () => void } }
+export interface Toast { kind: 'error' | 'warn' | 'ok'; msg: string; action?: { label: string; run: () => void }; sticky?: boolean }
 
 function load<T>(key: string, fallback: T): T {
   try { return { ...fallback, ...JSON.parse(localStorage.getItem(key) ?? 'null') } } catch { return fallback }

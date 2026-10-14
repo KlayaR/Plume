@@ -13,6 +13,7 @@ import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { useEffect } from 'react'
 import { backupNow, joinSeries, listBackups, seriesName } from '../library'
 import { LT_DEFAULT, ltTest } from '../lib/languagetool'
+import { checkForUpdate, offerUpdate } from '../updates'
 
 const ACTIONS: [ActionId, string][] = [['continue', 'Continue'], ['rewrite', 'Rewrite selection'], ['beats', 'Beats to prose']]
 type Tab = 'appearance' | 'manuscript' | 'writing' | 'voice' | 'claude' | 'book' | 'about'
@@ -61,11 +62,37 @@ export default function SettingsView({ version }: { version: string }) {
                 {book && <><dt>{t('Book')}</dt><dd>{book.root}</dd></>}
                 <dt>{t('Design')}</dt><dd>{t('After NEO by Hugh Howey (MIT)')}</dd>
               </dl>
+              <UpdatesRows />
             </SettingsSection>
           )}
         </div>
       </div>
     </Dialog>
+  )
+}
+
+/** Updates: on or off at startup, and a check on demand. */
+function UpdatesRows() {
+  const prefs = useStore(s => s.prefs)
+  const setPrefs = useStore(s => s.setPrefs)
+  const t = useT()
+  const [result, setResult] = useState('')
+  const checkNow = async () => {
+    setResult(t('Checking…'))
+    try {
+      const update = await checkForUpdate()
+      if (update) { setResult(''); offerUpdate(update) } else setResult(t('Plume is up to date.'))
+    } catch (e) { setResult(t('Could not check for updates: {e}', { e: String(e) })) }
+  }
+  return (
+    <>
+      <SettingRow label={t('Check for updates at startup')} description={t('Plume asks before installing a new version, and saves your work first.')}>
+        <Switch checked={prefs.autoUpdate} onChange={v => setPrefs({ autoUpdate: v })} label={t('Check for updates at startup')} />
+      </SettingRow>
+      <SettingRow label={t('Updates')} description={result || undefined}>
+        <button type="button" className="sk-btn sk-btn-sm" onClick={checkNow}>{t('Check now')}</button>
+      </SettingRow>
+    </>
   )
 }
 

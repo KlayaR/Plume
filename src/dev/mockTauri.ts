@@ -91,6 +91,12 @@ async function invoke(cmd: string, args: any = {}): Promise<unknown> {
     case 'file_mtime': return 0
     case 'device_name': return 'MOCK-PC'
     case 'plugin:dialog|save': return 'C:\\Users\\Test\\Export'
+    // Set window.__mockUpdate = '0.2.0' to be offered that version.
+    case 'plugin:updater|check': {
+      const v = (window as any).__mockUpdate
+      return v ? { rid: 1, currentVersion: '0.1.0-mock', version: v, body: 'Notes', rawJson: {} } : null
+    }
+    case 'plugin:updater|download_and_install': (window as any).__installed = true; return null
     default:
       return null // window theme and other plugin calls
   }
