@@ -1,7 +1,7 @@
 // Plan helpers: story-structure templates with where each beat is expected
 // (as a share of the book), and reading story time ("Day 3, 22:00") off cards.
 import type { Book, Lang, Scene } from './types'
-import { countWords } from './text'
+import { countWords, foldText } from './text'
 
 export interface Template { id: string; name: string; beats: { en: string; fr: string; at: number }[] }
 
@@ -37,6 +37,30 @@ export const TEMPLATES: Template[] = [
 
 export const templateBeats = (id: string, lang: Lang) =>
   (TEMPLATES.find(t => t.id === id)?.beats ?? []).map(x => ({ name: x[lang], at: x.at, note: '', sceneId: null as string | null }))
+
+/** Does this beat usually peak or breathe? Read from its name (English or French). */
+export function beatTension(name: string): 'high' | 'low' | null {
+  const f = foldText(name)
+  if (/ordinary world|monde ordinaire|opening image|image d.ouverture|set-?up|mise en place|exposition|resolution|denouement|final image|image finale|return with|retour avec|zone de confort|^ki|ketsu|theme/.test(f)) return 'low'
+  if (/climax|ordeal|epreuve supreme|all is lost|tout est perdu|finale|^final$|^final |dark night|nuit noire|disaster|desastre|resurrection|pinch|pincement|midpoint|point median|plot point|plot turn|tournant|retournement|ten:/.test(f)) return 'high'
+  return null
+}
+
+export interface BeatFlag { beat: string; sceneId: string; sceneTitle: string; tension: number; kind: 'calm' | 'tense' }
+
+/** Beats placed on a scene whose rated tension disagrees with what the beat usually is. */
+export function beatFlags(book: Book): BeatFlag[] {
+  const scenes = new Map(book.chapters.flatMap(c => c.scenes).map(s => [s.id, s]))
+  const out: BeatFlag[] = []
+  for (const b of book.meta.structure.beats) {
+    const s = b.sceneId ? scenes.get(b.sceneId) : undefined
+    if (!s || s.tension === undefined) continue
+    const kind = beatTension(b.name)
+    if (kind === 'high' && s.tension < 5) out.push({ beat: b.name, sceneId: s.id, sceneTitle: s.title, tension: s.tension, kind: 'calm' })
+    if (kind === 'low' && s.tension >= 8) out.push({ beat: b.name, sceneId: s.id, sceneTitle: s.title, tension: s.tension, kind: 'tense' })
+  }
+  return out
+}
 
 /** Where each scene starts and ends in the book, as a share of its words (0–100). */
 export function scenePositions(book: Book): Map<string, { start: number; end: number }> {

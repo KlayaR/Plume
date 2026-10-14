@@ -21,6 +21,8 @@ import { AgentDialog, ExportDialog, PrintView, TourDialog } from './components/B
 import FindDialog from './components/FindDialog'
 import OutlineDialog from './components/OutlineDialog'
 import SynonymDialog from './components/SynonymDialog'
+import EntryFromText from './components/EntryFromText'
+import ShortcutsDialog from './components/ShortcutsDialog'
 import SnapshotsDialog from './components/SnapshotsDialog'
 
 export default function App() {
@@ -56,7 +58,12 @@ export default function App() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === ',') { e.preventDefault(); useStore.setState({ showSettings: true }) }
-      // Find and replace across the book.
+      if ((e.ctrlKey || e.metaKey) && e.key === '/' && useStore.getState().book) { e.preventDefault(); useStore.setState({ dialog: 'shortcuts' }) }
+      // Ctrl+Z in the Plan, outside any text field: take back the last card or chapter move.
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z' && useStore.getState().view === 'plan' && !(e.target as HTMLElement | null)?.closest?.('input, textarea, select, [contenteditable]')) {
+        if (useStore.getState().undoMove()) e.preventDefault()
+      }
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'b' && useStore.getState().book) { e.preventDefault(); useStore.setState({ dialog: 'entry' }) }
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'y' && useStore.getState().book) { e.preventDefault(); useStore.setState({ dialog: 'synonyms' }) }
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'f' && useStore.getState().book) { e.preventDefault(); useStore.setState({ dialog: 'find' }) }
     }
@@ -86,6 +93,8 @@ export default function App() {
       {book && dialog === 'outline' && <OutlineDialog onClose={() => useStore.setState({ dialog: null })} />}
       {book && dialog === 'synonyms' && <SynonymDialog onClose={() => useStore.setState({ dialog: null })} />}
       {book && dialog === 'snapshots' && <SnapshotsDialog onClose={() => useStore.setState({ dialog: null })} />}
+      {book && dialog === 'entry' && <EntryFromText onClose={() => useStore.setState({ dialog: null })} />}
+      {book && dialog === 'shortcuts' && <ShortcutsDialog onClose={() => useStore.setState({ dialog: null })} />}
       {book && dialog === 'tour' && <TourDialog onClose={() => useStore.setState({ dialog: null })} />}
       {book && dialog === 'agents' && <AgentDialog onClose={() => useStore.setState({ dialog: null })} />}
       {book && printing && <PrintView />}

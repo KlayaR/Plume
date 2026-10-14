@@ -8,8 +8,10 @@ import { Conflict, loadBook, makeChapter, makeEntry, makeScene, reread, saveChap
 import { parseEntry, parseScene } from './lib/bible'
 import { t } from './i18n'
 
+const undos: (() => void)[] = []
+
 export type View = 'bible' | 'plan' | 'manuscript'
-export type BibleTab = 'entry' | 'review' | 'tracker' | 'map' | 'relations' | 'contradictions'
+export type BibleTab = 'entry' | 'review' | 'aicheck' | 'tracker' | 'map' | 'relations' | 'contradictions'
 export type PlanTab = 'board' | 'structure' | 'timeline' | 'lines' | 'dashboard' | 'revision'
 /** What the right pane of the Manuscript shows in Write mode. */
 export type RightTab = 'write' | 'chat' | 'notes'
@@ -50,6 +52,8 @@ export interface Prefs {
   showSceneTitle: boolean
   showPov: boolean
   showStatus: boolean
+  /** Story time and place of the scene, above the text. */
+  showWhere: boolean
   /** Page numbers in Page (book) view. */
   pageNumbers: boolean
   /** Cheap mode: past this % of the 5-hour limit, AI calls use Haiku (0 = off). */
@@ -95,6 +99,7 @@ export const DEFAULT_PREFS: Prefs = {
   showSceneTitle: true,
   showPov: true,
   showStatus: true,
+  showWhere: true,
   pageNumbers: true,
   cheapAt: 0,
   chatOpen: false,
@@ -160,7 +165,7 @@ interface State {
   /** A place to go to in a scene: the editor selects it once the scene is open. */
   jump: { sceneId: string; from: number; to: number } | null
   /** The book's big dialogs, and the PDF print view. */
-  dialog: 'export' | 'agents' | 'tour' | 'find' | 'snapshots' | 'outline' | 'synonyms' | null
+  dialog: 'export' | 'agents' | 'tour' | 'find' | 'snapshots' | 'outline' | 'synonyms' | 'entry' | 'shortcuts' | null
   printing: boolean
 
   open: (root: string) => Promise<void>
@@ -171,6 +176,8 @@ interface State {
   selectEntry: (slug: string | null) => void
   updateScene: (id: string, patch: Partial<Scene>) => void
   updateChapter: (id: string, patch: Partial<Chapter>) => void
+  /** Takes back the last move of a card or chapter in the Plan. */
+  undoMove: () => boolean
   addChapter: (title: string, opts?: { stay?: boolean }) => string
   /** Adds a scene at the end of a chapter; `stay` keeps the current view (the Plan board). */
   addScene: (chapterId: string, title: string, opts?: { stay?: boolean; note?: string }) => string
@@ -219,6 +226,9 @@ export const findScene = (book: Book | null, id: string | null) => {
 }
 
 export const useStore = create<State>((set, get) => {
+  // Undo for moves in the Plan (cards and chapters): each move leaves the move that reverses it.
+  let undoing = false
+  const remember = (inverse: () => void) => { if (!undoing) { undos.push(inverse); if (undos.length > 40) undos.shift() } }
   const mutate = (f: (b: Book) => Book) => { const b = get().book; if (b) set({ book: f(b) }) }
   // Today's words for the goals, at most every half minute.
   let progressAt = 0
@@ -327,8 +337,18 @@ export const useStore = create<State>((set, get) => {
       saveScene(b.root, sc).then(() => saveMeta(get().book!)).catch(fail)
       return sc.id
     },
+    undoMove: () => {
+      const f = undos.pop()
+      if (!f) return false
+      undoing = true
+      try { f() } finally { undoing = false }
+      get().notify('ok', t('Move undone.'))
+      return true
+    },
     moveChapter: (id, toIndex) => {
       const b = get().book!
+      const was = b.chapters.findIndex(c => c.id === id)
+      remember(() => get().moveChapter(id, was))
       const chapters = b.chapters.filter(c => c.id !== id)
       const ch = b.chapters.find(c => c.id === id)
       if (!ch) return
@@ -380,10 +400,13 @@ export const useStore = create<State>((set, get) => {
       const found = findScene(get().book, sceneId)
       if (!found) return
       const b = get().book!
+      const from = { chapter: found.chapter.id, index: found.index }
+      remember(() => get().moveScene(sceneId, from.chapter, from.index))
       if (found.chapter.id !== toChapterId) {
         // A scene file lives in its chapter's folder: write it there, trash the old copy.
         const to = b.chapters.find(c => c.id === toChapterId)!
-        const moved = { ...makeScene(to, found.scene.title), id: found.scene.id, pov: found.scene.pov, status: found.scene.status, text: found.scene.text }
+        // Everything about the scene travels with it (notes, time, place, lines, summary, tension, comments); only its file moves.
+        const moved = { ...found.scene, path: makeScene(to, found.scene.title).path }
         cancelLater(found.scene.path)
         const chapters = b.chapters.map(c => {
           let scenes = c.scenes.filter(s => s.id !== sceneId)

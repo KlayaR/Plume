@@ -7,6 +7,7 @@ import { findScene, useStore } from '../store'
 import { getEditorView } from '../editor/actions'
 import { addComment, diffWords, dropDarling, listVersions, readVersion, removeComment, restoreDarling, snapshot, staleScenes, summarizeScene, updateSummaries, useNotes, type DiffPart } from '../writing'
 import { hashText } from '../ai'
+import { locateQuote } from '../lib/text'
 import { useT } from '../i18n'
 import { PassChecks } from './Revision'
 
@@ -24,9 +25,9 @@ export default function NotesPanel() {
   const stale = staleScenes(book).length
   const fresh = scene.summaryOf === hashText(scene.text)
 
-  const jump = (quote: string) => {
+  const jump = (quote: string, near?: number) => {
     const v = getEditorView()
-    const at = v ? v.state.doc.toString().indexOf(quote) : -1
+    const at = v ? locateQuote(v.state.doc.toString(), quote, near) : -1
     if (v && at >= 0) { v.dispatch({ selection: { anchor: at, head: at + quote.length }, scrollIntoView: true }); v.focus() }
   }
 
@@ -37,7 +38,7 @@ export default function NotesPanel() {
         <span className="sk-label">{t('Comments')}</span>
         {(scene.comments ?? []).map(c => (
           <div key={c.id} className="pl-comment">
-            <button type="button" className="pl-quiet pl-comment-quote" onClick={() => jump(c.quote)} title={t('Show in the text')}>« {c.quote.slice(0, 80)}{c.quote.length > 80 ? '…' : ''} »</button>
+            <button type="button" className="pl-quiet pl-comment-quote" onClick={() => jump(c.quote, c.at)} title={t('Show in the text')}>« {c.quote.slice(0, 80)}{c.quote.length > 80 ? '…' : ''} »</button>
             <div className="pl-row"><span className="pl-grow">{c.text}</span>
               <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm sk-btn-icon" onClick={() => removeComment(scene.id, c.id)} aria-label={t('Delete')}><Trash2 size={12} /></button>
             </div>

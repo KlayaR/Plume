@@ -4,7 +4,8 @@ import { useEffect, useRef } from 'react'
 import { Compartment, EditorState } from '@codemirror/state'
 import { EditorView, keymap, placeholder } from '@codemirror/view'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
-import { useStore } from '../store'
+import { findScene, useStore } from '../store'
+import { locateQuote } from '../lib/text'
 import { t } from '../i18n'
 import type { Entry, Lang, Scene } from '../lib/types'
 import { buildMatcher, findMentions } from '../lib/context'
@@ -62,7 +63,7 @@ const unknown = unknownNamesExt({
 export function commentHighlights(text: string, comments: Comment[] | undefined): Highlight[] {
   const out: Highlight[] = []
   for (const c of comments ?? []) {
-    const at = c.quote ? text.indexOf(c.quote) : -1
+    const at = locateQuote(text, c.quote, c.at)
     if (at >= 0) out.push({ from: at, to: at + c.quote.length, cls: 'cm-comment', title: c.text })
   }
   return out
@@ -145,7 +146,12 @@ function makeState(s: Scene, lang: Lang) {
         },
       }),
       EditorView.updateListener.of(u => {
-        if (u.docChanged) useStore.getState().updateScene(s.id, { text: u.state.doc.toString() })
+        if (u.docChanged) {
+          // Margin comments follow the text they were made on.
+          const cur = findScene(useStore.getState().book, s.id)?.scene.comments
+          const moved = cur?.some(c => c.at !== undefined && u.changes.mapPos(c.at) !== c.at)
+          useStore.getState().updateScene(s.id, { text: u.state.doc.toString(), ...(moved ? { comments: cur!.map(c => c.at === undefined ? c : { ...c, at: u.changes.mapPos(c.at) }) } : {}) })
+        }
         if (u.docChanged || u.selectionSet) {
           clearTimeout(tick)
           tick = setTimeout(() => useStore.getState().bumpEditor(), 250)

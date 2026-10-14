@@ -82,6 +82,7 @@ export function parseEntry(path: string, text: string): Entry {
     voice,
     knows: str(data.knows),
     unaware: str(data.unaware),
+    notes: str(data.notes),
     image: str(data.image),
     kind: (['any', 'dialogue', 'action', 'description', 'introspection'].includes(String(data.kind)) ? data.kind : undefined) as ExcerptKind | undefined,
     resolved: data.resolved === true ? true : undefined,
@@ -100,7 +101,7 @@ export function parseEntry(path: string, text: string): Entry {
   }
 }
 
-const ENTRY_KEYS = ['type', 'name', 'aliases', 'include', 'links', 'voice', 'knows', 'unaware', 'image', 'kind', 'resolved']
+const ENTRY_KEYS = ['type', 'name', 'aliases', 'include', 'links', 'voice', 'knows', 'unaware', 'notes', 'image', 'kind', 'resolved']
 const SCENE_KEYS = ['id', 'title', 'pov', 'status', 'note', 'time', 'place', 'lines', 'summary', 'summaryOf', 'comments', 'tension', 'passes']
 const rest = (data: Record<string, unknown>, known: string[]) => Object.fromEntries(Object.entries(data).filter(([k]) => !known.includes(k)))
 const filled = (v: VoiceCard | undefined) => (v && Object.values(v).some(x => x.trim()) ? v : undefined)
@@ -110,7 +111,7 @@ export function serializeEntry(e: Entry): string {
   if (e.aliases.length) data.aliases = e.aliases
   data.include = e.include
   if (e.links.length) data.links = e.links
-  Object.assign(data, { voice: filled(e.voice), knows: e.knows, unaware: e.unaware, image: e.image, kind: e.kind, resolved: e.resolved }, e.extra)
+  Object.assign(data, { voice: filled(e.voice), knows: e.knows, unaware: e.unaware, notes: e.notes || undefined, image: e.image, kind: e.kind, resolved: e.resolved }, e.extra)
   const body = [
     `## Short\n${e.short.trim()}`,
     `## Full\n${e.full.trim()}`,
@@ -138,7 +139,7 @@ export function parseScene(path: string, text: string): Scene {
     tension: Number.isFinite(Number(data.tension)) && data.tension !== undefined && data.tension !== '' ? Math.max(0, Math.min(10, Number(data.tension))) : undefined,
     passes: data.passes ? asList(data.passes) : undefined,
     comments: Array.isArray(data.comments)
-      ? (data.comments as Record<string, unknown>[]).map(c => ({ id: String(c.id ?? ''), quote: String(c.quote ?? ''), text: String(c.text ?? ''), date: String(c.date ?? '') }))
+      ? (data.comments as Record<string, unknown>[]).map(c => ({ id: String(c.id ?? ''), quote: String(c.quote ?? ''), text: String(c.text ?? ''), date: String(c.date ?? ''), ...(Number.isFinite(Number(c.at)) && c.at !== undefined ? { at: Number(c.at) } : {}) }))
       : [],
     extra: rest(data, SCENE_KEYS),
   }

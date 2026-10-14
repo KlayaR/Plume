@@ -4,7 +4,10 @@ import { buildContext, buildMatcher, findMentions } from './context'
 import { autoCapitalRule, fixTypography, loneI, typingRule } from './typography'
 import { pasteText, wrapMarks } from './paste'
 import { matterPages, FRONT, BACK } from './matter'
-import { lastWords, slugify } from './text'
+import { checkBible } from './bibleCheck'
+import { attention } from './attention'
+import { beatFlags, beatTension } from './structures'
+import { lastWords, locateQuote, slugify } from './text'
 import { allowedKinds, chapterLabels, enterStartsScene } from './chapters'
 import { countSigns, textStats } from './stats'
 import type { Book, Entry, Scene } from './types'
@@ -551,5 +554,79 @@ describe('front and back matter', () => {
     const html = toHtml(withMatter, { ...o, format: 'html' })
     expect(html).toContain('<h2 class="part">Part One</h2>')
     expect(html).toContain('id="about"')
+  })
+})
+
+describe('bible AI check', () => {
+  const kara = entry({ slug: 'kara', name: 'Kara', full: 'A thief of the docks.', include: 'auto' })
+  const dax = entry({ slug: 'dax', name: 'Dax', short: 'Her fence.', full: 'Sells what she steals.' })
+  const clone = entry({ slug: 'kara-2', name: 'Kara Voss', aliases: ['Kara'], short: 'Another.' })
+  const three = ['Kara met Dax.', 'Kara and Dax ran.', 'Dax paid Kara.'].map((t, i) => scene('s' + i, t, { pov: 'kara' }))
+  const book = bookOf(three, [kara, dax, clone])
+  const kinds = (b: Book) => checkBible(b).issues.map(i => i.kind)
+  it('finds what makes the AI context worse', () => {
+    const k = kinds(book)
+    expect(k).toContain('no-short')
+    expect(k).toContain('no-voice')
+    expect(k).toContain('no-knows')
+    expect(k).toContain('duplicate')
+    expect(k).toContain('unlinked')
+  })
+  it('is quiet about a tidy bible', () => {
+    const tidy = bookOf(three, [
+      entry({ slug: 'kara', name: 'Kara', short: 'A thief.', full: 'A thief.', knows: 'The docks.', links: ['dax'], voice: { register: 'curt', sentences: '', tic: '', gesture: '', never: '', inner: '', lines: '' } }),
+      entry({ slug: 'dax', name: 'Dax', type: 'creature', short: 'Her fence.', full: 'Her fence.' }),
+    ])
+    expect(checkBible(tidy).issues.filter(i => i.severity === 'warn')).toEqual([])
+  })
+  it('warns about a short, lower-case alias', () => {
+    expect(kinds(bookOf(three, [entry({ slug: 'kara', name: 'Kara', short: 'x', aliases: ['the'] })]))).toContain('common-alias')
+  })
+})
+
+describe('private notes and new entry types', () => {
+  it('keeps notes in the file and out of the AI context', () => {
+    const e = { ...entry({ slug: 'orb', type: 'magic', path: 'bible/magic/orb.md', name: 'Orb', short: 'Glows.' }), notes: 'secret plan' }
+    const back = parseEntry(e.path, serializeEntry(e))
+    expect(back.notes).toBe('secret plan')
+    expect(back.type).toBe('magic')
+    const b = buildContext({ book: bookOf([], [e]), chapter: 1, pov: null, action: 'continue', instruction: '', before: 'The Orb glowed.', selection: '', after: '', overrides: {} })
+    expect(b.system).toContain('Glows.')
+    expect(b.system).not.toContain('secret plan')
+  })
+})
+
+describe('needs attention', () => {
+  it('lists empty scenes, scenes without a POV and unplaced beats', () => {
+    const base = bookOf([scene('a', 'Written.'), scene('b', '')], [entry({ slug: 'kara', name: 'Kara' })])
+    const book = { ...base, meta: { ...base.meta, structure: { template: 'x', beats: [{ name: 'Climax', at: 90, note: '', sceneId: null }] } } }
+    const kinds = attention(book).map(a => a.kind)
+    expect(kinds).toEqual(expect.arrayContaining(['empty', 'no-pov', 'beats-unplaced', 'next-pass']))
+  })
+})
+
+describe('beats and tension', () => {
+  it('reads whether a beat peaks or breathes', () => {
+    expect(beatTension('Climax')).toBe('high')
+    expect(beatTension('Tout est perdu')).toBe('high')
+    expect(beatTension('Ordinary world')).toBe('low')
+    expect(beatTension('Final image')).toBe('low')
+    expect(beatTension('Debate')).toBeNull()
+  })
+  it('flags a calm scene on a climax', () => {
+    const base = bookOf([scene('a', 'x', { tension: 2 }), scene('b', 'y', { tension: 9 })])
+    const book = { ...base, meta: { ...base.meta, structure: { template: 'x', beats: [
+      { name: 'Climax', at: 90, note: '', sceneId: 'a' }, { name: 'Opening image', at: 0, note: '', sceneId: 'b' }] } } }
+    expect(beatFlags(book).map(f => [f.beat, f.kind])).toEqual([['Climax', 'calm'], ['Opening image', 'tense']])
+  })
+})
+
+describe('comment anchors', () => {
+  it('picks the repeat nearest to where the comment was', () => {
+    const text = 'no. yes. no. yes. no.'
+    expect(locateQuote(text, 'no', 0)).toBe(0)
+    expect(locateQuote(text, 'no', 12)).toBe(9)
+    expect(locateQuote(text, 'no', 20)).toBe(18)
+    expect(locateQuote(text, 'maybe', 0)).toBe(-1)
   })
 })

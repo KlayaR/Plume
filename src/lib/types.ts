@@ -4,7 +4,10 @@
 export type Lang = 'fr' | 'en'
 
 export type EntryType =
-  | 'character' | 'place' | 'object' | 'lore' | 'faction' | 'storyline' | 'theme' | 'wordlist' | 'excerpt' | 'style'
+  | 'character' | 'place' | 'object' | 'lore' | 'magic' | 'creature' | 'event' | 'faction' | 'storyline' | 'theme' | 'wordlist' | 'excerpt' | 'style'
+
+/** Entry types that describe the story world: what outlines and structure suggestions are given. */
+export const WORLD_TYPES: EntryType[] = ['character', 'place', 'faction', 'storyline', 'lore', 'magic', 'creature', 'event']
 
 /** Secret: never sent to the AI, not even when @-mentioned. */
 export type Include = 'auto' | 'always' | 'never' | 'secret'
@@ -31,6 +34,15 @@ export const ENTRY_TYPES: EntryTypeInfo[] = [
   { type: 'lore', folder: 'lore', label: 'Lore & rules', plural: 'Lore & rules', headings: {
     en: ['The rule', 'Its limits', 'Exceptions'],
     fr: ['La règle', 'Ses limites', 'Exceptions'] } },
+  { type: 'magic', folder: 'magic', label: 'Magic & powers', plural: 'Magic & powers', headings: {
+    en: ['How it works', 'The cost', 'Limits', 'Who can use it', 'Signs and effects'],
+    fr: ['Fonctionnement', 'Le prix', 'Limites', 'Qui peut l’utiliser', 'Signes et effets'] } },
+  { type: 'creature', folder: 'creatures', label: 'Creature', plural: 'Bestiary', headings: {
+    en: ['Appearance', 'Abilities', 'Weaknesses', 'Habitat and behaviour', 'In the story'],
+    fr: ['Apparence', 'Capacités', 'Faiblesses', 'Habitat et comportement', 'Dans l’histoire'] } },
+  { type: 'event', folder: 'history', label: 'Event or era', plural: 'History & events', headings: {
+    en: ['What happened', 'When', 'Who was involved', 'Consequences today'],
+    fr: ['Ce qui s’est passé', 'Quand', 'Qui était impliqué', 'Conséquences aujourd’hui'] } },
   { type: 'faction', folder: 'factions', label: 'Faction', plural: 'Factions', headings: {
     en: ['Goals', 'Members', 'Conflicts'],
     fr: ['Objectifs', 'Membres', 'Conflits'] } },
@@ -90,6 +102,8 @@ export interface Entry {
   voice?: VoiceCard
   knows?: string
   unaware?: string
+  /** Your own notes on the entry: kept in the file, never sent to the AI. */
+  notes?: string
   /** A picture in the book folder (bible/images/...). */
   image?: string
   /** Excerpts: the kind of passage it shows. */
@@ -110,6 +124,8 @@ export interface Comment {
   quote: string
   text: string
   date: string
+  /** Where the quote was when last seen (moves with the text), to tell apart repeats of the same words. */
+  at?: number
 }
 
 export interface Scene {

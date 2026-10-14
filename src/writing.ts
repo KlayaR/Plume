@@ -93,11 +93,12 @@ export function dropDarling(id: string) {
 
 export function addComment(view: EditorView, sceneId: string, text: string) {
   const { from, to } = view.state.selection.main
-  const quote = view.state.doc.sliceString(from, to).trim()
+  const raw = view.state.doc.sliceString(from, to)
+  const quote = raw.trim()
   if (!quote) return useStore.getState().notify('warn', t('Select the passage to comment on first.'))
   const scene = findScene(useStore.getState().book, sceneId)?.scene
   if (!scene) return
-  useStore.getState().updateScene(sceneId, { comments: [...(scene.comments ?? []), { id: newId(), quote, text, date: now().slice(0, 10) }] })
+  useStore.getState().updateScene(sceneId, { comments: [...(scene.comments ?? []), { id: newId(), quote, text, date: now().slice(0, 10), at: from + raw.indexOf(quote) }] })
 }
 
 export function removeComment(sceneId: string, id: string) {

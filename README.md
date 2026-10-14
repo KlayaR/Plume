@@ -7,6 +7,29 @@ in with your Claude subscription. No API key.
 Plan: [Plume — Roadmap](https://claude.ai/code/artifact/1bbb8ac1-8e0c-4a44-bed0-fcd2de1d195d) (0.2.0 → 0.9.0) ·
 first spec: [Plume — Step 1 Spec](https://claude.ai/code/artifact/f1897651-066d-49a1-ae39-1357421b88be)
 
+## What 1.1.0 changes
+**Bible, tuned for the AI**
+- **AI check** (Bible tab): what makes the AI's context worse, found locally for free: entries without a short version, short versions over ~90 tokens, huge full versions, characters without a voice card, POV characters without "Knows / Doesn't know", entries that answer to the same name, short lower-case aliases that match ordinary words, entries that always appear together but aren't linked, names used in the text but missing from the bible. One-click fixes; "Write the missing short versions" does them all with Haiku.
+- **Short versions written by Haiku** from the full text (button next to the field), with a token count on both versions.
+- **Private notes** on every entry: kept in the file, never sent to the AI.
+- **Fantasy entry types:** Magic & powers (how it works, the cost, limits), Creature (bestiary), Event or era. They are used by outlines and structure suggestions too.
+- **New entry from the text** (Ctrl+Shift+B): select a name; Claude drafts the entry from the passages that mention it, you edit and add.
+- Each entry shows where it first and last appears and in how many scenes it is the POV.
+
+**Plan**
+- Board: colour cards by POV, story line or tension; show only one POV or story line.
+- Dashboard: "Needs attention" (empty scenes, scenes without POV, unplaced beats, unrated tension, outdated summaries that feed the AI's "story so far", next revision step).
+- Tension: warns when a beat that usually peaks sits on a calm scene, or the reverse.
+- Outline from a premise: untick scenes; a chapter with the same title as one of yours receives the scenes. A new book can start from a premise.
+- **Ctrl+Z in the Plan** takes back the last card or chapter move. **Fixed:** dragging a card to another chapter used to lose its note, time, place, story lines, summary, tension and comments.
+
+**Manuscript**
+- Story time and place are editable in the scene header.
+- Alternatives (x3) can show what changes against your text.
+- Margin comments follow their text when you edit, and find the right repeat of a quote.
+- "Who says what" jumps to the finding in whichever scene it is.
+- Ctrl+/ lists every keyboard shortcut.
+
 ## What 1.0.1 adds (ideas taken from NEO)
 - **Ctrl+Z right after an autocorrect** (smart quote, ellipsis, dash, capital) gives back exactly what you typed.
 - **Automatic capitals** (Settings -> Writing, on by default): a sentence's first letter, and the English "I", as you type. Not after abbreviations (Mr., etc.), initials, ellipses, or ? and ! (a dialogue tag goes on in lower case).

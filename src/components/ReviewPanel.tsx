@@ -100,7 +100,7 @@ export default function ReviewPanel() {
         )}
       </section>
 
-      <Speakers text={text} />
+      <Speakers text={text} scenes={scope === 'scene' ? [scene] : chapter.scenes} />
 
       <AIChecks sceneId={scene.id} chapterId={chapter.id} chapterText={chapter.scenes.map(s => s.text).join('\n')} />
       <ReadAloud />
@@ -110,16 +110,22 @@ export default function ReviewPanel() {
 }
 
 /** Who says what: lines, length and tics per character, and what a voice card says they never say. */
-function Speakers({ text }: { text: string }) {
+function Speakers({ text, scenes }: { text: string; scenes: { id: string; text: string }[] }) {
   const book = useStore(s => s.book)!
   const t = useT()
   const [open, setOpen] = useState(false)
   const list = useMemo(() => open ? speakerStats(text, book) : [], [open, text, book])
   const jump = (from: number, to: number) => {
-    const v = getEditorView()
-    if (!v) return
-    // The text analysed is the scene or chapter shown; a jump works when it is the scene in the editor.
-    if (v.state.doc.toString() === text) { v.dispatch({ selection: { anchor: from, head: to }, scrollIntoView: true }); v.focus() }
+    // The text analysed is the scene, or the chapter's scenes joined by line breaks: find the scene the place falls in.
+    let start = 0
+    for (const s of scenes) {
+      if (from <= start + s.text.length) {
+        useStore.setState({ jump: { sceneId: s.id, from: from - start, to: Math.min(to - start, s.text.length) } })
+        useStore.getState().selectScene(s.id)
+        return
+      }
+      start += s.text.length + 1
+    }
   }
   return (
     <section className="pl-cat">

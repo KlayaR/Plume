@@ -12,7 +12,7 @@ import { pickImage, useImage } from '../lib/images'
 import { acceptProposal, checkContradictions, contradictionCost, rejectProposal, updateProposal, useChat, type Contradiction } from '../chat'
 import { numLocale, useT } from '../i18n'
 
-const NAMED: EntryType[] = ['character', 'place', 'object', 'lore', 'faction', 'storyline', 'theme']
+const NAMED: EntryType[] = ['character', 'place', 'object', 'lore', 'magic', 'creature', 'event', 'faction', 'storyline', 'theme']
 
 // --- Review list ---------------------------------------------------------------
 

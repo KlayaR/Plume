@@ -50,6 +50,9 @@ export default function ManuscriptOptions({ full = false }: { full?: boolean }) 
       <SettingRow label={t('Point of view')}>
         <Switch checked={prefs.showPov} onChange={v => set({ showPov: v })} label={t('Point of view')} />
       </SettingRow>
+      <SettingRow label={t('Story time and place')}>
+        <Switch checked={prefs.showWhere} onChange={v => set({ showWhere: v })} label={t('Story time and place')} />
+      </SettingRow>
       <SettingRow label={t('Status (draft, revised, done)')}>
         <Switch checked={prefs.showStatus} onChange={v => set({ showStatus: v })} label={t('Status (draft, revised, done)')} />
       </SettingRow>

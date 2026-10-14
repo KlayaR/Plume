@@ -53,3 +53,14 @@ export const newId = () => Math.random().toString(36).slice(2, 8)
 
 /** Rough token count: there is no tokenizer offline, ~3.6 characters a token for prose. */
 export const estimateTokens = (s: string) => Math.ceil(s.length / 3.6)
+
+/** Where `quote` is in `text`: the occurrence nearest to `at` when the words repeat, or -1. */
+export function locateQuote(text: string, quote: string, at = 0): number {
+  if (!quote) return -1
+  let best = -1
+  for (let i = text.indexOf(quote); i >= 0; i = text.indexOf(quote, i + 1)) {
+    if (best < 0 || Math.abs(i - at) < Math.abs(best - at)) best = i
+    if (i > at && best >= 0 && i - at > Math.abs(best - at)) break
+  }
+  return best
+}

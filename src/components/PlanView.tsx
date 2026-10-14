@@ -6,7 +6,7 @@ import { useMemo, useState } from 'react'
 import { ask as askDialog } from '@tauri-apps/plugin-dialog'
 import { AlertTriangle, GripVertical, Lightbulb, PenLine, Plus, Sparkles, Trash2, X } from 'lucide-react'
 import { useStore, type PlanTab } from '../store'
-import type { Chapter, LooseCard, Scene, SceneStatus } from '../lib/types'
+import { WORLD_TYPES, type Chapter, type LooseCard, type Scene, type SceneStatus } from '../lib/types'
 import { chapterLabels } from '../lib/chapters'
 import { countWords, newId } from '../lib/text'
 import { parseStoryTime, scenePositions, templateBeats, TEMPLATES, timeFlags } from '../lib/structures'
@@ -51,6 +51,16 @@ function Board() {
   const [zoom, setZoom] = useState(1)
   const [drag, setDrag] = useState<Drag>(null)
   const [selected, setSelected] = useState<string | null>(null)
+  const [colorBy, setColorBy] = useState<'none' | 'pov' | 'line' | 'tension'>('none')
+  const [fPov, setFPov] = useState('')
+  const [fLine, setFLine] = useState('')
+  const characters = book.entries.filter(e => e.type === 'character').sort((a, b) => a.name.localeCompare(b.name))
+  const storyLines = book.entries.filter(e => e.type === 'storyline').sort((a, b) => a.name.localeCompare(b.name))
+  /** The colour a card carries, by what you chose to see. */
+  const tintOf = (s: Scene) => colorBy === 'pov' ? (s.pov ? lineColor(s.pov) : undefined)
+    : colorBy === 'line' ? (s.lines?.[0] ? lineColor(s.lines[0]) : undefined)
+      : colorBy === 'tension' ? (s.tension === undefined ? undefined : `hsl(${120 - s.tension * 12} 55% 48%)`) : undefined
+  const dimmed = (s: Scene) => (!!fPov && s.pov !== fPov) || (!!fLine && !s.lines?.includes(fLine))
   const labels = chapterLabels(book.chapters, book.meta.language)
   const st = useStore.getState
   const fr = book.meta.language === 'fr'
@@ -75,6 +85,17 @@ function Board() {
     <div className="pl-board-wrap">
       <div className="pl-row pl-board-bar">
         <span className="pl-label pl-grow">{t('Drag cards to reorder: the text moves with them. Double-click a card to write it.')}</span>
+        <select className="sk-select sk-btn-sm" value={colorBy} onChange={e => setColorBy(e.target.value as typeof colorBy)} aria-label={t('Colour the cards by')}>
+          <option value="none">{t('No colour')}</option><option value="pov">{t('Colour by POV')}</option><option value="line">{t('Colour by story line')}</option><option value="tension">{t('Colour by tension')}</option>
+        </select>
+        <select className="sk-select sk-btn-sm" value={fPov} onChange={e => setFPov(e.target.value)} aria-label={t('Show only one POV')}>
+          <option value="">{t('All POVs')}</option>{characters.map(c => <option key={c.slug} value={c.slug}>{c.name}</option>)}
+        </select>
+        {storyLines.length > 0 && (
+          <select className="sk-select sk-btn-sm" value={fLine} onChange={e => setFLine(e.target.value)} aria-label={t('Show only one story line')}>
+            <option value="">{t('All story lines')}</option>{storyLines.map(c => <option key={c.slug} value={c.slug}>{c.name}</option>)}
+          </select>
+        )}
         <button type="button" className="sk-btn sk-btn-sm" onClick={() => useStore.setState({ dialog: 'outline' })}><Sparkles size={13} /> {t('Outline from a premise')}</button>
         <label className="pl-row pl-zoom">{t('Zoom')}
           <input type="range" className="sk-slider" min={0.4} max={1.2} step={0.05} value={zoom} onChange={e => setZoom(Number(e.target.value))}
@@ -106,7 +127,7 @@ function Board() {
             </div>
             <input className="pl-col-part" value={c.part ?? ''} placeholder={t('Starts a part: its title')} title={t('A part page goes before this chapter in exports')} onChange={e => st().updateChapter(c.id, { part: e.target.value })} />
             {c.scenes.map((s, si) => (
-              <Card key={s.id} scene={s} active={selected === s.id}
+              <Card key={s.id} scene={s} active={selected === s.id} tint={tintOf(s)} dim={dimmed(s)}
                 onSelect={() => setSelected(selected === s.id ? null : s.id)}
                 onDragStart={() => setDrag({ kind: 'scene', id: s.id })}
                 onDrop={() => dropOn(c, si)} />
@@ -123,14 +144,14 @@ function Board() {
   )
 }
 
-function Card({ scene, active, onSelect, onDragStart, onDrop }: { scene: Scene; active: boolean; onSelect: () => void; onDragStart: () => void; onDrop: () => void }) {
+function Card({ scene, active, tint, dim, onSelect, onDragStart, onDrop }: { scene: Scene; active: boolean; tint?: string; dim?: boolean; onSelect: () => void; onDragStart: () => void; onDrop: () => void }) {
   const book = useStore(s => s.book)!
   const t = useT()
   const pov = book.entries.find(e => e.slug === scene.pov)?.name
   const place = book.entries.find(e => e.slug === scene.place)?.name
   const text = scene.note?.trim() || scene.summary?.trim() || scene.text.split('\n').find(l => l.trim())?.trim() || ''
   return (
-    <div className={`pl-card ${active ? 'pl-card-active' : ''}`} draggable onDragStart={e => { e.stopPropagation(); onDragStart() }}
+    <div className={`pl-card ${active ? 'pl-card-active' : ''} ${dim ? 'pl-card-dim' : ''}`} style={tint ? { borderLeft: `4px solid ${tint}` } : undefined} draggable onDragStart={e => { e.stopPropagation(); onDragStart() }}
       onDragOver={e => e.preventDefault()} onDrop={e => { e.stopPropagation(); onDrop() }}
       onClick={onSelect} onDoubleClick={() => useStore.getState().selectScene(scene.id)}>
       <span className="pl-card-head">
@@ -236,7 +257,7 @@ function Structure() {
   const suggest = async () => {
     setBusy(true)
     try {
-      const bible = book.entries.filter(e => ['character', 'place', 'faction', 'storyline', 'lore'].includes(e.type) && e.include !== 'secret').map(e => `- ${e.name} (${e.type}): ${e.short}`).join('\n')
+      const bible = book.entries.filter(e => WORLD_TYPES.includes(e.type) && e.include !== 'secret').map(e => `- ${e.name} (${e.type}): ${e.short}`).join('\n')
       const cards = scenes.map(s => `- ${s.title}: ${s.note ?? s.summary ?? ''}`).join('\n')
       const reply = await ask({
         model: 'sonnet', effort: 'medium',

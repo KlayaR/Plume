@@ -132,19 +132,29 @@ function SheetScene({ scene, first, solo, active, characters, update, t }: {
   update: (id: string, patch: Partial<Scene>) => void; t: ReturnType<typeof useT>
 }) {
   const prefs = useStore(s => s.prefs)
+  const places = useStore(s => s.book!.entries.filter(e => e.type === 'place'))
   return (
           <section className={`pl-scene-block ${first ? 'pl-dropcap' : ''} ${active ? 'pl-scene-active' : ''}`}>
             {!first && !solo && <div className="pl-break" aria-label={t('Scene break')}>* * *</div>}
-            {(prefs.showSceneTitle || prefs.showPov || prefs.showStatus) && (
+            {(prefs.showSceneTitle || prefs.showPov || prefs.showStatus || prefs.showWhere) && (
               <div className="pl-scene-head">
                 {prefs.showSceneTitle && <input className="pl-head-scene" value={scene.title} onChange={e => update(scene.id, { title: e.target.value })} aria-label={t('Scene title')} />}
-                {(prefs.showPov || prefs.showStatus) && (
+                {(prefs.showPov || prefs.showStatus || prefs.showWhere) && (
                   <div className="pl-head-meta">
                     {prefs.showPov && (
                       <select value={scene.pov ?? ''} onChange={e => update(scene.id, { pov: e.target.value || null })} aria-label={t('POV')} title={t('POV')}>
                         <option value="">{t('POV')} : {t('None')}</option>
                         {characters.map(c => <option key={c.slug} value={c.slug}>{t('POV')} : {c.name}</option>)}
                       </select>
+                    )}
+                    {prefs.showWhere && (
+                      <>
+                        <input className="pl-head-time" value={scene.time ?? ''} placeholder={t('Story time')} title={t('Story time')} onChange={e => update(scene.id, { time: e.target.value || undefined })} />
+                        <select value={scene.place ?? ''} onChange={e => update(scene.id, { place: e.target.value || null })} aria-label={t('Place')} title={t('Place')}>
+                          <option value="">{t('Place')} : {t('None')}</option>
+                          {places.map(p => <option key={p.slug} value={p.slug}>{t('Place')} : {p.name}</option>)}
+                        </select>
+                      </>
                     )}
                     {prefs.showStatus && (
                       <select value={scene.status} onChange={e => update(scene.id, { status: e.target.value as SceneStatus })} aria-label={t('Status')} title={t('Status')}>

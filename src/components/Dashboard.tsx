@@ -9,6 +9,8 @@ import { review } from '../lib/review'
 import { referenceTargets, useRefs } from '../lib/references'
 import { hashText } from '../ai'
 import { bookCounts } from '../lib/stats'
+import { attention, type Attention } from '../lib/attention'
+import { staleScenes, updateSummaries, useNotes } from '../writing'
 import { numLocale, useT } from '../i18n'
 
 interface Metrics { words: number; dialogue: number; sentence: number; readability: number; rates: Record<string, number> }
@@ -76,6 +78,19 @@ export default function Dashboard() {
   const ref = refs && def.ref ? def.ref(refs) : undefined
   const top = Math.max(1, ...values, ref ?? 0) * 1.1
 
+  const todo = useMemo(() => attention(book), [book])
+  const stale = staleScenes(book).length
+  const summarizing = useNotes(s => s.summarizing)
+  const say = (a: Attention): string => {
+    switch (a.kind) {
+      case 'empty': return t('{n} scenes have no text yet.', { n: a.n })
+      case 'no-pov': return t('{n} written scenes have no point of view.', { n: a.n })
+      case 'no-note': return t('{n} empty scenes have no card note either.', { n: a.n })
+      case 'beats-unplaced': return t('{n} beats of your structure aren’t placed in a scene.', { n: a.n })
+      case 'unrated': return t('{n} scenes have no tension rating yet.', { n: a.n })
+      case 'next-pass': return t('Next revision step: {pass}.', { pass: a.pass ?? '' })
+    }
+  }
   const { words } = bookCounts(book.chapters)
   const scenes = book.chapters.flatMap(c => c.scenes)
   const status = { draft: 0, revised: 0, done: 0 }
@@ -99,6 +114,24 @@ export default function Dashboard() {
         <div className="pl-dash-card"><b>{n(Math.round(words / 230 / 6) / 10, 1)} h</b><span>{t('reading time')}</span></div>
         <div className="pl-dash-card"><b>{n(Math.ceil(words / 250))}</b><span>{t('pages (250 words)')}</span></div>
       </div>
+
+      {(todo.length > 0 || stale > 0) && (
+        <section className="pl-dash-block">
+          <span className="pl-label">{t('Needs attention')}</span>
+          {stale > 0 && (
+            <div className="pl-aicheck-row">
+              <span className="pl-grow">{t('{n} scene summaries are out of date: the AI’s “story so far” is built from them.', { n: stale })}</span>
+              <button type="button" className="sk-btn sk-btn-sm" disabled={!!summarizing} onClick={() => updateSummaries()}>{summarizing ? t('Thinking…') : t('Update them')}</button>
+            </div>
+          )}
+          {todo.map(a => (
+            <div key={a.kind} className="pl-aicheck-row">
+              <span className="pl-grow">{say(a)}</span>
+              {a.sceneId && <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm" onClick={() => useStore.getState().selectScene(a.sceneId!)}>{t('Open')}</button>}
+            </div>
+          ))}
+        </section>
+      )}
 
       <section className="pl-dash-block">
         <div className="pl-row">

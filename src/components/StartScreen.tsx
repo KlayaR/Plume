@@ -123,6 +123,7 @@ function NewBook({ onClose }: { onClose: () => void }) {
   const t = useT()
   const [title, setTitle] = useState('')
   const [author, setAuthor] = useState('')
+  const [premise, setPremise] = useState('')
   const [lang, setLang] = useState<Lang>(useStore.getState().prefs.ui)
   const [parent, setParent] = useParent()
   const [busy, setBusy] = useState(false)
@@ -139,6 +140,11 @@ function NewBook({ onClose }: { onClose: () => void }) {
       const root = await join(parent, folderName(title))
       const book = await createBook(root, title.trim(), author.trim(), lang)
       useStore.getState().setBook(book)
+      // A premise, if given, is kept and offered as the start of an outline.
+      if (premise.trim()) {
+        useStore.getState().updateMeta({ summary: premise.trim() })
+        if (premise.trim().length >= 20) useStore.setState({ view: 'plan', planTab: 'board', dialog: 'outline' })
+      }
     } catch (e) { notify('error', t('Could not create the book: {e}', { e: String(e) })) }
     setBusy(false)
   }
@@ -163,6 +169,11 @@ function NewBook({ onClose }: { onClose: () => void }) {
           <button type="button" aria-pressed={lang === 'fr'} onClick={() => setLang('fr')}>Français</button>
           <button type="button" aria-pressed={lang === 'en'} onClick={() => setLang('en')}>English</button>
         </div>
+      </div>
+      <div className="sk-field">
+        <label htmlFor="nb-premise">{t('Premise (optional)')}</label>
+        <textarea id="nb-premise" className="sk-input" rows={3} value={premise} onChange={e => setPremise(e.target.value)} placeholder={t('Who, what they want, what stands in the way. Plume can then propose an outline.')} />
+        <span className="sk-hint">{t('New books start with Plume’s fantasy voice settings (Settings → Voice).')}</span>
       </div>
       <div className="sk-field">
         <label>{t('Saved in')}</label>

@@ -1,19 +1,22 @@
 // Research & Bible: every entry by type, and the entry editor.
 import { useEffect, useMemo, useState } from 'react'
 import { ask } from '@tauri-apps/plugin-dialog'
-import { ImagePlus, MessagesSquare, Plus, Search, Trash2, X } from 'lucide-react'
+import { ImagePlus, MessagesSquare, Plus, Search, Sparkles, Trash2, X } from 'lucide-react'
 import { useStore, type BibleTab } from '../store'
 import { EMPTY_VOICE, ENTRY_TYPES, typeInfo, type Entry, type EntryType, type ExcerptKind, type Include, type VoiceCard } from '../lib/types'
 import { formatFact, parseFact } from '../lib/bible'
 import { buildMatcher, findMentions } from '../lib/context'
-import { foldText } from '../lib/text'
+import { estimateTokens, foldText } from '../lib/text'
+import { FULL_MAX, SHORT_MAX } from '../lib/bibleCheck'
+import { writeShort } from '../bibleAI'
 import { useT } from '../i18n'
 import { ChatDock } from './ChatPanel'
 import { Contradictions, MapView, Relations, ReviewList, Tracker } from './BibleTools'
+import AICheck from './AICheck'
 import { startInterview, useChat } from '../chat'
 import { pickImage, useImage } from '../lib/images'
 
-const TABS: [BibleTab, string][] = [['entry', 'Entry'], ['review', 'To review'], ['tracker', 'Tracker'], ['map', 'Map'], ['relations', 'Relations'], ['contradictions', 'Contradictions']]
+const TABS: [BibleTab, string][] = [['entry', 'Entry'], ['review', 'To review'], ['aicheck', 'AI check'], ['tracker', 'Tracker'], ['map', 'Map'], ['relations', 'Relations'], ['contradictions', 'Contradictions']]
 
 export default function BibleView() {
   const book = useStore(s => s.book)!
@@ -98,6 +101,7 @@ export default function BibleView() {
           </nav>
           {tab === 'entry' && (selected ? <EntryEditor key={selected.slug} entry={selected} /> : <div className="sk-empty">{t('Pick an entry, or add one with New entry.')}</div>)}
           {tab === 'review' && <ReviewList />}
+          {tab === 'aicheck' && <AICheck />}
           {tab === 'tracker' && <Tracker />}
           {tab === 'map' && <MapView />}
           {tab === 'relations' && <Relations />}
@@ -116,6 +120,7 @@ export function EntryEditor({ entry }: { entry: Entry }) {
   // Word lists and excerpts are plain text: no aliases, links, short version or facts.
   const plain = isStyle || entry.type === 'wordlist' || entry.type === 'excerpt'
   const t = useT()
+  const [writing, setWriting] = useState(false)
   const [aliases, setAliases] = useState(entry.aliases.join(', '))
   const [facts, setFacts] = useState(entry.facts.map(formatFact).join('\n'))
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -196,8 +201,16 @@ export function EntryEditor({ entry }: { entry: Entry }) {
 
       {!plain && (
         <div className="sk-field">
-          <label htmlFor="ee-short">{t('Short version')}</label>
+          <div className="pl-row">
+            <label htmlFor="ee-short" className="pl-grow">{t('Short version')}</label>
+            <span className={`sk-hint ${estimateTokens(entry.short) > SHORT_MAX ? 'pl-warn' : ''}`}>≈ {estimateTokens(entry.short)} {t('tokens')}</span>
+            <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm" disabled={writing || !entry.full.trim()} title={t('Haiku writes 1 or 2 sentences from the full version and the facts')}
+              onClick={async () => { setWriting(true); try { update({ short: await writeShort(book, entry) }) } catch (e) { useStore.getState().notify('error', (e as Error).message) } setWriting(false) }}>
+              <Sparkles size={13} /> {writing ? t('Thinking…') : t('Write it')}
+            </button>
+          </div>
           <textarea id="ee-short" className="sk-input" rows={2} value={entry.short} onChange={e => update({ short: e.target.value })} placeholder={t('One or two lines, sent by default.')} />
+          <span className="sk-hint">{t('Sent every time the name appears in the passage, so keep it to what helps write the entry right.')}</span>
         </div>
       )}
 
@@ -218,11 +231,18 @@ export function EntryEditor({ entry }: { entry: Entry }) {
       <div className="sk-field">
         <label htmlFor="ee-full">{t(isStyle ? 'Style guide (always sent)' : entry.type === 'wordlist' ? 'Words and phrases, one per line' : entry.type === 'excerpt' ? 'Your passage (a few hundred words of your own prose)' : 'Full version')}</label>
         <textarea id="ee-full" className="sk-input pl-full" rows={14} value={entry.full} onChange={e => update({ full: e.target.value })} />
-        {!plain && <span className="sk-hint">{t("Sent for the scene's POV character, or when you write @{name} in an instruction.", { name: entry.name })}</span>}
+        {!plain && <span className={`sk-hint ${estimateTokens(entry.full) > FULL_MAX ? 'pl-warn' : ''}`}>{t("Sent for the scene's POV character, or when you write @{name} in an instruction.", { name: entry.name })} ≈ {estimateTokens(entry.full)} {t('tokens')}</span>}
         {entry.type === 'wordlist' && <span className="sk-hint">{t('Banned from AI text and flagged by the rule checker. In a prompt:')} {`{list.${entry.name}}`}</span>}
       </div>
 
       {entry.type === 'character' && <VoiceEditor entry={entry} update={update} />}
+
+      {!plain && (
+        <div className="sk-field">
+          <label htmlFor="ee-notes">{t('Private notes')}</label>
+          <textarea id="ee-notes" className="sk-input" rows={3} value={entry.notes ?? ''} onChange={e => update({ notes: e.target.value })} placeholder={t('Reminders, ideas, research. Never sent to the AI.')} />
+        </div>
+      )}
 
       {!plain && (
         <div className="sk-field">
@@ -241,6 +261,10 @@ export function EntryEditor({ entry }: { entry: Entry }) {
             const gap = written - mentions[mentions.length - 1].ci
             return gap >= 5 ? <span className="sk-hint pl-warn">{t('{name} hasn’t appeared for {n} chapters.', { name: entry.name, n: gap })}</span> : null
           })()}
+          {mentions.length > 0 && (
+            <span className="sk-hint">{t('First in {a}, last in {b}; {n} scenes, {p} from their point of view.', {
+              a: mentions[0].label, b: mentions[mentions.length - 1].label, n: mentions.length, p: book.chapters.flatMap(c => c.scenes).filter(sc => sc.pov === entry.slug).length })}</span>
+          )}
           {mentions.length === 0 ? <span className="sk-hint">{t('Not mentioned in any scene yet.')}</span> : (
             <div className="sk-list">
               {mentions.map(m => (

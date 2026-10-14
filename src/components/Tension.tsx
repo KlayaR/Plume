@@ -5,7 +5,7 @@ import { useState } from 'react'
 import { ask as askDialog } from '@tauri-apps/plugin-dialog'
 import { Sparkles } from 'lucide-react'
 import { useStore } from '../store'
-import { scenePositions } from '../lib/structures'
+import { beatFlags, scenePositions } from '../lib/structures'
 import { ask, parseJSON } from '../ai'
 import { useT } from '../i18n'
 
@@ -72,6 +72,13 @@ export default function Tension() {
         {rated.length > 1 && <polyline points={points} className="pl-tension-line" />}
         {rated.map(s => <circle key={s.id} cx={x(s)} cy={y(s.tension!)} r={4} className="pl-tension-dot"><title>{`${s.title} : ${s.tension}`}</title></circle>)}
       </svg>
+      {beatFlags(book).map(f => (
+        <button key={f.beat} type="button" className="pl-aicheck-row pl-warn" onClick={() => useStore.getState().selectScene(f.sceneId)}>
+          {f.kind === 'calm'
+            ? t('“{beat}” usually peaks, but its scene “{scene}” is rated {n}.', { beat: f.beat, scene: f.sceneTitle, n: f.tension })
+            : t('“{beat}” usually breathes, but its scene “{scene}” is rated {n}.', { beat: f.beat, scene: f.sceneTitle, n: f.tension })}
+        </button>
+      ))}
       <span className="sk-hint">{rated.length ? t('Click the chart to correct a scene’s value. Dashed lines: the beats of your structure.') : t('Claude rates each scene from its note or text; then you can correct any value by clicking the chart.')}</span>
     </div>
   )

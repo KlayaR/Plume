@@ -716,3 +716,15 @@ body.pl-typing .pl-toolbar { opacity: 0.08; }
 .pl-matter { display: flex; flex-direction: column; gap: 4px; padding: 6px 0; }
 .pl-col-part { border: 0; border-bottom: 1px dashed var(--border); background: transparent; color: var(--text-muted); font-size: 11px; padding: 2px 6px; margin-bottom: 6px; }
 .pl-col-part:placeholder-shown { opacity: 0.5; }
+
+/* Bible AI check. */
+.pl-aicheck { max-width: 60rem; display: flex; flex-direction: column; gap: 8px; }
+.pl-aicheck-row { display: flex; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); font-size: var(--fs-sm); }
+.pl-aicheck-row.pl-warn { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }
+
+.pl-card-dim { opacity: 0.22; }
+
+.pl-head-time { width: 8.5rem; background: transparent; border: 0; border-bottom: 1px dashed var(--border); color: var(--text-muted); font: inherit; font-size: 12px; padding: 2px 4px; }
+
+.pl-shortcuts { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.pl-shortcuts kbd { min-width: 9.5rem; font: inherit; font-size: 12px; padding: 2px 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface-1); }

@@ -7,7 +7,8 @@ import { useStore } from '../store'
 import type { ActionId, Effort, Model } from '../lib/types'
 import type { Override } from '../lib/context'
 import { accept, alternatives, currentContext, discard, pickAlternative, retry, retryFixing, runAction, stopAction, useAI } from '../editor/actions'
-import { learnTaste, useNotes } from '../writing'
+import { diffWords, learnTaste, useNotes } from '../writing'
+import { getEditorView } from '../editor/actions'
 import { allPrompts } from '../lib/voice'
 import { isCheap } from '../ai'
 import { numLocale, useT } from '../i18n'
@@ -48,7 +49,7 @@ export default function ContextPanel() {
   const [text, setText] = useState<Record<Tab, string>>({ continue: '', rewrite: '', beats: '' })
   const [overrides, setOverrides] = useState<Record<string, Override>>({})
   const [preview, setPreview] = useState(false)
-  const [alts, setAlts] = useState<{ texts: string[]; from: number; to: number } | null>(null)
+  const [alts, setAlts] = useState<{ texts: string[]; from: number; to: number; original: string } | null>(null)
   const taste = useNotes(s => s.taste.length)
   const [learning, setLearning] = useState(false)
   // Beats to prose falls back on the plan card's note when no beats are written.
@@ -122,7 +123,7 @@ export default function ContextPanel() {
         )}
         {!running && (
           <button type="button" className="sk-btn" disabled={hasProposal} title={t('Three versions side by side; keep the one you like')}
-            onClick={async () => { const r = await alternatives(action, instruction, overrides); if (r) setAlts(r) }}>
+            onClick={async () => { const r = await alternatives(action, instruction, overrides); if (r) setAlts({ ...r, original: getEditorView()?.state.doc.sliceString(r.from, r.to) ?? '' }) }}>
             <Copy size={14} /> {t('×3')}
           </button>
         )}
@@ -218,7 +219,7 @@ export default function ContextPanel() {
       {alts && (
         <Dialog wide title={t('Alternatives')} subtitle={t('Edit any of them, then use the one you want.')} onClose={() => setAlts(null)}>
           <div className="pl-alts">
-            {alts.texts.map((x, i) => <Alternative key={i} text={x} onUse={v => { pickAlternative(v, alts.from, alts.to); setAlts(null) }} />)}
+            {alts.texts.map((x, i) => <Alternative key={i} text={x} original={alts.original} onUse={v => { pickAlternative(v, alts.from, alts.to); setAlts(null) }} />)}
           </div>
         </Dialog>
       )}
@@ -235,11 +236,15 @@ export default function ContextPanel() {
   )
 }
 
-function Alternative({ text, onUse }: { text: string; onUse: (text: string) => void }) {
+function Alternative({ text, original, onUse }: { text: string; original: string; onUse: (text: string) => void }) {
   const [v, setV] = useState(text)
+  const [diff, setDiff] = useState(!!original.trim())
   const t = useT()
+  const parts = diff ? diffWords(original, v) : []
   return (
     <div className="pl-alt">
+      {original.trim() && <label className="pl-row pl-check-label"><input type="checkbox" className="sk-check" checked={diff} onChange={e => setDiff(e.target.checked)} /> {t('Show what changes')}</label>}
+      {diff && <div className="pl-diff">{parts.map((p, i) => p.kind === 'same' ? <span key={i}>{p.text}</span> : p.kind === 'add' ? <ins key={i}>{p.text}</ins> : <del key={i}>{p.text}</del>)}</div>}
       <textarea className="sk-input" value={v} onChange={e => setV(e.target.value)} />
       <button type="button" className="sk-btn sk-btn-primary sk-btn-sm" onClick={() => onUse(v)}><Check size={13} /> {t('Use this one')}</button>
     </div>
