@@ -12,9 +12,6 @@ import { restorePrompts } from './lib/voice'
 import { restoreReferences } from './lib/references'
 import { shellStrings, translate, useT } from './i18n'
 import StartScreen from './components/StartScreen'
-import WritingView from './components/WritingView'
-import BibleView from './components/BibleView'
-import PlanView from './components/PlanView'
 import SettingsView from './components/SettingsView'
 import BottomBar from './components/BottomBar'
 import { AgentDialog, ExportDialog, PrintView, TourDialog } from './components/BookDialogs'
@@ -24,6 +21,7 @@ import SynonymDialog from './components/SynonymDialog'
 import EntryFromText from './components/EntryFromText'
 import ShortcutsDialog from './components/ShortcutsDialog'
 import QuickJump from './components/QuickJump'
+import DualView, { ViewBody } from './components/DualView'
 import SnapshotsDialog from './components/SnapshotsDialog'
 
 export default function App() {
@@ -86,7 +84,7 @@ export default function App() {
   return (
     <div className="pl-room">
       <main className="pl-stage" key={book ? view : 'shelf'}>
-        {!book ? <StartScreen version={version} /> : view === 'bible' ? <BibleView /> : view === 'plan' ? <PlanView /> : <WritingView />}
+        {!book ? <StartScreen version={version} /> : prefs.dual && prefs.dual !== view ? <DualView view={view} other={prefs.dual} /> : <ViewBody view={view} />}
       </main>
       {book && <BottomBar />}
       {showSettings && <SettingsView version={version} />}

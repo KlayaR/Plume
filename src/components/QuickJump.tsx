@@ -17,7 +17,7 @@ export default function QuickJump({ onClose }: { onClose: () => void }) {
 
   const open = (it: JumpItem) => {
     if (it.kind === 'scene') useStore.getState().selectScene(it.id)
-    else useStore.setState({ view: 'bible', entrySlug: it.id, bibleTab: 'entry' })
+    else useStore.getState().showEntry(it.id)
     onClose()
   }
   const key = (e: React.KeyboardEvent) => {

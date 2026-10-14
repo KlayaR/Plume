@@ -11,6 +11,7 @@ import { FULL_MAX, SHORT_MAX } from '../lib/bibleCheck'
 import { writeShort } from '../bibleAI'
 import { useT } from '../i18n'
 import { ChatDock } from './ChatPanel'
+import BlocksEditor from './BlocksEditor'
 import { Contradictions, MapView, Relations, ReviewList, Tracker } from './BibleTools'
 import AICheck from './AICheck'
 import { startInterview, useChat } from '../chat'
@@ -27,9 +28,11 @@ export default function BibleView() {
   const [query, setQuery] = useState('')
   const [adding, setAdding] = useState<EntryType | null>(null)
   const [name, setName] = useState('')
+  const [tag, setTag] = useState('')
   const t = useT()
   const q = foldText(query.trim())
-  const shown = book.entries.filter(e => !q || foldText([e.name, ...e.aliases].join(' ')).includes(q))
+  const allTags = [...new Set(book.entries.flatMap(e => e.tags ?? []))].sort((a, b) => a.localeCompare(b))
+  const shown = book.entries.filter(e => (!q || foldText([e.name, ...e.aliases, ...(e.tags ?? [])].join(' ')).includes(q)) && (!tag || e.tags?.includes(tag)))
   const selected = book.entries.find(e => e.slug === slug) ?? null
 
   const create = () => {
@@ -52,6 +55,11 @@ export default function BibleView() {
             <Search size={14} />
             <input className="sk-input" placeholder={t('Search names and aliases')} value={query} onChange={e => setQuery(e.target.value)} />
           </div>
+          {allTags.length > 0 && (
+            <div className="pl-chips">
+              {allTags.map(x => <button key={x} type="button" className={`pl-chip ${tag === x ? 'pl-chip-on' : ''}`} onClick={() => setTag(tag === x ? '' : x)}>{x}</button>)}
+            </div>
+          )}
           {adding && (
             <div className="pl-newentry">
               <select className="sk-select" value={adding} onChange={e => setAdding(e.target.value as EntryType)}>
@@ -122,9 +130,10 @@ export function EntryEditor({ entry }: { entry: Entry }) {
   const t = useT()
   const [writing, setWriting] = useState(false)
   const [aliases, setAliases] = useState(entry.aliases.join(', '))
+  const [tags, setTags] = useState((entry.tags ?? []).join(', '))
   const [facts, setFacts] = useState(entry.facts.map(formatFact).join('\n'))
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { setAliases(entry.aliases.join(', ')); setFacts(entry.facts.map(formatFact).join('\n')) }, [entry.slug])
+  useEffect(() => { setTags((entry.tags ?? []).join(', ')); setAliases(entry.aliases.join(', ')); setFacts(entry.facts.map(formatFact).join('\n')) }, [entry.slug])
 
   const others = book.entries.filter(e => e.slug !== entry.slug && e.type !== 'style')
   const mentions = useMemo(() => {
@@ -167,6 +176,11 @@ export function EntryEditor({ entry }: { entry: Entry }) {
             <input id="ee-aliases" className="sk-input" value={aliases} placeholder="Lise, la Duchesse"
               onChange={e => { setAliases(e.target.value); update({ aliases: e.target.value.split(',').map(s => s.trim()).filter(Boolean) }) }} />
             <span className="sk-hint">{t('Comma-separated. End one with ! to match its exact capitals (Rose!).')}</span>
+          </div>
+          <div className="sk-field">
+            <label htmlFor="ee-tags">{t('Tags')}</label>
+            <input id="ee-tags" className="sk-input" value={tags} placeholder={t('villains, act 2, magic users')}
+              onChange={e => { setTags(e.target.value); update({ tags: e.target.value.split(',').map(s => s.trim()).filter(Boolean) }) }} />
           </div>
           <div className="sk-field">
             <label htmlFor="ee-include">{t('Sent to the AI')}</label>
@@ -230,7 +244,9 @@ export function EntryEditor({ entry }: { entry: Entry }) {
 
       <div className="sk-field">
         <label htmlFor="ee-full">{t(isStyle ? 'Style guide (always sent)' : entry.type === 'wordlist' ? 'Words and phrases, one per line' : entry.type === 'excerpt' ? 'Your passage (a few hundred words of your own prose)' : 'Full version')}</label>
-        <textarea id="ee-full" className="sk-input pl-full" rows={14} value={entry.full} onChange={e => update({ full: e.target.value })} />
+        {plain
+          ? <textarea id="ee-full" className="sk-input pl-full" rows={14} value={entry.full} onChange={e => update({ full: e.target.value })} />
+          : <BlocksEditor entry={entry} update={update} />}
         {!plain && <span className={`sk-hint ${estimateTokens(entry.full) > FULL_MAX ? 'pl-warn' : ''}`}>{t("Sent for the scene's POV character, or when you write @{name} in an instruction.", { name: entry.name })} ≈ {estimateTokens(entry.full)} {t('tokens')}</span>}
         {entry.type === 'wordlist' && <span className="sk-hint">{t('Banned from AI text and flagged by the rule checker. In a prompt:')} {`{list.${entry.name}}`}</span>}
       </div>

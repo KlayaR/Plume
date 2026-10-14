@@ -4,7 +4,7 @@
 // The manuscript's own controls (Write / Review, Sheet / Page, Scene / Chapter /
 // Book, split, Aa) live in a toolbar above the page: ManuscriptToolbar.
 import { useEffect, useRef, useState } from 'react'
-import { Bot, BookPlus, Camera, Keyboard, ChevronLeft, Columns2, Compass, Ellipsis, FileOutput, Replace, Search, Settings } from 'lucide-react'
+import { Bot, BookPlus, Camera, Keyboard, PanelRight, ChevronLeft, Columns2, Compass, Ellipsis, FileOutput, Replace, Search, Settings } from 'lucide-react'
 import ManuscriptOptions from './ManuscriptOptions'
 import GoalsPanel from './GoalsPanel'
 import { findScene, useStore, type Scope, type View } from '../store'
@@ -65,7 +65,7 @@ export default function BottomBar() {
 
       <nav className="pl-seg pl-seg-main" aria-label={t('Spaces')}>
         {tabs.map(([id, label]) => (
-          <button key={id} type="button" aria-pressed={view === id} onClick={() => st().setView(id)}>{t(label)}</button>
+          <button key={id} type="button" aria-pressed={view === id} onClick={() => { if (st().prefs.dual === id) st().setPrefs({ dual: view }); st().setView(id) }}>{t(label)}</button>
         ))}
       </nav>
 
@@ -79,6 +79,7 @@ export default function BottomBar() {
         )}
         {lastBackend?.kind === 'openrouter' && <span className="pl-count" title={t('Answered by {name} on OpenRouter', { name: lastBackend.name })}>OpenRouter</span>}
         <span className={`pl-dot ${exe === null ? 'pl-dot-off' : running ? 'pl-dot-busy' : ''}`} title={usageTip} aria-label={t(claude)} />
+        <DualMenu />
         <MoreMenu />
         <button type="button" className="pl-quiet" onClick={() => useStore.setState({ showSettings: true })} title={t('Settings') + ' (Ctrl+,)'}><Settings size={15} /></button>
       </div>
@@ -99,6 +100,29 @@ function usePopover() {
     return () => { window.removeEventListener('mousedown', onDown); window.removeEventListener('keydown', onKey) }
   }, [open])
   return { open, setOpen, box }
+}
+
+/** A second view beside the main one. */
+function DualMenu() {
+  const { open, setOpen, box } = usePopover()
+  const view = useStore(s => s.view)
+  const dual = useStore(s => s.prefs.dual)
+  const t = useT()
+  const pick = (v: View | null) => { setOpen(false); useStore.getState().setPrefs({ dual: v }) }
+  const names: Record<View, string> = { bible: 'Bible', plan: 'Plan', manuscript: 'Manuscript' }
+  return (
+    <span className="pl-aa" ref={box}>
+      <button type="button" className={`pl-quiet ${dual && dual !== view ? 'pl-on' : ''}`} aria-expanded={open} onClick={() => setOpen(o => !o)} title={t('Show a second view beside this one')}><PanelRight size={15} /></button>
+      {open && (
+        <div className="pl-pop pl-menu" role="menu">
+          {(['bible', 'plan', 'manuscript'] as View[]).filter(v => v !== view).map(v => (
+            <button key={v} type="button" role="menuitem" className="pl-menuitem" onClick={() => pick(v)}>{dual === v ? '✓ ' : ''}{t('{name} beside', { name: t(names[v]) })}</button>
+          ))}
+          {dual && <button type="button" role="menuitem" className="pl-menuitem" onClick={() => pick(null)}>{t('One view only')}</button>}
+        </div>
+      )}
+    </span>
+  )
 }
 
 /** The rarer things about the whole book: agent tasks, export, the tour. */

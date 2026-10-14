@@ -41,6 +41,7 @@ editor, back them up however you like.
 - Characters with voice cards and what they know, places on a map, objects,
   lore, magic systems, creatures, history, factions, story lines, word lists,
   excerpts of your own prose, a style guide.
+- Entries are stacks of **blocks** you can reorder; each block says whether the AI always reads it, reads it with the full entry, or never reads it (secrets stay out). Tags, and a second view to keep the bible beside the manuscript.
 - Facts dated by chapter ("blind in the left eye from chapter 12"), series
   shared across books, a relationship web, an appearance tracker.
 - **AI check:** finds what makes the AI's context worse (missing short versions,

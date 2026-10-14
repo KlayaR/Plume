@@ -6,6 +6,7 @@ import { create } from 'zustand'
 import { invoke } from '@tauri-apps/api/core'
 import type { Book, Entry, EntryType } from './lib/types'
 import { ENTRY_TYPES } from './lib/types'
+import { aiBlocks, aiFull } from './lib/blocks'
 import { parseFact } from './lib/bible'
 import { estimateTokens, newId } from './lib/text'
 import { buildMatcher, findMentions } from './lib/context'
@@ -130,7 +131,7 @@ function bibleFor(book: Book, recent: string): string {
   const lines: string[] = []
   let used = 0
   for (const e of [...named].sort((a, b) => Number(talked.has(b.slug)) - Number(talked.has(a.slug)))) {
-    const body = talked.has(e.slug) ? [e.short, e.full, e.facts.map(f => `- ${f.text}`).join('\n')].filter(s => s.trim()).join('\n') : e.short || e.full.split('\n\n')[0]
+    const body = talked.has(e.slug) ? [e.short, aiFull(e), e.facts.map(f => `- ${f.text}`).join('\n')].filter(s => s.trim()).join('\n') : e.short || aiBlocks(e).first
     const block = `<entry type="${e.type}" name="${e.name}">\n${body.trim()}\n</entry>`
     used += estimateTokens(block)
     if (used > 6000) break
@@ -152,7 +153,7 @@ function systemFor(book: Book, recent: string, interview: Entry | null): string 
   return [
     head,
     style?.full.trim() ? `<style_guide>\n${style.full.trim()}\n</style_guide>` : '',
-    interview ? `<entry_to_complete type="${interview.type}" name="${interview.name}">\n${[interview.short, interview.full].join('\n\n').trim()}\n</entry_to_complete>` : '',
+    interview ? `<entry_to_complete type="${interview.type}" name="${interview.name}">\n${[interview.short, aiFull(interview)].join('\n\n').trim()}\n</entry_to_complete>` : '',
     `<bible>\n${bibleFor(book, recent)}\n</bible>`,
   ].filter(Boolean).join('\n\n')
 }
@@ -278,14 +279,14 @@ export interface Contradiction { entries: string[]; issue: string; fix: string }
 /** Rough size of the contradiction check, shown before it runs. */
 export function contradictionCost(book: Book): number {
   return book.entries.filter(e => TYPES.includes(e.type) && e.include !== 'secret')
-    .reduce((s, e) => s + estimateTokens(e.short + e.full + e.facts.map(f => f.text).join(' ')), 600)
+    .reduce((s, e) => s + estimateTokens(e.short + aiFull(e) + e.facts.map(f => f.text).join(' ')), 600)
 }
 
 export async function checkContradictions(): Promise<Contradiction[]> {
   const book = useStore.getState().book!
   const fr = book.meta.language === 'fr'
   const all = book.entries.filter(e => TYPES.includes(e.type) && e.include !== 'secret')
-    .map(e => `<entry type="${e.type}" name="${e.name}">\n${[e.short, e.full, e.facts.map(f => `- ${f.text}`).join('\n')].filter(s => s.trim()).join('\n')}\n</entry>`).join('\n')
+    .map(e => `<entry type="${e.type}" name="${e.name}">\n${[e.short, aiFull(e), e.facts.map(f => `- ${f.text}`).join('\n')].filter(s => s.trim()).join('\n')}\n</entry>`).join('\n')
   const reply = await ask({
     model: 'sonnet', effort: 'medium',
     system: fr ? 'Tu relis la bible d’un roman pour y trouver les contradictions. Réponds uniquement en JSON valide.' : 'You read a novel’s story bible to find contradictions. Reply with valid JSON only.',

@@ -50,7 +50,7 @@ export default function EntryFromText({ onClose }: { onClose: () => void }) {
       short, ...(full.trim() ? { full } : {}),
       aliases: aliases.split(',').map(a => a.trim()).filter(Boolean),
     })
-    st.notify('ok', t('{name} added to the bible.', { name: name.trim() }), { label: t('Open'), run: () => { useStore.setState({ view: 'bible', entrySlug: e.slug, bibleTab: 'entry' }) } })
+    st.notify('ok', t('{name} added to the bible.', { name: name.trim() }), { label: t('Open'), run: () => useStore.getState().showEntry(e.slug) })
     onClose()
   }
 

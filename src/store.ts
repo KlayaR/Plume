@@ -90,6 +90,9 @@ export interface Prefs {
   orKey: string
   /** The model preset the brainstorm chat uses (empty: Sonnet, low effort). */
   chatPreset: string
+  /** A second view shown beside the main one (Bible, Plan or Manuscript), and its width in px. */
+  dual: View | null
+  dualW: number
   /** Version of the saved prefs, for one-time upgrades. */
   v?: number
 }
@@ -130,6 +133,8 @@ export const DEFAULT_PREFS: Prefs = {
   fallbackPreset: '',
   orKey: '',
   chatPreset: '',
+  dual: null,
+  dualW: 520,
   v: 2,
 }
 
@@ -190,6 +195,8 @@ interface State {
   setView: (v: View) => void
   selectScene: (id: string) => void
   selectEntry: (slug: string | null) => void
+  /** Shows a bible entry: in the second pane if the Bible is there, else by going to the Bible. */
+  showEntry: (slug: string) => void
   updateScene: (id: string, patch: Partial<Scene>) => void
   updateChapter: (id: string, patch: Partial<Chapter>) => void
   /** Takes back the last move of a card or chapter in the Plan. */
@@ -301,8 +308,9 @@ export const useStore = create<State>((set, get) => {
       set({ book: null, sceneId: null, entrySlug: null })
     },
     setView: view => set({ view }),
-    selectScene: id => set({ sceneId: id, view: 'manuscript', freshSceneId: get().freshSceneId === id ? id : null }),
+    selectScene: id => set({ sceneId: id, ...(get().prefs.dual === 'manuscript' ? {} : { view: 'manuscript' as View }), freshSceneId: get().freshSceneId === id ? id : null }),
     selectEntry: slug => set({ entrySlug: slug, bibleTab: 'entry' }),
+    showEntry: slug => set({ entrySlug: slug, bibleTab: 'entry', ...(get().prefs.dual === 'bible' ? {} : { view: 'bible' as View }) }),
 
     updateScene: (id, patch) => {
       mutate(b => ({ ...b, chapters: b.chapters.map(c => ({ ...c, scenes: c.scenes.map(s => s.id === id ? { ...s, ...patch } : s) })) }))

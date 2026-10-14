@@ -51,7 +51,7 @@ const unknown = unknownNamesExt({
   add: (name: string, type: EntryType) => {
     const st = useStore.getState()
     const e = st.addEntry(type, name)
-    st.notify('ok', t('{name} added to the bible.', { name }), { label: t('Open'), run: () => { useStore.setState({ view: 'bible', entrySlug: e.slug, bibleTab: 'entry' }) } })
+    st.notify('ok', t('{name} added to the bible.', { name }), { label: t('Open'), run: () => useStore.getState().showEntry(e.slug) })
   },
   ignore: (name: string) => {
     const st = useStore.getState()

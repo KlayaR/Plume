@@ -737,3 +737,27 @@ body.pl-typing .pl-toolbar { opacity: 0.08; }
 .pl-jump { display: flex; gap: 8px; align-items: center; width: 100%; text-align: left; }
 .pl-jump-on { background: color-mix(in srgb, var(--accent) 18%, transparent); }
 .pl-chat-model { gap: 8px; }
+
+/* Bible entry blocks. */
+.pl-blocks { display: flex; flex-direction: column; gap: 10px; }
+.pl-block { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; border: 1px solid var(--border); border-left: 4px solid var(--border); border-radius: 8px; }
+.pl-send-always { border-left-color: var(--accent); }
+.pl-send-never { border-left-color: #c0554a; opacity: 0.8; }
+.pl-block-title { background: transparent; border: 0; border-bottom: 1px dashed var(--border); color: inherit; font: inherit; font-weight: 600; padding: 2px 0; }
+
+/* Two views side by side. */
+.pl-dual { position: absolute; inset: 0; display: flex; }
+.pl-dual-pane { position: relative; min-width: 0; overflow: hidden; }
+.pl-dual-main { flex: 1; }
+.pl-dual-side { flex: none; border-left: 1px solid var(--border); background: var(--bg); }
+.pl-dual-head { position: absolute; top: 0; left: 0; right: 0; height: 32px; display: flex; align-items: center; gap: 6px; padding: 0 10px; border-bottom: 1px solid var(--border); }
+.pl-dual-body { position: absolute; top: 32px; left: 0; right: 0; bottom: 0; overflow: hidden; }
+.pl-dual-resize { flex: none; width: 6px; margin: 0 -3px; z-index: 5; cursor: col-resize; touch-action: none; }
+.pl-dual-resize:hover, .pl-dual-resize.pl-dragging { background: color-mix(in srgb, var(--accent) 35%, transparent); }
+.pl-quiet.pl-on { color: var(--accent); }
+
+/* The Bible (and its entry form) in the narrower second pane. */
+.pl-dual-side .pl-bible { grid-template-columns: 11rem minmax(0, 1fr); }
+.pl-dual-side .pl-bible-list { padding: 12px 8px; }
+.pl-dual-side .pl-grid2 { grid-template-columns: 1fr; }
+.pl-dual-side .pl-bible-tabs { flex-wrap: wrap; }

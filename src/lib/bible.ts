@@ -83,6 +83,8 @@ export function parseEntry(path: string, text: string): Entry {
     knows: str(data.knows),
     unaware: str(data.unaware),
     notes: str(data.notes),
+    sends: data.sends && typeof data.sends === 'object' ? Object.fromEntries(Object.entries(data.sends as object).filter(([, v]) => v === 'always' || v === 'full' || v === 'never')) as Entry['sends'] : undefined,
+    tags: data.tags ? asList(data.tags) : undefined,
     image: str(data.image),
     kind: (['any', 'dialogue', 'action', 'description', 'introspection'].includes(String(data.kind)) ? data.kind : undefined) as ExcerptKind | undefined,
     resolved: data.resolved === true ? true : undefined,
@@ -101,7 +103,7 @@ export function parseEntry(path: string, text: string): Entry {
   }
 }
 
-const ENTRY_KEYS = ['type', 'name', 'aliases', 'include', 'links', 'voice', 'knows', 'unaware', 'notes', 'image', 'kind', 'resolved']
+const ENTRY_KEYS = ['type', 'name', 'aliases', 'include', 'links', 'voice', 'knows', 'unaware', 'notes', 'sends', 'tags', 'image', 'kind', 'resolved']
 const SCENE_KEYS = ['id', 'title', 'pov', 'status', 'note', 'time', 'place', 'lines', 'summary', 'summaryOf', 'comments', 'tension', 'passes']
 const rest = (data: Record<string, unknown>, known: string[]) => Object.fromEntries(Object.entries(data).filter(([k]) => !known.includes(k)))
 const filled = (v: VoiceCard | undefined) => (v && Object.values(v).some(x => x.trim()) ? v : undefined)
@@ -111,7 +113,7 @@ export function serializeEntry(e: Entry): string {
   if (e.aliases.length) data.aliases = e.aliases
   data.include = e.include
   if (e.links.length) data.links = e.links
-  Object.assign(data, { voice: filled(e.voice), knows: e.knows, unaware: e.unaware, notes: e.notes || undefined, image: e.image, kind: e.kind, resolved: e.resolved }, e.extra)
+  Object.assign(data, { voice: filled(e.voice), knows: e.knows, unaware: e.unaware, notes: e.notes || undefined, sends: e.sends && Object.keys(e.sends).length ? e.sends : undefined, tags: e.tags?.length ? e.tags : undefined, image: e.image, kind: e.kind, resolved: e.resolved }, e.extra)
   const body = [
     `## Short\n${e.short.trim()}`,
     `## Full\n${e.full.trim()}`,

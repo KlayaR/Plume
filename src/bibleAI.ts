@@ -2,6 +2,7 @@
 // version written to remind the model who or what an entry is each time it
 // appears, and a first draft of an entry from how the book already uses its name.
 import { ask, parseJSON } from './ai'
+import { aiFull } from './lib/blocks'
 import { buildMatcher, findMentions } from './lib/context'
 import { typeInfo, type Book, type Entry, type EntryType } from './lib/types'
 
@@ -14,7 +15,7 @@ export async function writeShort(book: Book, e: Entry): Promise<string> {
     system: fr
       ? 'Tu rédiges la version courte d’une fiche de bible de roman, relue par une IA chaque fois que le nom apparaît. Réponds uniquement par le texte.'
       : 'You write the short version of a novel-bible entry, which an AI reads every time the name comes up. Reply with the text only.',
-    message: `<entry type="${e.type}" name="${e.name}">\n${e.full.trim().slice(0, 6000)}\n${facts}\n</entry>\n\n${fr
+    message: `<entry type="${e.type}" name="${e.name}">\n${aiFull(e).slice(0, 6000)}\n${facts}\n</entry>\n\n${fr
       ? 'Écris 1 à 2 phrases (35 mots au plus) : ce que c’est ou qui c’est, ce qui le définit, ce qui compte pour l’histoire. Pas de généralités, pas de style fleuri, seulement ce qui aide à écrire juste.'
       : 'Write 1 or 2 sentences (35 words at most): what or who it is, what defines it, what matters to the story. No generalities or flourish, only what helps write it right.'}`,
   })

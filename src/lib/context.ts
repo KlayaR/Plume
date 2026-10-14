@@ -7,6 +7,7 @@ import { estimateTokens, fold, lastWords, firstWords } from './text'
 import { taskMessage, systemRules } from './prompts'
 import { expandVariables, promptFor, promptText } from './voice'
 import { passageKind } from './analysis'
+import { aiBlocks } from './blocks'
 
 /** Entry types that are never looked for in the text. */
 const UNNAMED = new Set(['style', 'wordlist', 'excerpt'])
@@ -113,7 +114,9 @@ function voiceBlock(e: Entry, lang: Lang): string {
 function renderEntry(e: Entry, mode: Mode, chapter: number, lang: Lang, bookIndex = 1, pov = false): string {
   const aka = e.aliases.filter(a => a !== e.name).map(a => a.replace(/!$/, ''))
   const head = `<entry type="${e.type}" name="${e.name}"${aka.length ? ` aka="${aka.join(', ')}"` : ''}${pov ? ' pov="true"' : ''}>`
-  const body = mode === 'full' && e.full.trim() ? [e.short, e.full].filter(s => s.trim()).join('\n\n') : (e.short.trim() || e.full.trim().split('\n\n')[0])
+  // Blocks marked never are not sent; blocks marked always travel with the short version.
+  const blocks = aiBlocks(e)
+  const body = mode === 'full' && blocks.visible ? [e.short, blocks.visible].filter(s => s.trim()).join('\n\n') : ([e.short.trim(), blocks.always].filter(Boolean).join('\n\n') || blocks.first)
   const facts = e.facts.filter(f => factApplies(f, chapter, bookIndex)).map(f => `- ${f.text}`)
   const label = lang === 'fr' ? 'Faits à ce stade de l’histoire :' : 'Facts at this point of the story:'
   // POV awareness: what the point-of-view character knows and doesn't.

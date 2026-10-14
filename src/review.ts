@@ -7,6 +7,7 @@ import { findScene, useStore } from './store'
 import { buildMatcher, findMentions } from './lib/context'
 import { estimateTokens, newId } from './lib/text'
 import { ask, parseJSON } from './ai'
+import { aiFull } from './lib/blocks'
 import { setChanges, type Change } from './editor/marks'
 import { t } from './i18n'
 
@@ -80,7 +81,7 @@ export function continuityCheck(sceneId: string) {
     const { scene, number } = sceneOf(sceneId)
     const named = book.entries.filter(e => !['style', 'wordlist', 'excerpt'].includes(e.type) && e.include !== 'secret')
     const here = new Set(findMentions(scene.text, buildMatcher(named)).map(m => m.slug))
-    const bible = named.filter(e => here.has(e.slug) || e.include === 'always').map(e => `<entry name="${e.name}">\n${[e.short, e.full, e.facts.map(f => `- ${f.text}`).join('\n')].filter(s => s.trim()).join('\n')}\n</entry>`).join('\n')
+    const bible = named.filter(e => here.has(e.slug) || e.include === 'always').map(e => `<entry name="${e.name}">\n${[e.short, aiFull(e), e.facts.map(f => `- ${f.text}`).join('\n')].filter(s => s.trim()).join('\n')}\n</entry>`).join('\n')
     const reply = await ask({
       model: 'sonnet', effort: 'medium',
       system: fr() ? 'Tu vérifies la continuité d’un roman. Réponds uniquement en JSON valide, en français.' : 'You check a novel’s continuity. Reply with valid JSON only.',

@@ -6,6 +6,7 @@ import { pasteText, wrapMarks } from './paste'
 import { matterPages, FRONT, BACK } from './matter'
 import { checkBible } from './bibleCheck'
 import { jumpItems, rankJump } from './quickjump'
+import { aiBlocks, joinBlocks, parseBlocks } from './blocks'
 import { chatBody, DEFAULT_PRESETS, httpMessage, isLimitError, presetFor, readEvent, readModels, searchModels, splitSSE } from './presets'
 import { attention } from './attention'
 import { beatFlags, beatTension } from './structures'
@@ -689,5 +690,42 @@ describe('quick jump', () => {
     expect(rankJump(items, 'ESCAPE')[0].kind).toBe('scene')
     expect(rankJump(items, 'zzz')).toEqual([])
     expect(rankJump(items, '').every(i => i.kind === 'scene')).toBe(true)
+  })
+})
+
+describe('entry blocks', () => {
+  const full = 'Overview line.\n\n### Appearance\nTall, scarred.\n\n### Secrets\nShe is the heir.\n\n### Empty'
+  it('splits on headings and joins back', () => {
+    const b = parseBlocks(full)
+    expect(b.map(x => x.title)).toEqual(['', 'Appearance', 'Secrets', 'Empty'])
+    expect(b[1].text).toBe('Tall, scarred.')
+    expect(joinBlocks(b)).toBe(full)
+    expect(parseBlocks('')).toEqual([])
+  })
+  it('keeps never-blocks away from the AI and sends always-blocks with the short version', () => {
+    const e = { full, sends: { Secrets: 'never' as const, Appearance: 'always' as const } }
+    const a = aiBlocks(e)
+    expect(a.visible).toContain('Tall, scarred.')
+    expect(a.visible).not.toContain('heir')
+    expect(a.visible).not.toContain('Empty')
+    expect(a.always).toBe('### Appearance\nTall, scarred.')
+    expect(a.first).toBe('Overview line.')
+  })
+  it('builds the AI context from them', () => {
+    const e = entry({ slug: 'kara', name: 'Kara', short: 'A thief.', full, sends: { Secrets: 'never', Appearance: 'always' } })
+    const book = bookOf([], [e])
+    const base = { book, chapter: 1, pov: null, action: 'continue' as const, instruction: '', before: 'Kara ran.', selection: '', after: '', overrides: {} }
+    const short = buildContext(base).system
+    expect(short).toContain('Tall, scarred.')
+    expect(short).not.toContain('heir')
+    const withFull = buildContext({ ...base, pov: 'kara' }).system
+    expect(withFull).toContain('Overview line.')
+    expect(withFull).not.toContain('heir')
+  })
+  it('keeps the choices and tags in the entry file', () => {
+    const e = { ...entry({ slug: 'kara', name: 'Kara', path: 'bible/characters/kara.md', full }), sends: { Secrets: 'never' as const }, tags: ['thieves', 'act 1'] }
+    const back = parseEntry(e.path, serializeEntry(e))
+    expect(back.sends).toEqual({ Secrets: 'never' })
+    expect(back.tags).toEqual(['thieves', 'act 1'])
   })
 })

@@ -104,6 +104,10 @@ export interface Entry {
   unaware?: string
   /** Your own notes on the entry: kept in the file, never sent to the AI. */
   notes?: string
+  /** What the AI may read of each block (### Heading) of the full text; unlisted blocks go with the full version. */
+  sends?: Record<string, 'always' | 'full' | 'never'>
+  /** Free labels to filter the bible by ("act 2", "villains"). */
+  tags?: string[]
   /** A picture in the book folder (bible/images/...). */
   image?: string
   /** Excerpts: the kind of passage it shows. */
