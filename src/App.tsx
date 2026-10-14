@@ -59,9 +59,9 @@ export default function App() {
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === ',') { e.preventDefault(); useStore.setState({ showSettings: true }) }
       if ((e.ctrlKey || e.metaKey) && e.key === '/' && useStore.getState().book) { e.preventDefault(); useStore.setState({ dialog: 'shortcuts' }) }
-      // Ctrl+Z in the Plan, outside any text field: take back the last card or chapter move.
-      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z' && useStore.getState().view === 'plan' && !(e.target as HTMLElement | null)?.closest?.('input, textarea, select, [contenteditable]')) {
-        if (useStore.getState().undoMove()) e.preventDefault()
+      // Ctrl+Z in the Plan or the Bible, outside any text field: take back the last move, deletion or rename.
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z' && useStore.getState().view !== 'manuscript' && !(e.target as HTMLElement | null)?.closest?.('input, textarea, select, [contenteditable]')) {
+        if (useStore.getState().undo()) e.preventDefault()
       }
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'b' && useStore.getState().book) { e.preventDefault(); useStore.setState({ dialog: 'entry' }) }
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'y' && useStore.getState().book) { e.preventDefault(); useStore.setState({ dialog: 'synonyms' }) }
@@ -119,7 +119,7 @@ function Toasts() {
         <Icon size={15} />
         <span className="sk-toast-text">{toast.msg}</span>
         {toast.action && (
-          <button className="sk-btn sk-btn-sm sk-toast-action" onClick={() => { toast.action!.run(); useStore.setState({ toast: null }) }}>{toast.action.label}</button>
+          <button className="sk-btn sk-btn-sm sk-toast-action" onClick={() => { const { run } = toast.action!; useStore.setState({ toast: null }); run() }}>{toast.action.label}</button>
         )}
         <button className="sk-btn sk-btn-ghost sk-btn-sm sk-btn-icon" onClick={() => useStore.setState({ toast: null })} aria-label={t('Dismiss')}><X size={14} /></button>
       </div>

@@ -7,6 +7,12 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.12.0
+**Undo for deletions and renames**
+- Removing a bible entry or a scene, or deleting a loose idea or a structure beat, shows a toast with **Undo**: it comes back in its place, with everything it held.
+- **Ctrl+Z in the Plan and the Bible** (outside a text field) now takes back the last deletion or rename too, not only moves: chapter and scene titles, entry names, idea titles and beat names.
+- Opening another book forgets the previous book's undo steps.
+
 ## 0.11.0
 **Bible, tuned for the AI**
 - **AI check** (Bible tab): what makes the AI's context worse, found locally for free: entries without a short version, short versions over ~90 tokens, huge full versions, characters without a voice card, POV characters without "Knows / Doesn't know", entries that answer to the same name, short lower-case aliases that match ordinary words, entries that always appear together but aren't linked, names used in the text but missing from the bible. One-click fixes; "Write the missing short versions" does them all with Haiku.

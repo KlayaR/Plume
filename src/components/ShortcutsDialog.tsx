@@ -21,7 +21,7 @@ const GROUPS: [string, [string, string][]][] = [
   ['Book', [
     ['Ctrl+Shift+F', 'Find and replace in the whole book'],
     ['Ctrl+Shift+B', 'New bible entry from the selected name'],
-    ['Ctrl+Z (Plan)', 'Take back the last card or chapter move'],
+    ['Ctrl+Z (Plan, Bible)', 'Take back the last move, deletion or rename'],
     ['Ctrl+,', 'Settings'],
     ['Ctrl+/', 'This list'],
   ]],

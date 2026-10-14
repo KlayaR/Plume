@@ -5,7 +5,7 @@
 import { useMemo, useState } from 'react'
 import { ask as askDialog } from '@tauri-apps/plugin-dialog'
 import { AlertTriangle, GripVertical, Lightbulb, PenLine, Plus, Sparkles, Trash2, X } from 'lucide-react'
-import { useStore, type PlanTab } from '../store'
+import { undoableRename, useStore, type PlanTab } from '../store'
 import { WORLD_TYPES, type Chapter, type LooseCard, type Scene, type SceneStatus } from '../lib/types'
 import { chapterLabels } from '../lib/chapters'
 import { countWords, newId } from '../lib/text'
@@ -66,6 +66,11 @@ function Board() {
   const fr = book.meta.language === 'fr'
   const loose = book.meta.loose
   const setLoose = (list: LooseCard[]) => st().updateMeta({ loose: list })
+  const deleteIdea = (card: LooseCard) => {
+    const at = loose.indexOf(card)
+    setLoose(loose.filter(x => x.id !== card.id))
+    st().remember(t('Idea restored.'), () => { const now = st().book!.meta.loose; setLoose([...now.slice(0, at), card, ...now.slice(at)]) }, t('Idea deleted.'))
+  }
 
   const dropOn = (chapter: Chapter, index: number) => {
     if (drag?.kind === 'scene') st().moveScene(drag.id, chapter.id, index)
@@ -109,9 +114,10 @@ function Board() {
           </div>
           {loose.map(l => (
             <div key={l.id} className="pl-card pl-card-loose" draggable onDragStart={() => setDrag({ kind: 'loose', id: l.id })} onDragEnd={() => setDrag(null)}>
-              <input className="pl-card-input" value={l.title} placeholder={t('Idea')} onChange={e => setLoose(loose.map(x => x.id === l.id ? { ...x, title: e.target.value } : x))} />
+              <input className="pl-card-input" value={l.title} placeholder={t('Idea')} onChange={e => setLoose(loose.map(x => x.id === l.id ? { ...x, title: e.target.value } : x))}
+                {...undoableRename(was => setLoose(st().book!.meta.loose.map(x => x.id === l.id ? { ...x, title: was } : x)))} />
               <textarea className="pl-card-note" rows={3} value={l.note} placeholder={t('What happens…')} onChange={e => setLoose(loose.map(x => x.id === l.id ? { ...x, note: e.target.value } : x))} />
-              <button type="button" className="pl-quiet pl-card-x" aria-label={t('Delete')} onClick={() => setLoose(loose.filter(x => x.id !== l.id))}><X size={12} /></button>
+              <button type="button" className="pl-quiet pl-card-x" aria-label={t('Delete')} onClick={() => deleteIdea(l)}><X size={12} /></button>
             </div>
           ))}
           {loose.length === 0 && <span className="sk-hint">{t('Ideas without a home yet. Drag one onto a chapter to make it a scene.')}</span>}
@@ -123,7 +129,8 @@ function Board() {
             <div className="pl-col-head" draggable onDragStart={e => { e.stopPropagation(); setDrag({ kind: 'chapter', id: c.id }) }} onDragEnd={() => setDrag(null)}>
               <GripVertical size={13} className="pl-grip" />
               <span className="pl-col-num">{c.kind === 'chapter' ? labels[ci].number : labels[ci].label}</span>
-              <input className="pl-col-title" value={c.title} placeholder={t('Untitled')} onChange={e => st().updateChapter(c.id, { title: e.target.value })} />
+              <input className="pl-col-title" value={c.title} placeholder={t('Untitled')} onChange={e => st().updateChapter(c.id, { title: e.target.value })}
+                {...undoableRename(was => st().updateChapter(c.id, { title: was }))} />
             </div>
             <input className="pl-col-part" value={c.part ?? ''} placeholder={t('Starts a part: its title')} title={t('A part page goes before this chapter in exports')} onChange={e => st().updateChapter(c.id, { part: e.target.value })} />
             {c.scenes.map((s, si) => (
@@ -185,7 +192,8 @@ function Inspector({ scene, onClose }: { scene: Scene; onClose: () => void }) {
   return (
     <aside className="pl-inspector">
       <div className="pl-row">
-        <input className="pl-entryname pl-grow" value={scene.title} onChange={e => update({ title: e.target.value })} aria-label={t('Scene title')} />
+        <input className="pl-entryname pl-grow" value={scene.title} onChange={e => update({ title: e.target.value })} aria-label={t('Scene title')}
+          {...undoableRename(was => useStore.getState().updateScene(scene.id, { title: was }))} />
         <button type="button" className="sk-btn sk-btn-sm" onClick={() => useStore.getState().selectScene(scene.id)}><PenLine size={13} /> {t('Write it')}</button>
         <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm sk-btn-icon" onClick={onClose} aria-label={t('Close')}><X size={14} /></button>
       </div>
@@ -247,6 +255,11 @@ function Structure() {
   const { template, beats } = book.meta.structure
   const [busy, setBusy] = useState(false)
   const set = (patch: Partial<typeof book.meta.structure>) => useStore.getState().updateMeta({ structure: { ...useStore.getState().book!.meta.structure, ...patch } })
+  const deleteBeat = (i: number) => {
+    const gone = beats[i]
+    set({ beats: beats.filter((_, j) => j !== i) })
+    useStore.getState().remember(t('Beat restored.'), () => { const now = useStore.getState().book!.meta.structure.beats; set({ beats: [...now.slice(0, i), gone, ...now.slice(i)] }) }, t('Beat deleted.'))
+  }
   const scenes = book.chapters.flatMap(c => c.scenes)
   const pos = useMemo(() => scenePositions(book), [book])
 
@@ -295,7 +308,8 @@ function Structure() {
           <div key={i} className="pl-beat">
             <div className="pl-row">
               {template === 'custom'
-                ? <input className="sk-input pl-grow" value={b.name} onChange={e => patch({ name: e.target.value })} />
+                ? <input className="sk-input pl-grow" value={b.name} onChange={e => patch({ name: e.target.value })}
+                  {...undoableRename(was => { const now = useStore.getState().book!.meta.structure.beats; if (now[i]) set({ beats: now.map((x, j) => j === i ? { ...x, name: was } : x) }) })} />
                 : <span className="pl-beat-name pl-grow">{b.name}</span>}
               {template === 'custom'
                 ? <input className="sk-input pl-num" type="number" min={0} max={100} value={b.at} onChange={e => patch({ at: Number(e.target.value) || 0 })} />
@@ -304,7 +318,7 @@ function Structure() {
                 <option value="">{t('No scene yet')}</option>
                 {scenes.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}
               </select>
-              {template === 'custom' && <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm sk-btn-icon" onClick={() => set({ beats: beats.filter((_, j) => j !== i) })} aria-label={t('Delete')}><Trash2 size={13} /></button>}
+              {template === 'custom' && <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm sk-btn-icon" onClick={() => deleteBeat(i)} aria-label={t('Delete')}><Trash2 size={13} /></button>}
             </div>
             <textarea className="sk-input" rows={2} value={b.note} placeholder={t('What happens at this beat in your book')} onChange={e => patch({ note: e.target.value })} />
             {off && <span className="sk-hint pl-warn"><AlertTriangle size={12} /> {t('Placed at {a} % of the book; this beat usually comes around {b} %.', { a: Math.round(at!), b: b.at })}</span>}

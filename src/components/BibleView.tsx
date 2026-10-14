@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ask } from '@tauri-apps/plugin-dialog'
 import { ImagePlus, MessagesSquare, Plus, Search, Sparkles, Trash2, X } from 'lucide-react'
-import { useStore, type BibleTab } from '../store'
+import { undoableRename, useStore, type BibleTab } from '../store'
 import { EMPTY_VOICE, ENTRY_TYPES, typeInfo, type Entry, type EntryType, type ExcerptKind, type Include, type VoiceCard } from '../lib/types'
 import { formatFact, parseFact } from '../lib/bible'
 import { buildMatcher, findMentions } from '../lib/context'
@@ -145,7 +145,8 @@ export function EntryEditor({ entry }: { entry: Entry }) {
   return (
     <div className="pl-entryedit">
       <div className="pl-row">
-        <input className="pl-entryname" value={entry.name} onChange={e => update({ name: e.target.value })} aria-label={t('Name')} />
+        <input className="pl-entryname" value={entry.name} onChange={e => update({ name: e.target.value })} aria-label={t('Name')}
+          {...undoableRename(was => useStore.getState().updateEntry(entry.slug, { name: was }))} />
         <span className="sk-badge">{t(typeInfo(entry.type).label)}</span>
         {!plain && <button type="button" className="sk-btn sk-btn-sm" title={t('Claude asks you questions to fill the gaps of this entry')} onClick={() => startInterview(entry.slug)}><MessagesSquare size={14} /> {t('Interview me')}</button>}
         {!isStyle && <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm sk-btn-icon" title={t('Remove entry')} onClick={remove}><Trash2 size={14} /></button>}
