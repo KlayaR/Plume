@@ -78,6 +78,20 @@ To build it yourself, see [CONTRIBUTING.md](CONTRIBUTING.md).
 - LanguageTool (optional, off unless chosen) sends the scene you check to the
   server you set; a server on your own computer keeps it all local.
 
+## Code signing policy
+
+Free code signing provided by [SignPath.io](https://about.signpath.io),
+certificate by [SignPath Foundation](https://signpath.org).
+
+- Committers, reviewers and approvers: [KlayaR](https://github.com/KlayaR),
+  the maintainer. Pull requests from anyone else are reviewed before merging.
+- Installers are built only by the [Release workflow](.github/workflows/release.yml)
+  from a tagged commit of this repository, and each signing request is approved
+  by hand in SignPath.
+- Privacy: Plume sends nothing to other networked systems unless you ask it to
+  (see [Privacy](#privacy)); what you send to Claude falls under
+  [Anthropic's privacy policy](https://www.anthropic.com/legal/privacy).
+
 ## Learn more
 
 - [CHANGELOG.md](CHANGELOG.md): what each version added.
