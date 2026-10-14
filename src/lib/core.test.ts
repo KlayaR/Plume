@@ -23,6 +23,7 @@ import { darlingSpot, diffWords } from '../writing'
 import { parseJSON } from '../ai'
 import { chunks, kindOf, ltLanguage } from './languagetool'
 import { balanceSplit, inlineHtml, parseInline, stripInline } from './inline'
+import { UndoStack } from './undo'
 import { splitManuscript } from '../library'
 import { toHtml, toMarkdown } from './export'
 import { matchRanges, replaceInText } from './find'
@@ -628,5 +629,35 @@ describe('comment anchors', () => {
     expect(locateQuote(text, 'no', 12)).toBe(9)
     expect(locateQuote(text, 'no', 20)).toBe(18)
     expect(locateQuote(text, 'maybe', 0)).toBe(-1)
+  })
+})
+
+describe('undo', () => {
+  it('reverses the last step first, and remembers nothing while undoing', () => {
+    const u = new UndoStack(3)
+    const log: string[] = []
+    u.push('a undone', () => { log.push('a'); u.push('echo', () => {}) })
+    u.push('b undone', () => { log.push('b') })
+    expect(u.undo()).toBe('b undone')
+    expect(u.undo()).toBe('a undone')
+    expect(u.undo()).toBeNull()
+    expect(log).toEqual(['b', 'a'])
+  })
+  it("undoes a given step (a toast's button) once, and keeps at most `max`", () => {
+    const u = new UndoStack(2)
+    const first = u.push('1', () => {})
+    const second = u.push('2', () => {})
+    u.push('3', () => {})
+    expect(u.undo(first)).toBeNull()
+    expect(u.undo(second)).toBe('2')
+    expect(u.undo(second)).toBeNull()
+    expect(u.undo()).toBe('3')
+  })
+  it('a step can say it could not undo', () => {
+    const u = new UndoStack()
+    u.push('restored', () => 'stays in the trash')
+    expect(u.undo()).toBe('stays in the trash')
+    u.push('x', () => {}); u.clear()
+    expect(u.undo()).toBeNull()
   })
 })
