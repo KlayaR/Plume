@@ -2,6 +2,10 @@ name: Release
 
 # Push a tag like v0.12.0: builds the Windows installer and publishes a
 # release with that version's CHANGELOG.md section, published at once.
+# Signing (SignPath Foundation): with the SIGNPATH_API_TOKEN secret and the
+# SIGNPATH_ORGANIZATION_ID variable set, the installer goes to SignPath and the
+# job waits (up to 5 hours) until the maintainer approves the request there.
+# Without them, the installer is unsigned.
 on:
   push:
     tags: ['v*']
@@ -12,6 +16,8 @@ permissions:
 jobs:
   windows:
     runs-on: windows-latest
+    env:
+      SIGN: ${{ secrets.SIGNPATH_API_TOKEN != '' }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -26,6 +32,25 @@ jobs:
       - run: npm test
       - run: npm run check
       - run: npm run build
+      - name: Upload the unsigned installer
+        id: unsigned
+        if: env.SIGN == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-installer
+          path: src-tauri/target/release/bundle/nsis/*.exe
+      - name: Sign the installer (approve it in SignPath)
+        if: env.SIGN == 'true'
+        uses: signpath/github-action-submit-signing-request@v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: plume
+          signing-policy-slug: release-signing
+          github-artifact-id: ${{ steps.unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 18000
+          output-artifact-directory: src-tauri/target/release/bundle/nsis
       - name: Draft the release
         shell: bash
         env:
