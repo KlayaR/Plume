@@ -65,6 +65,6 @@ a few lines that reproduce the problem are enough.
 ## Releases (maintainer)
 
 Add the version's section to `CHANGELOG.md`, bump the three version files,
-commit, then tag and push: `git tag v1.2.0 && git push origin v1.2.0`. The
-Release workflow builds the Windows installer and opens a draft release with the
-changelog section; check it and publish.
+commit, then tag and push: `git tag v0.12.0 && git push origin v0.12.0`. The
+Release workflow builds the Windows installer and publishes a release (a
+pre-release while Plume is in 0.x) with the changelog section.
