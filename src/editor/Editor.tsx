@@ -1,8 +1,8 @@
 // One scene's editor. A chapter shows one per scene; the scene you are in is
 // the "active" one: the AI panel, Accept/Discard and the counters follow it.
 import { useEffect, useRef } from 'react'
-import { Compartment, EditorState } from '@codemirror/state'
-import { EditorView, keymap, placeholder } from '@codemirror/view'
+import { Compartment, EditorState, StateField } from '@codemirror/state'
+import { EditorView, keymap, placeholder, showTooltip, type Tooltip } from '@codemirror/view'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { findScene, useStore } from '../store'
 import { locateQuote } from '../lib/text'
@@ -101,6 +101,49 @@ function breakKey(sceneId: string) {
   }
 }
 
+// A small bar above selected text: the most used actions, one click away.
+const BAR: [string, (v: EditorView) => void][] = [
+  ['Rewrite', () => runAction('rewrite', '', {})],
+  ['Shorten', () => runAction('shorten', '', {})],
+  ['Expand', () => runAction('expand', '', {})],
+  ['Show it', () => runAction('show', '', {})],
+  ['Comment', () => useStore.getState().setPrefs({ rightTab: 'notes', mode: 'write' })],
+]
+function selectionBar(state: EditorState): readonly Tooltip[] {
+  const sel = state.selection.main
+  if (sel.empty || sel.to - sel.from > 6000 || state.field(proposalField, false) || !useStore.getState().prefs.selBar) return []
+  return [{
+    pos: sel.from, above: true, arrow: false,
+    create: view => {
+      // CodeMirror styles the tooltip element itself; the bar goes inside it.
+      const dom = document.createElement('div')
+      const bar = dom.appendChild(document.createElement('div'))
+      bar.className = 'pl-selbar'
+      const add = (label: string, run: () => void, title?: string) => {
+        const b = bar.appendChild(document.createElement('button'))
+        b.type = 'button'
+        b.textContent = label
+        if (title) b.title = title
+        // Keep the selection: act on mousedown, never take the focus.
+        b.addEventListener('mousedown', e => { e.preventDefault(); view.focus(); run() })
+      }
+      for (const [label, run] of BAR) add(t(label), () => run(view))
+      const text = view.state.sliceDoc(view.state.selection.main.from, view.state.selection.main.to)
+      if (text.length <= 60) add(t('Synonyms'), () => useStore.setState({ dialog: 'synonyms' }))
+      add('…', () => {
+        const r = bar.getBoundingClientRect()
+        showMenu({ clientX: r.right - 8, clientY: r.bottom + 4, preventDefault: () => {} }, editorMenu(view, view.state.selection.main.from))
+      }, t('More'))
+      return { dom }
+    },
+  }]
+}
+const selectionBarField = StateField.define<readonly Tooltip[]>({
+  create: selectionBar,
+  update: (v, tr) => (tr.docChanged || tr.selection || tr.effects.length ? selectionBar(tr.state) : v),
+  provide: f => showTooltip.computeN([f], st => st.field(f)),
+})
+
 function makeState(s: Scene, lang: Lang) {
   let tick: ReturnType<typeof setTimeout> | undefined
   return EditorState.create({
@@ -132,6 +175,7 @@ function makeState(s: Scene, lang: Lang) {
       placeholder(s.note?.trim() ? s.note.trim() : t('Start writing…')),
       marksExt,
       inlineExt,
+      selectionBarField,
       trackedChangesExt,
       unknown,
       placeholderExt((view, from, to, note) => fillPlaceholder(view, from, to, note)),

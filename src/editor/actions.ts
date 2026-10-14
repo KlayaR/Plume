@@ -7,7 +7,8 @@ import { buildContext, type Built, type Override } from '../lib/context'
 import { checkRules, fixDirection, type Check } from '../lib/voice'
 import { ask, effective, isCheap } from '../ai'
 import { noteTaste } from '../writing'
-import { canRun, cancelLLM, choose, runLLM } from '../llm'
+import { canRun, cancelLLM, runLLM } from '../llm'
+import type { Effort, Model } from '../lib/types'
 import { findScene, useStore } from '../store'
 import { t } from '../i18n'
 import { acceptProposal, appendProposal, discardProposal, endStream, proposalField, setProposal } from './cm'
@@ -59,6 +60,14 @@ export function currentContext(action: ActionId, instruction: string, overrides:
   return { ...built, from, to }
 }
 
+/** The model the Assistant uses: its own two choices (backend, model); the effort stays per action. */
+function assistantChoice(action: ActionId): { model: Model; effort: Effort; orModel?: string } {
+  const st = useStore.getState()
+  const act = st.book!.meta.ai.actions[action]
+  if (st.prefs.assistBackend === 'openrouter' && st.prefs.assistModel) return { model: act.model, effort: act.effort, orModel: st.prefs.assistModel }
+  return { model: (['haiku', 'sonnet', 'opus'].includes(st.prefs.assistModel) ? st.prefs.assistModel : act.model) as Model, effort: act.effort }
+}
+
 export async function runAction(action: ActionId, instruction: string, overrides: Record<string, Override>) {
   const st = useStore.getState()
   if (!view || !st.book || useAI.getState().running) return
@@ -68,13 +77,13 @@ export async function runAction(action: ActionId, instruction: string, overrides
   if (action === 'beats' && !instruction.trim()) return st.notify('warn', t('Write the beats first, one per line.'))
   const ctx = currentContext(action, instruction, overrides)
   if (!ctx) return
-  const chosen = choose(st.book.meta.ai.actions[action])
+  const chosen = assistantChoice(action)
   const settings = effective(chosen.model, chosen.effort)
   const v = view
   v.dispatch({ effects: setProposal.of({ from: ctx.from, to: ctx.to, text: '', streaming: true }) })
   useAI.setState({ last: { action, instruction, overrides }, hasProposal: true, running: 'starting', checks: [] })
   const id = await runLLM(
-    { model: settings.model, effort: settings.effort, preset: chosen.preset, system: ctx.system, message: ctx.message },
+    { model: settings.model, effort: settings.effort, orModel: chosen.orModel, system: ctx.system, message: ctx.message },
     // The reply goes to the scene it was asked for, even if another scene is active by now.
     text => { if (v.dom.isConnected) v.dispatch({ effects: appendProposal.of(text) }) },
     r => {
@@ -149,10 +158,10 @@ export async function alternatives(action: ActionId, instruction: string, overri
   if (isRewrite(action) && view.state.selection.main.empty) { st.notify('warn', t('Select the passage to rewrite first.')); return null }
   const ctx = currentContext(action, instruction, overrides)
   if (!ctx) return null
-  const s = st.book.meta.ai.actions[action]
+  const s = assistantChoice(action)
   useAI.setState({ running: 'alternatives', last: { action, instruction, overrides } })
   try {
-    const texts = await Promise.all(Array.from({ length: n }, () => ask({ model: s.model, effort: s.effort, preset: s.preset, system: ctx.system, message: ctx.message }).catch(() => '')))
+    const texts = await Promise.all(Array.from({ length: n }, () => ask({ model: s.model, effort: s.effort, orModel: s.orModel, system: ctx.system, message: ctx.message }).catch(() => '')))
     return { texts: texts.map(x => x.trim()).filter(Boolean), from: ctx.from, to: ctx.to }
   } finally { useAI.setState({ running: null }) }
 }

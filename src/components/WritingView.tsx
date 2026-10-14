@@ -16,7 +16,6 @@ import BookView, { Inline } from './BookView'
 import ChatPanel, { ResizeHandle } from './ChatPanel'
 import { ManuscriptToolbar } from './BottomBar'
 import NotesPanel from './NotesPanel'
-import { EntryEditor } from './BibleView'
 import { countPlaceholders } from '../editor/marks'
 import { useChat } from '../chat'
 import { useT } from '../i18n'
@@ -54,8 +53,7 @@ export default function WritingView() {
           <button type="button" className="sk-btn sk-btn-sm sk-btn-ghost" onClick={() => discard()}>{t('Discard')} <kbd>Esc</kbd></button>
         </div>
       )}
-      <div className={`pl-scroll ${prefs.split !== null ? 'pl-scroll-split' : ''}`}>
-        {prefs.split !== null && found && <SplitPane />}
+      <div className="pl-scroll">
         {found ? (prefs.page ? <BookView key={viewKey} /> : <Sheet key={viewKey} />) :<div className="sk-empty" style={{ paddingTop: 80 }}>{t('Pick or add a scene on the left.')}</div>}
       </div>
 
@@ -270,41 +268,6 @@ function SceneTree() {
 }
 
 /** Split view: a second scene (to read) or a bible entry (to read or edit) beside the text. */
-function SplitPane() {
-  const book = useStore(s => s.book)!
-  const split = useStore(s => s.prefs.split) ?? ''
-  const t = useT()
-  const set = (v: string | null) => useStore.getState().setPrefs({ split: v })
-  const [kind, id] = split.split(':')
-  const scene = kind === 'scene' ? book.chapters.flatMap(c => c.scenes).find(s => s.id === id) : undefined
-  const entry = kind === 'entry' ? book.entries.find(e => e.slug === id) : undefined
-  return (
-    <div className="pl-splitpane">
-      <div className="pl-row">
-        <select className="sk-select sk-btn-sm pl-grow" value={split} onChange={e => set(e.target.value)}>
-          <option value="">{t('Show beside the text…')}</option>
-          <optgroup label={t('Scenes')}>
-            {book.chapters.flatMap(c => c.scenes).map(s => <option key={s.id} value={`scene:${s.id}`}>{s.title}</option>)}
-          </optgroup>
-          <optgroup label={t('Bible')}>
-            {book.entries.filter(e => e.type !== 'style').sort((a, b) => a.name.localeCompare(b.name)).map(e => <option key={e.slug} value={`entry:${e.slug}`}>{e.name}</option>)}
-          </optgroup>
-        </select>
-        <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm" onClick={() => set(null)}>{t('Close')}</button>
-      </div>
-      {scene && (
-        <div className="pl-splittext">
-          <div className="pl-head-chapter">{scene.title}</div>
-          {scene.text.split('\n').filter(p => p.trim()).map((p, i) => <p key={i}>{p}</p>)}
-          <button type="button" className="sk-btn sk-btn-sm" onClick={() => useStore.getState().selectScene(scene.id)}>{t('Write in this scene')}</button>
-        </div>
-      )}
-      {entry && <div className="pl-splitentry"><EntryEditor key={entry.slug} entry={entry} /></div>}
-      {!scene && !entry && <p className="sk-hint">{t('Pick a scene to read, or a bible entry to read or edit, while you write.')}</p>}
-    </div>
-  )
-}
-
 /**
  * In the whole-book view, a scene far from the screen is plain text with the
  * same look; its editor is built when it gets within a screen or two of view,

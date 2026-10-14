@@ -7,6 +7,12 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.18.0
+**One way to do each thing** (UX plan, phase 2)
+- **Choosing the AI is the same everywhere:** under the Assistant and under the Chat, first which AI answers (Claude command line or OpenRouter), then the model. The per-action model rows in Settings → This book are gone (the effort per action stays). Settings → Claude now lists **your OpenRouter models**: the short list offered when you pick OpenRouter.
+- **A bar above selected text** with Rewrite, Shorten, Expand, Show it, Comment, Synonyms and "…" for the full menu. It can be turned off in Settings → Writing.
+- **One second view:** the old split view (a scene or entry squeezed beside the text) is gone; the toolbar button now opens the Bible beside the text, in the same second view as the bottom-bar button. Reading another scene beside the one you write is no longer possible; say if you miss it.
+
 ## 0.17.0
 **Trust and clarity** (first part of the UX plan, `docs/UX_PLAN.md`)
 - **Saved indicator** in the bottom bar: "Saved", "Saving…", or "Not saved: retry" when a write failed (click to try again).

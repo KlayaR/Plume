@@ -955,6 +955,13 @@ const FR: Record<string, string> = {
   'Entry moved to the trash.': 'Fiche déplacée dans la corbeille.',
   'Previous / next scene': 'Scène précédente / suivante',
   'Back / forward through what you opened': 'Revenir / avancer dans ce que vous avez ouvert',
+  'The bible beside the text': 'La bible à côté du texte',
+  'Your OpenRouter models': 'Vos modèles OpenRouter',
+  'The short list shown when you choose OpenRouter in the Assistant or the Chat. Add models from the full list; rename them as you like.': 'La courte liste proposée quand vous choisissez OpenRouter dans l’Assistant ou le Chat. Ajoutez des modèles depuis la liste complète ; renommez-les à votre guise.',
+  'Bar on selected text': 'Barre sur le texte sélectionné',
+  'Rewrite, Shorten, Expand, Show it, Comment and Synonyms above any selection.': 'Réécrire, Raccourcir, Développer, Le montrer, Commenter et Synonymes au-dessus de toute sélection.',
+  'The model is chosen under the Assistant and under the Chat (which AI, then which model).': 'Le modèle se choisit sous l’Assistant et sous le Chat (quelle IA, puis quel modèle).',
+  'Comment': 'Commenter',
 }
 
 const SHELL = {

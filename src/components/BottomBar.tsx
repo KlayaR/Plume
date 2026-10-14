@@ -196,7 +196,7 @@ export function ManuscriptToolbar() {
           <button key={id} type="button" aria-pressed={prefs.scope === id} onClick={() => st().setPrefs({ scope: id })} title={t(tip)}>{t(label)}</button>
         ))}
       </span>
-      <button type="button" className="pl-quiet pl-splitbtn" aria-pressed={prefs.split !== null} onClick={() => st().setPrefs({ split: prefs.split === null ? '' : null })} title={t('Split view: a scene or a bible entry beside the text')}><Columns2 size={15} /></button>
+      <button type="button" className="pl-quiet pl-splitbtn" aria-pressed={prefs.dual === 'bible'} onClick={() => st().setPrefs({ dual: prefs.dual === 'bible' ? null : 'bible' })} title={t('The bible beside the text')}><Columns2 size={15} /></button>
       <button type="button" className="pl-quiet" onClick={() => useStore.setState({ dialog: 'find' })} title={t('Find and replace in the book') + ' (Ctrl+Shift+F)'}><Search size={15} /></button>
       <button type="button" className="pl-quiet" onMouseDown={e => e.preventDefault()} onClick={() => useStore.setState({ dialog: 'synonyms' })} title={t('Synonyms for the selected word') + ' (Ctrl+Shift+Y)'}><Replace size={15} /></button>
       <button type="button" className="pl-quiet" onMouseDown={e => e.preventDefault()} onClick={() => useStore.setState({ dialog: 'entry' })} title={t('New bible entry from the selected name') + ' (Ctrl+Shift+B)'}><BookPlus size={15} /></button>

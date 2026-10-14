@@ -39,6 +39,8 @@ export default function App() {
   setShellStrings(shellStrings(prefs.ui))
   setClaudeTranslator((text, vars) => translate(useStore.getState().prefs.ui, text, vars))
 
+  // The old split view (before 0.18) becomes the second view with the Bible.
+  useEffect(() => { const p = useStore.getState().prefs; if (p.split !== null && p.split !== undefined) useStore.getState().setPrefs({ split: null, dual: p.split.startsWith('entry:') ? 'bible' : p.dual }) }, [])
   useEffect(() => { useStore.getState().detectClaude(); restorePrompts(); restoreReferences() }, [])
   // The first time a book opens, a short tour of where things are.
   useEffect(() => {

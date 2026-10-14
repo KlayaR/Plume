@@ -100,6 +100,9 @@ function WritingTab() {
       <SettingRow label={t('Enter, Enter, Enter')} description={t('At the end of a scene, Enter twice starts a new scene, three times a new chapter')}>
         <Switch checked={prefs.enterBreaks} onChange={v => setPrefs({ enterBreaks: v })} label={t('Enter, Enter, Enter')} />
       </SettingRow>
+      <SettingRow label={t('Bar on selected text')} description={t('Rewrite, Shorten, Expand, Show it, Comment and Synonyms above any selection.')}>
+        <Switch checked={prefs.selBar} onChange={v => setPrefs({ selBar: v })} label={t('Bar on selected text')} />
+      </SettingRow>
       <SettingRow label={t('Automatic capitals')} description={t('A sentence’s first letter, and the English “I”, are capitalised as you type. Ctrl+Z right after gives back what you typed.')}>
         <Switch checked={prefs.autoCapital} onChange={v => setPrefs({ autoCapital: v })} label={t('Automatic capitals')} />
       </SettingRow>
@@ -241,11 +244,7 @@ function BookTab() {
       </SettingRow>
     </SettingsSection>
     <SettingsSection title={t('AI for this book')}>
-      {ACTIONS.map(([id, label]) => (
-        <SettingRow key={id} label={t(label)}>
-          <PresetSelect value={ai.actions[id]} onChange={next => setAi({ actions: { ...ai.actions, [id]: next } })} />
-        </SettingRow>
-      ))}
+      <p className="sk-hint">{t('The model is chosen under the Assistant and under the Chat (which AI, then which model).')}</p>
       <SettingRow label={t('Bible budget')} description={t('Most tokens of bible entries sent per request')}>
         <input className="sk-input pl-num" type="number" min={500} max={20000} step={500} value={ai.bibleBudget} onChange={e => setAi({ bibleBudget: num(e.target.value, 500, 20000) })} />
       </SettingRow>

@@ -93,6 +93,11 @@ export interface Prefs {
   /** One-time tips already shown. */
   seen: string[]
   chatModel: string
+  /** The same two choices for the Assistant (continue, rewrite, quick actions). */
+  assistBackend: 'claude' | 'openrouter'
+  assistModel: string
+  /** The small bar of actions above selected text. */
+  selBar: boolean
   /** A second view shown beside the main one (Bible, Plan or Manuscript), and its width in px. */
   dual: View | null
   dualW: number
@@ -138,6 +143,9 @@ export const DEFAULT_PREFS: Prefs = {
   chatBackend: 'claude',
   seen: [],
   chatModel: 'sonnet',
+  assistBackend: 'claude',
+  assistModel: 'sonnet',
+  selBar: true,
   dual: null,
   dualW: 520,
   v: 2,
