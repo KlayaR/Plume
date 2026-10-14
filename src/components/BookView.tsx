@@ -13,6 +13,8 @@ import { chapterLabels } from '../lib/chapters'
 import type { Chapter, Scene } from '../lib/types'
 import { balanceSplit, parseInline } from '../lib/inline'
 import { useT } from '../i18n'
+import { showMenu } from '../contextMenu'
+import { paragraphMenu } from '../menus'
 
 interface Block {
   kind: 'para' | 'break'
@@ -225,7 +227,7 @@ export default function BookView({ scopeOverride }: { scopeOverride?: 'book' } =
                 {pg.blocks.map((b, j) => b.kind === 'break'
                   ? <div key={j} className="pl-bk-break">{b.text}</div>
                   : (
-                    <p key={j} className={paraClass(b)} onDoubleClick={() => edit(b.sceneId)}>
+                    <p key={j} className={paraClass(b)} onDoubleClick={() => edit(b.sceneId)} onContextMenu={e => b.sceneId && showMenu(e, paragraphMenu(b.sceneId, () => edit(b.sceneId)))}>
                       {dropAt(b) ? <><span className="pl-bk-drop">{b.text[0]}</span><Inline text={b.text.slice(1)} /></> : <Inline text={b.text} />}
                     </p>
                   ))}

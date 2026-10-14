@@ -12,6 +12,8 @@ import { writeShort } from '../bibleAI'
 import { useT } from '../i18n'
 import { ChatDock } from './ChatPanel'
 import BlocksEditor from './BlocksEditor'
+import { showMenu } from '../contextMenu'
+import { entryMenu } from '../menus'
 import { Contradictions, MapView, Relations, ReviewList, Tracker } from './BibleTools'
 import AICheck from './AICheck'
 import { startInterview, useChat } from '../chat'
@@ -78,7 +80,7 @@ export default function BibleView() {
             if (!items.length && ty.type === 'style') return null
             return (
               <div key={ty.type} className="pl-group">
-                <div className="pl-group-head">
+                <div className="pl-group-head" onContextMenu={ev => ty.type !== 'style' && showMenu(ev, [{ label: t('New {type}', { type: t(ty.label).toLowerCase() }), onClick: () => { setAdding(ty.type); setName('') } }])}>
                   <span className="sk-label">{t(ty.plural)}</span>
                   {ty.type !== 'style' && (
                     <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm sk-btn-icon" title={t('New {type}', { type: t(ty.label).toLowerCase() })} onClick={() => { setAdding(ty.type); setName('') }}>
@@ -87,7 +89,7 @@ export default function BibleView() {
                   )}
                 </div>
                 {items.map(e => (
-                  <button key={e.slug} type="button" className={`pl-group-item ${e.slug === slug ? 'pl-active' : ''}`} onClick={() => useStore.getState().selectEntry(e.slug)}>
+                  <button key={e.slug} type="button" className={`pl-group-item ${e.slug === slug ? 'pl-active' : ''}`} onClick={() => useStore.getState().selectEntry(e.slug)} onContextMenu={ev => showMenu(ev, entryMenu(e.slug))}>
                     <span>{e.name}</span>
                     {e.include === 'always' && ty.type !== 'style' && <span className="sk-badge sk-badge-accent">{t('always')}</span>}
                     {e.include === 'never' && <span className="sk-badge">{t('never')}</span>}

@@ -13,6 +13,8 @@ import { parseStoryTime, scenePositions, templateBeats, TEMPLATES, timeFlags } f
 import { ask, parseJSON } from '../ai'
 import { numLocale, useT } from '../i18n'
 import { ChatDock } from './ChatPanel'
+import { showMenu } from '../contextMenu'
+import { chapterMenu, newThingsMenu, sceneMenu } from '../menus'
 import Dashboard from './Dashboard'
 import Revision from './Revision'
 import Tension from './Tension'
@@ -102,7 +104,7 @@ function Board() {
             style={{ ['--sk-fill' as string]: `${((zoom - 0.4) / 0.8) * 100}%` }} />
         </label>
       </div>
-      <div className="pl-board" style={{ ['--pl-card-zoom' as string]: zoom }}>
+      <div className="pl-board" onContextMenu={e => { if (e.target === e.currentTarget) showMenu(e, [...newThingsMenu(), { label: t('New idea'), onClick: () => setLoose([...loose, { id: newId(), title: '', note: '' }]) }]) }} style={{ ['--pl-card-zoom' as string]: zoom }}>
         <section className="pl-col pl-col-loose">
           <div className="pl-col-head"><Lightbulb size={14} /> <span className="pl-grow">{t('Loose ideas')}</span>
             <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm sk-btn-icon" title={t('New idea')} onClick={() => setLoose([...loose, { id: newId(), title: '', note: '' }])}><Plus size={13} /></button>
@@ -120,7 +122,7 @@ function Board() {
         {book.chapters.map((c, ci) => (
           <section key={c.id} className={`pl-col ${drag?.kind === 'chapter' && drag.id !== c.id ? 'pl-col-target' : ''}`}
             onDragOver={e => e.preventDefault()} onDrop={() => dropOn(c, c.scenes.length)}>
-            <div className="pl-col-head" draggable onDragStart={e => { e.stopPropagation(); setDrag({ kind: 'chapter', id: c.id }) }} onDragEnd={() => setDrag(null)}>
+            <div className="pl-col-head" onContextMenu={e => { e.stopPropagation(); showMenu(e, chapterMenu(c.id)) }} draggable onDragStart={e => { e.stopPropagation(); setDrag({ kind: 'chapter', id: c.id }) }} onDragEnd={() => setDrag(null)}>
               <GripVertical size={13} className="pl-grip" />
               <span className="pl-col-num">{c.kind === 'chapter' ? labels[ci].number : labels[ci].label}</span>
               <input className="pl-col-title" value={c.title} placeholder={t('Untitled')} onChange={e => st().updateChapter(c.id, { title: e.target.value })} />
@@ -151,7 +153,7 @@ function Card({ scene, active, tint, dim, onSelect, onDragStart, onDrop }: { sce
   const place = book.entries.find(e => e.slug === scene.place)?.name
   const text = scene.note?.trim() || scene.summary?.trim() || scene.text.split('\n').find(l => l.trim())?.trim() || ''
   return (
-    <div className={`pl-card ${active ? 'pl-card-active' : ''} ${dim ? 'pl-card-dim' : ''}`} style={tint ? { borderLeft: `4px solid ${tint}` } : undefined} draggable onDragStart={e => { e.stopPropagation(); onDragStart() }}
+    <div onContextMenu={e => { e.stopPropagation(); showMenu(e, sceneMenu(scene.id, { card: true })) }} className={`pl-card ${active ? 'pl-card-active' : ''} ${dim ? 'pl-card-dim' : ''}`} style={tint ? { borderLeft: `4px solid ${tint}` } : undefined} draggable onDragStart={e => { e.stopPropagation(); onDragStart() }}
       onDragOver={e => e.preventDefault()} onDrop={e => { e.stopPropagation(); onDrop() }}
       onClick={onSelect} onDoubleClick={() => useStore.getState().selectScene(scene.id)}>
       <span className="pl-card-head">

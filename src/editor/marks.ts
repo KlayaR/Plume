@@ -129,7 +129,7 @@ const placeholders = ViewPlugin.fromClass(class {
 }, { decorations: v => v.decorations })
 
 /** Ctrl+Shift+X drops a placeholder at the cursor (or around the selection) and puts the cursor inside. */
-const insertPlaceholder = (view: EditorView) => {
+export const insertPlaceholder = (view: EditorView) => {
   const { from, to } = view.state.selection.main
   const inner = view.state.doc.sliceString(from, to)
   view.dispatch({ changes: { from, to, insert: `⟦${inner}⟧` }, selection: { anchor: from + 1, head: from + 1 + inner.length } })
@@ -289,7 +289,7 @@ const inlinePlugin = ViewPlugin.fromClass(class {
 }, { decorations: v => v.decorations })
 
 /** Wraps the selection in the marker, or takes it off if it is already wrapped. */
-function toggleInline(view: EditorView, mark: string): boolean {
+export function toggleInline(view: EditorView, mark: string): boolean {
   const { from, to } = view.state.selection.main
   const doc = view.state.doc
   const n = mark.length

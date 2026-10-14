@@ -211,6 +211,8 @@ interface State {
   promoteScene: (id: string) => void
   moveScene: (sceneId: string, toChapterId: string, toIndex: number) => void
   removeScene: (id: string) => Promise<void>
+  /** Moves a chapter and all its scenes to the book's trash folder. */
+  removeChapter: (id: string) => Promise<void>
   addEntry: (type: EntryType, name: string) => Entry
   updateEntry: (slug: string, patch: Partial<Entry>) => void
   removeEntry: (slug: string) => Promise<void>
@@ -452,6 +454,18 @@ export const useStore = create<State>((set, get) => {
       })
       set({ book: { ...b, chapters } })
       metaLater()
+    },
+    removeChapter: async id => {
+      const b = get().book!
+      const c = b.chapters.find(x => x.id === id)
+      if (!c) return
+      for (const s of c.scenes) { cancelLater(s.path); await trash(b.root, s.path) }
+      cancelLater(`ch:${id}`)
+      await trash(b.root, `manuscript/${c.folder}/chapter.md`).catch(() => {})
+      const chapters = get().book!.chapters.filter(x => x.id !== id)
+      const keep = get().sceneId && chapters.some(ch => ch.scenes.some(s => s.id === get().sceneId)) ? get().sceneId : chapters.flatMap(ch => ch.scenes)[0]?.id ?? null
+      set({ book: { ...get().book!, chapters }, sceneId: keep })
+      await saveMeta(get().book!)
     },
     removeScene: async id => {
       const found = findScene(get().book, id)

@@ -11,6 +11,8 @@ import type { Entry, Lang, Scene } from '../lib/types'
 import { buildMatcher, findMentions } from '../lib/context'
 import { ltCheck, ltLanguage } from '../lib/languagetool'
 import { languageToolExt, refreshLT } from './lt'
+import { showMenu } from '../contextMenu'
+import { editorMenu } from '../menus'
 import { enterStartsScene } from '../lib/chapters'
 import { proposalField, sceneExtensions, setNames } from './cm'
 import { accept, discard, fillPlaceholder, getEditorView, runAction, setEditorView, syncProposalState, useAI } from './actions'
@@ -134,6 +136,16 @@ function makeState(s: Scene, lang: Lang) {
       unknown,
       placeholderExt((view, from, to, note) => fillPlaceholder(view, from, to, note)),
       EditorView.domEventHandlers({
+        // Plume's own menu; in Review with the Windows spellchecker the system menu stays, for its suggestions.
+        contextmenu: (e, view) => {
+          if (windowsSpell()) return false
+          const at = view.posAtCoords({ x: e.clientX, y: e.clientY })
+          if (at === null) return false
+          const sel = view.state.selection.main
+          if (at < sel.from || at > sel.to) view.dispatch({ selection: { anchor: at } })
+          showMenu(e, editorMenu(view, at))
+          return true
+        },
         focus: () => {
           // Clicking into a scene makes it the active one.
           if (useStore.getState().sceneId !== s.id) useStore.getState().selectScene(s.id)

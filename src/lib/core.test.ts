@@ -7,6 +7,7 @@ import { matterPages, FRONT, BACK } from './matter'
 import { checkBible } from './bibleCheck'
 import { jumpItems, rankJump } from './quickjump'
 import { aiBlocks, joinBlocks, parseBlocks } from './blocks'
+import { tidy } from '../contextMenu'
 import { chatBody, DEFAULT_PRESETS, httpMessage, isLimitError, presetFor, readEvent, readModels, searchModels, splitSSE } from './presets'
 import { attention } from './attention'
 import { beatFlags, beatTension } from './structures'
@@ -727,5 +728,12 @@ describe('entry blocks', () => {
     const back = parseEntry(e.path, serializeEntry(e))
     expect(back.sends).toEqual({ Secrets: 'never' })
     expect(back.tags).toEqual(['thieves', 'act 1'])
+  })
+})
+
+describe('context menu helper', () => {
+  it('drops empty groups and doubled separators', () => {
+    const out = tidy([{ separator: true }, { label: 'A' }, false, { separator: true }, { separator: true }, { label: 'B' }, null, { separator: true }])
+    expect(out.map(i => i.label ?? '-')).toEqual(['A', '-', 'B'])
   })
 })

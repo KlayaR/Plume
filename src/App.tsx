@@ -22,6 +22,7 @@ import EntryFromText from './components/EntryFromText'
 import ShortcutsDialog from './components/ShortcutsDialog'
 import QuickJump from './components/QuickJump'
 import DualView, { ViewBody } from './components/DualView'
+import ContextMenuHost from './components/ContextMenuHost'
 import SnapshotsDialog from './components/SnapshotsDialog'
 
 export default function App() {
@@ -99,6 +100,7 @@ export default function App() {
       {book && dialog === 'tour' && <TourDialog onClose={() => useStore.setState({ dialog: null })} />}
       {book && dialog === 'agents' && <AgentDialog onClose={() => useStore.setState({ dialog: null })} />}
       {book && printing && <PrintView />}
+      <ContextMenuHost />
       <Toasts />
     </div>
   )

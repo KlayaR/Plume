@@ -8,6 +8,7 @@ import { estimateTokens } from '../lib/text'
 import { typeInfo, type Entry } from '../lib/types'
 import { useStore } from '../store'
 import { useT } from '../i18n'
+import { showMenu } from '../contextMenu'
 
 const SENDS: [Send, string][] = [['always', 'Always sent'], ['full', 'With the full entry'], ['never', 'Never sent']]
 
@@ -62,7 +63,15 @@ export default function BlocksEditor({ entry, update }: { entry: Entry; update: 
     <div className="pl-blocks">
       {blocks.length === 0 && <span className="sk-hint">{t('No block yet. Add one below, such as Appearance or Secrets.')}</span>}
       {blocks.map((b, i) => (
-        <div key={i} className={`pl-block pl-send-${sendOf(entry, b.title)}`}>
+        <div key={i} className={`pl-block pl-send-${sendOf(entry, b.title)}`} onContextMenu={e => showMenu(e, [
+          { label: t('What the AI may read'), header: t('What the AI may read') },
+          ...SENDS.map(([id, label]) => ({ label: t(label), checked: sendOf(entry, b.title) === id, onClick: () => setSend(b.title, id) })),
+          { separator: true },
+          { label: t('Move up'), disabled: i === 0, onClick: () => move(i, -1) },
+          { label: t('Move down'), disabled: i === blocks.length - 1, onClick: () => move(i, 1) },
+          { label: t('Duplicate'), onClick: () => save([...blocks.slice(0, i + 1), { title: `${b.title} (${t('copy')})`, text: b.text }, ...blocks.slice(i + 1)]) },
+          { label: t('Delete'), danger: true, onClick: () => save(blocks.filter((_, j) => j !== i)) },
+        ])}>
           <div className="pl-row">
             {b.title === '' && i === 0
               ? <span className="sk-label pl-grow">{t('Overview')}</span>

@@ -9,6 +9,8 @@ import { useStore } from '../store'
 import { deleteChat, endInterview, newChat, openChat, renameChat, send, stopChat, turnIntoEntries, useChat } from '../chat'
 import { useT } from '../i18n'
 import { BackendModelSelect } from './ModelPresets'
+import { showMenu } from '../contextMenu'
+import { messageMenu } from '../menus'
 
 /** A drag handle on the inner edge of a pane: the pane's width follows the pointer. */
 export function ResizeHandle({ side }: { side: 'left' | 'right' }) {
@@ -107,7 +109,7 @@ export default function ChatPanel() {
             {messages.length === 0 && streaming === null && (
               <p className="sk-hint">{t('Think out loud with Claude: characters, places, twists. It knows your bible. When you like something, "Turn into entries" drafts it for your review.')}</p>
             )}
-            {messages.map((m, i) => <div key={i} className={`pl-msg pl-msg-${m.role}`}>{m.text}</div>)}
+            {messages.map((m, i) => <div key={i} className={`pl-msg pl-msg-${m.role}`} onContextMenu={e => showMenu(e, messageMenu(i))}>{m.text}</div>)}
             {streaming !== null && <div className="pl-msg pl-msg-assistant pl-msg-streaming">{streaming || '…'}</div>}
           </div>
 

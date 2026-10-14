@@ -213,6 +213,12 @@ export const endInterview = () => {
 const TYPES = ENTRY_TYPES.filter(x => !['style', 'wordlist', 'excerpt'].includes(x.type)).map(x => x.type)
 
 /** Drafts entries or additions from the conversation into the review list. */
+/** Removes one message from the open conversation. */
+export function deleteMessage(index: number) {
+  const { chatId, messages } = useChat.getState()
+  commit(chatId, messages.filter((_, i) => i !== index))
+}
+
 export async function turnIntoEntries() {
   const book = useStore.getState().book
   const { messages, interview } = useChat.getState()

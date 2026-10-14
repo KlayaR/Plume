@@ -20,6 +20,8 @@ import { EntryEditor } from './BibleView'
 import { countPlaceholders } from '../editor/marks'
 import { useChat } from '../chat'
 import { useT } from '../i18n'
+import { showMenu } from '../contextMenu'
+import { chapterMenu, newThingsMenu, sceneMenu } from '../menus'
 
 export default function WritingView() {
   const book = useStore(s => s.book)!
@@ -198,13 +200,14 @@ function SceneTree() {
   }
 
   return (
-    <nav className="pl-tree">
+    <nav className="pl-tree" onContextMenu={e => { if (e.target === e.currentTarget) showMenu(e, newThingsMenu()) }}>
       {book.chapters.map((c, ci) => {
         const kinds = allowedKinds(ci, book.chapters.length)
         return (
           <div key={c.id} className="pl-chapter">
             <div
               className={`pl-chapter-head ${over === c.id ? 'pl-over' : ''}`}
+              onContextMenu={e => showMenu(e, chapterMenu(c.id))}
               onDragOver={e => { e.preventDefault(); setOver(c.id) }}
               onDragLeave={() => setOver(null)}
               onDrop={() => drop(c, c.scenes.length)}
@@ -232,6 +235,7 @@ function SceneTree() {
                 onDragLeave={() => setOver(null)}
                 onDrop={() => drop(c, si)}
                 onClick={() => st().selectScene(s.id)}
+                onContextMenu={e => showMenu(e, sceneMenu(s.id))}
               >
                 <GripVertical size={12} className="pl-grip" />
                 <span className={`pl-status pl-status-${s.status}`} title={t(s.status === 'draft' ? 'Draft' : s.status === 'revised' ? 'Revised' : 'Done')} />

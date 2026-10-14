@@ -7,6 +7,13 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.15.0
+**Right-click menus everywhere** (Plume's own, instead of the web view's Back / Reload / Inspect; text fields keep the system menu, and Shift + right-click always gives it).
+- **In the text:** Cut, Copy, Paste, Paste as plain text, Select all; Italic, Bold; **Ask Claude** (Rewrite, Expand, Shorten, Show it, Sharpen dialogue, Synonyms on a selection; Continue from here and Describe here without one); Comment on this, Cut to the darlings drawer, Drop a placeholder, Read aloud, Search the book for this, New bible entry from this. On a **bible name:** Open it, Open it beside, Add the selection as an alias. On a **name the bible doesn't know:** Add it to the bible as (any type), Ignore. On a **margin comment:** Show it in Notes, Delete it. During a **proposal:** Accept, Retry, Discard. (In Review with the Windows spellchecker, the system menu stays, for its spelling suggestions.)
+- **Scene list and plan cards:** Write it, Rename, Status, Point of view, Story lines (cards), Move to chapter, New scene after, Duplicate, Remove. **Chapters:** New scene, Rename, Kind, Start a part here, Move up or down, **Delete the chapter** (new). Empty space: New chapter, New idea.
+- **Bible:** on an entry: Open (also in the second pane), Sent to the AI, Add or remove a tag, Share with the series, Duplicate, Remove; on a heading: New entry; on a block: what the AI may read, Move, Duplicate, Delete.
+- **Chat messages:** Copy, Insert in the manuscript, Turn into entries, Delete the message. **Page view paragraphs:** Edit, Go to the scene.
+
 ## 0.14.2
 - **Icon:** the gold quill is larger and has no dark square behind it, so it fills its space like other apps' icons on the Windows taskbar and Start menu.
 
