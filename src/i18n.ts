@@ -1113,6 +1113,12 @@ const FR: Record<string, string> = {
   'new scene': 'nouvelle scène',
   'Not in the new outline, kept as they are (remove them yourself if you want): {list}': 'Absentes du nouveau plan, gardées telles quelles (supprimez-les vous-même si vous voulez) : {list}',
   'Outline updated.': 'Plan mis à jour.',
+  'Ends on': 'Finit sur',
+  '+ The chapter’s goal and how it ends': '+ Le but du chapitre et sa fin',
+  'Merge these two scenes': 'Fusionner ces deux scènes',
+  'Edit': 'Modifier',
+  'Click to edit': 'Cliquez pour modifier',
+  '+ What happens in this scene': '+ Ce qui se passe dans cette scène',
 }
 
 const SHELL = {

@@ -875,3 +875,27 @@ body.pl-dimpara .cm-focused .cm-line.cm-activeLine { opacity: 1; }
 .pl-ol-pcard ol { margin: 0; padding-left: 1.4rem; font-size: 0.92rem; }
 .pl-ol-old { text-decoration: line-through; opacity: 0.55; font-size: 0.9rem; }
 @media (max-width: 760px) { .pl-ol-extra { grid-template-columns: 1fr; } }
+/* Outline, calmer: cards read as text, one opens as a form; tools and the merge link show on hover. */
+.pl-ol-text { width: 100%; box-sizing: border-box; height: auto; padding: 6px 10px; }
+.pl-ol-card { gap: 6px; }
+.pl-ol-read { cursor: text; border-left-color: transparent; background: transparent; border-color: transparent; padding: 10px 14px; }
+.pl-ol-read:hover { background: var(--surface-1); border-color: var(--border); }
+.pl-ol-form { box-shadow: var(--shadow); }
+.pl-ol-tools { display: inline-flex; align-items: center; gap: 2px; opacity: 0; transition: opacity 0.15s; }
+.pl-ol-read:hover .pl-ol-tools, .pl-ol-form .pl-ol-tools, .pl-ol-chhead:hover .pl-ol-tools, .pl-ol-tools:focus-within { opacity: 1; }
+.pl-ol-lock { opacity: 0; color: var(--text-muted); }
+.pl-ol-read:hover .pl-ol-lock, .pl-ol-form .pl-ol-lock, .pl-ol-lock.pl-on { opacity: 1; }
+.pl-ol-metaline { font-size: var(--fs-sm); color: var(--text-muted); }
+.pl-ol-summarytext { margin: 2px 0 0; line-height: 1.55; white-space: pre-wrap; }
+.pl-ol-ghost { margin: 0; color: var(--text-muted); font-style: italic; }
+.pl-ol-beatlist { margin: 2px 0 0; padding-left: 1.4rem; display: flex; flex-direction: column; gap: 2px; line-height: 1.5; font-size: 0.95rem; }
+.pl-ol-small { font-size: var(--fs-sm); color: var(--text-dim); }
+.pl-ol-small b { font-weight: 600; margin-right: 4px; color: var(--text-muted); }
+.pl-ol-chread { display: flex; flex-direction: column; gap: 2px; align-items: flex-start; text-align: left; border: 0; background: none; padding: 2px 4px 6px 34px; color: var(--text-dim); font: inherit; font-style: italic; cursor: text; border-radius: 6px; }
+.pl-ol-chread:hover { background: var(--surface-1); }
+.pl-ol-chread b { font-style: normal; font-weight: 600; margin-right: 4px; color: var(--text-muted); }
+.pl-ol-slot { display: flex; flex-direction: column; }
+.pl-ol-gap { height: 14px; display: flex; align-items: center; justify-content: center; }
+.pl-ol-gap button { opacity: 0; font-size: var(--fs-xs); display: inline-flex; align-items: center; gap: 4px; color: var(--text-muted); padding: 0 8px; transition: opacity 0.15s; }
+.pl-ol-gap:hover button, .pl-ol-gap button:focus { opacity: 1; color: var(--accent); }
+.pl-ol-ch { background: var(--surface-1); border-color: transparent; gap: 4px; }

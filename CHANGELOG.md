@@ -7,6 +7,14 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.27.1
+**A calmer Outline tab**
+- Cards now read as text: title, one grey line (POV, place, time, words), the summary, the beats as a plain numbered list, and the other fields only when they're filled in. **Click a card to edit it** (one at a time; Done, Escape or a click elsewhere closes it).
+- A chapter's goal and ending show as two lines under its title, editable on click.
+- Buttons (Detail, write, lock, ⋯) appear when you point at a card; a locked card keeps its padlock in view.
+- **Merge two scenes:** point between them and click **Merge these two scenes** (it's also in the right-click menu).
+- Fix: beats were squeezed into narrow boxes.
+
 ## 0.27.0
 **Plan → Outline: read the whole outline, change any part, keep Claude in check**
 - **A new Outline tab**, first in the Plan (the Board stays for the cards): the whole outline on one page, chapter after chapter, every field editable in place. Each chapter has its **goal** and **how it ends**; each scene its summary, POV, place, story time, who is there, numbered **beats** (add, reorder, remove), what the reader learns, the arc and the pace. Search and fold chapters.
