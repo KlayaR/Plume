@@ -83,6 +83,9 @@ function AppearanceTab() {
           <button type="button" aria-pressed={prefs.ui === 'en'} onClick={() => setPrefs({ ui: 'en' })}>English</button>
         </div>
       </SettingRow>
+      <SettingRow label={t('Show everything')} description={t('Every tab and report: the Plan’s timeline, story lines, dashboard and revision, the bible’s More tab, and all the Review reports. Off, Plume shows what most writers use.')}>
+        <Switch checked={!prefs.simple} onChange={v => setPrefs({ simple: !v })} label={t('Show everything')} />
+      </SettingRow>
     </SettingsSection>
   )
 }
@@ -148,24 +151,27 @@ function SpellSection() {
           <SettingRow label={t('Check while writing')} description={t('Off by default. When on, the scene’s text is sent to the server a moment after you stop typing, in Write mode too.')}>
             <Switch checked={prefs.ltLive} onChange={v => setPrefs({ ltLive: v })} label={t('Check while writing')} />
           </SettingRow>
-          <SettingRow label={t('LanguageTool server')} description={publicServer ? t('The public server: free, about 20 checks a minute, and the scene’s text is sent to it. A server running on your own computer keeps everything private.') : t('Your own server.')}>
-            <input className="sk-input pl-wide" value={prefs.ltServer} placeholder={LT_DEFAULT} onChange={e => setPrefs({ ltServer: e.target.value })} />
-          </SettingRow>
-          <SettingRow label={t('Premium account')} description={t('Optional: your LanguageTool Premium login and API key.')}>
-            <span className="pl-row">
-              <input className="sk-input" value={prefs.ltUser} placeholder={t('Login')} onChange={e => setPrefs({ ltUser: e.target.value })} />
-              <input className="sk-input" type="password" value={prefs.ltKey} placeholder={t('API key')} onChange={e => setPrefs({ ltKey: e.target.value })} />
-            </span>
-          </SettingRow>
           <SettingRow label={t('English variant')} description={t('For English books. French books use French.')}>
             <select className="sk-select" value={prefs.ltEnglish} onChange={e => setPrefs({ ltEnglish: e.target.value })}>
               <option value="en-US">English (US)</option><option value="en-GB">English (UK)</option>
               <option value="en-CA">English (Canada)</option><option value="en-AU">English (Australia)</option>
             </select>
           </SettingRow>
-          <SettingRow label={t('Test the connection')} description={result}>
-            <button type="button" className="sk-btn sk-btn-sm" onClick={test}>{t('Test')}</button>
-          </SettingRow>
+          <details className="pl-advanced pl-advconn">
+            <summary>{t('Advanced connections')} <span className="sk-hint">{t('server, Premium account, test')}</span></summary>
+            <SettingRow label={t('LanguageTool server')} description={publicServer ? t('The public server: free, about 20 checks a minute, and the scene’s text is sent to it. A server running on your own computer keeps everything private.') : t('Your own server.')}>
+              <input className="sk-input pl-wide" value={prefs.ltServer} placeholder={LT_DEFAULT} onChange={e => setPrefs({ ltServer: e.target.value })} />
+            </SettingRow>
+            <SettingRow label={t('Premium account')} description={t('Optional: your LanguageTool Premium login and API key.')}>
+              <span className="pl-row">
+                <input className="sk-input" value={prefs.ltUser} placeholder={t('Login')} onChange={e => setPrefs({ ltUser: e.target.value })} />
+                <input className="sk-input" type="password" value={prefs.ltKey} placeholder={t('API key')} onChange={e => setPrefs({ ltKey: e.target.value })} />
+              </span>
+            </SettingRow>
+            <SettingRow label={t('Test the connection')} description={result}>
+              <button type="button" className="sk-btn sk-btn-sm" onClick={test}>{t('Test')}</button>
+            </SettingRow>
+          </details>
         </>
       )}
       {book && words.length > 0 && (

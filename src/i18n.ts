@@ -975,6 +975,21 @@ const FR: Record<string, string> = {
   'Presence': 'Présence',
   'tags, links, voice, facts, private notes': 'étiquettes, liens, voix, faits, notes privées',
   'tags, links, facts, private notes': 'étiquettes, liens, faits, notes privées',
+  'Shows every tab and report. Settings → Appearance turns it back off.': 'Affiche tous les onglets et rapports. Réglages → Apparence permet de revenir en arrière.',
+  'Show everything': 'Tout afficher',
+  'Worth a look first': 'À regarder d’abord',
+  'Nothing to review yet.': 'Rien à relire pour l’instant.',
+  'Every report is within its target.': 'Chaque rapport est dans sa cible.',
+  'All reports': 'Tous les rapports',
+  'Hide the other reports': 'Masquer les autres rapports',
+  'Every tab and report: the Plan’s timeline, story lines, dashboard and revision, the bible’s More tab, and all the Review reports. Off, Plume shows what most writers use.': 'Tous les onglets et rapports : chronologie, intrigues, tableau de bord et révision du Plan, l’onglet Plus de la bible et tous les rapports de Relecture. Désactivé, Plume montre ce que la plupart des auteurs utilisent.',
+  'Advanced connections': 'Connexions avancées',
+  'server, Premium account, test': 'serveur, compte Premium, test',
+  '1. Your voice': '1. Votre voix',
+  'How this book is told. Sent with every request for this book.': 'Comment ce livre est raconté. Envoyé avec chaque demande pour ce livre.',
+  '2. Your rules': '2. Vos règles',
+  'scene rules, style profile, reference books': 'règles de scène, profil de style, livres de référence',
+  '3. Your prompt': '3. Votre prompt',
 }
 
 const SHELL = {

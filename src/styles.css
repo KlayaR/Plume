@@ -816,3 +816,7 @@ body.pl-typing .pl-toolbar { opacity: 0.08; }
 .pl-selbar { display: flex; gap: 2px; padding: 3px; border-radius: 8px; background: #23201a; border: 1px solid #4a4334; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35); font-family: system-ui, sans-serif; }
 .pl-selbar button { border: 0; background: transparent; color: #f1ead8; font: inherit; font-size: 12px; padding: 4px 8px; border-radius: 5px; cursor: pointer; white-space: nowrap; }
 .pl-selbar button:hover { background: rgba(217, 180, 90, 0.25); color: #fff; }
+.pl-showall { font-size: var(--fs-xs); color: var(--text-dim); padding: 0 8px; }
+.pl-showall:hover { color: var(--text); }
+.pl-allreports { display: flex; align-items: center; gap: 4px; margin-top: 6px; font-size: var(--fs-sm); color: var(--text-dim); }
+.pl-voiceadv, .pl-advconn { margin-top: 8px; }

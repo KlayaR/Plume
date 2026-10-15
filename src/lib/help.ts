@@ -142,12 +142,14 @@ export const HELP: HelpTopic[] = [
     lines: {
       en: [
         'Switch **Write / Review** at the top. Review shows a score and reports for pacing, dialogue, strong writing, word choice, repetition and readability; click a report to highlight its findings in the text and step through them.',
+        'It opens on the **three reports worth a look first** (furthest above their target); **All reports** shows the rest. New installs start in a simpler mode that hides the less used tabs and reports: **Show everything** (or Settings → Appearance) brings them back.',
         'Targets come from Plume\'s defaults, or from **reference books** you add in Settings → Voice (novels you admire, measured on your computer; only the numbers are kept).',
         '**Who says what** shows each character\'s share of the dialogue, their tics, and lines that break their voice card. **Read aloud** speaks the scene.',
         'Spelling and grammar come from **LanguageTool** (any book language) or the Windows spellchecker; choose in Settings → Writing. The AI checks (beta reader, line edit, voices, continuity) cost tokens and say so first.',
       ],
       fr: [
         'Basculez **Écrire / Relire** en haut. Relire montre une note et des rapports sur le rythme, les dialogues, l\'écriture forte, le choix des mots, les répétitions et la lisibilité ; cliquez un rapport pour surligner ses résultats dans le texte et les parcourir.',
+        'Elle s’ouvre sur les **trois rapports à regarder d’abord** (les plus au-dessus de leur cible) ; **Tous les rapports** montre le reste. Une nouvelle installation démarre dans un mode plus simple qui masque les onglets et rapports moins utilisés : **Tout afficher** (ou Réglages → Apparence) les fait revenir.',
         'Les cibles viennent des valeurs par défaut de Plume, ou des **livres de référence** que vous ajoutez dans Paramètres → Voix (des romans que vous admirez, mesurés sur votre ordinateur ; seuls les chiffres sont gardés).',
         '**Qui dit quoi** montre la part de dialogue de chaque personnage, ses tics, et les répliques qui contredisent sa fiche de voix. **Lecture à voix haute** lit la scène.',
         'L\'orthographe et la grammaire viennent de **LanguageTool** (toute langue de livre) ou du correcteur de Windows ; choisissez dans Paramètres → Écriture. Les contrôles par IA (bêta-lecteur, relecture de style, voix, continuité) coûtent des tokens et le disent avant.',

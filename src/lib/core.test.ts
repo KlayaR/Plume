@@ -19,7 +19,7 @@ import type { Book, Entry, Scene } from './types'
 import { DEFAULT_AI, DEFAULT_VOICE, ENTRY_TYPES, FAMILIES, VOICE_TYPES, familyOf } from './types'
 import { adverbs, passives, echoes } from './analysis'
 import { checkRules, expandVariables } from './voice'
-import { review } from './review'
+import { review, topProblems } from './review'
 import { parseStoryTime } from './structures'
 import { makeZip, readZip, utf8, fromUtf8 } from './zip'
 import { scenePositions, timeFlags } from './structures'
@@ -757,5 +757,13 @@ describe('bible families', () => {
     }
     expect(familyOf('creature')).toBe('things')
     expect(familyOf('wordlist')).toBeNull()
+  })
+})
+
+describe('review top problems', () => {
+  it('keeps the reports furthest above target, worst first', () => {
+    const r = (id: string, rate: number, target: number, status: 'good' | 'ok' | 'bad') => ({ def: { id } as never, findings: [], count: 1, rate, target, fromRef: false, status })
+    const top = topProblems([r('a', 1, 2, 'good'), r('b', 3, 2, 'ok'), r('c', 10, 2, 'bad'), r('d', 5, 2, 'bad'), r('e', 2.5, 2, 'ok')])
+    expect(top.map(x => x.def.id)).toEqual(['c', 'd', 'b'])
   })
 })

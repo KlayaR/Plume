@@ -102,6 +102,8 @@ export interface Prefs {
   selBar: boolean
   /** Bible families folded in the list, and entry types whose Advanced fold is open. */
   famClosed: string[]
+  /** Beginner mode: the less used tabs and reports stay hidden until "Show everything". */
+  simple: boolean
   advOpen: string[]
   /** A second view shown beside the main one (Bible, Plan or Manuscript), and its width in px. */
   dual: View | null
@@ -152,6 +154,7 @@ export const DEFAULT_PREFS: Prefs = {
   assistModel: 'sonnet',
   selBar: true,
   famClosed: [],
+  simple: true,
   advOpen: [],
   dual: null,
   dualW: 520,
@@ -164,7 +167,9 @@ function loadPrefs(): Prefs {
   let saved: Partial<Prefs> | null = null
   try { saved = JSON.parse(localStorage.getItem(PREFS_KEY) ?? 'null') } catch { /* unreadable: defaults */ }
   // Read the version from what was saved, not from the defaults merged into it.
-  if (saved && (saved.v ?? 0) < 2) return { ...p, pinLeft: true, pinRight: true, v: 2 }
+  if (saved && (saved.v ?? 0) < 2) return { ...p, pinLeft: true, pinRight: true, simple: false, v: 2 }
+  // Beginner mode is for new installs: people who already use Plume keep everything.
+  if (saved && saved.simple === undefined) return { ...p, simple: false }
   return p
 }
 

@@ -25,7 +25,9 @@ const MORE: [BibleTab, string][] = [['tracker', 'Presence'], ['map', 'Map'], ['r
 export default function BibleView() {
   const book = useStore(s => s.book)!
   const slug = useStore(s => s.entrySlug)
-  const tab = useStore(s => s.bibleTab)
+  const simple = useStore(s => s.prefs.simple)
+  const chosen = useStore(s => s.bibleTab)
+  const tab = simple && MORE_TABS.includes(chosen) ? 'entry' : chosen
   const pinned = useStore(s => s.prefs.chatOpen)
   const closed = useStore(s => s.prefs.famClosed)
   const drafts = useChat(s => s.proposals.length)
@@ -122,7 +124,7 @@ export default function BibleView() {
                 {t(label)}{id === 'review' && drafts > 0 ? ` (${drafts})` : ''}
               </button>
             ))}
-            <button type="button" aria-pressed={MORE_TABS.includes(tab)} onClick={() => !MORE_TABS.includes(tab) && useStore.setState({ bibleTab: 'tracker' })}>{t('More')}</button>
+            {simple ? <ShowEverything /> : <button type="button" aria-pressed={MORE_TABS.includes(tab)} onClick={() => !MORE_TABS.includes(tab) && useStore.setState({ bibleTab: 'tracker' })}>{t('More')}</button>}
           </nav>
           {MORE_TABS.includes(tab) && (
             <nav className="pl-switch pl-bible-more" aria-label={t('More')}>
@@ -388,5 +390,14 @@ function Portrait({ entry, update }: { entry: Entry; update: (patch: Partial<Ent
       )}
       {url && <button type="button" className="pl-quiet pl-portrait-x" onClick={() => update({ image: undefined })} aria-label={t('Remove picture')}><X size={12} /></button>}
     </div>
+  )
+}
+
+/** Beginner mode's way out, at the end of a tab bar. */
+export function ShowEverything() {
+  const t = useT()
+  return (
+    <button type="button" className="pl-quiet pl-showall" title={t('Shows every tab and report. Settings → Appearance turns it back off.')}
+      onClick={() => useStore.getState().setPrefs({ simple: false })}>{t('Show everything')}</button>
   )
 }

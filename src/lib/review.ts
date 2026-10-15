@@ -259,5 +259,11 @@ export function review(text: string, book: Book, refs?: Record<string, number> |
   }
 }
 
+/** The reports furthest above their target, worst first (only those not within it). */
+export function topProblems(results: ReportResult[], n = 3): ReportResult[] {
+  const over = (r: ReportResult) => r.rate / Math.max(r.target, 0.1)
+  return results.filter(r => r.status !== 'good' && r.count > 0).sort((a, b) => over(b) - over(a)).slice(0, n)
+}
+
 /** Every occurrence of one word (for the overused-words list). */
 export const occurrences = (text: string, word: string): Finding[] => words(text).filter(x => foldText(x.w) === word).map(({ from, to }) => ({ from, to }))

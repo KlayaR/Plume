@@ -6,13 +6,14 @@ import { useEffect, useMemo, useState } from 'react'
 import { ChevronDown, ChevronLeft, ChevronRight, Pause, Play, Sparkles, Users, Wand2 } from 'lucide-react'
 import { findScene, useStore } from '../store'
 import { textStats, type TextStats } from '../lib/stats'
-import { CATEGORIES, review, type ReportResult } from '../lib/review'
+import { CATEGORIES, review, topProblems, type ReportResult } from '../lib/review'
 import { getEditorView } from '../editor/actions'
 import { betaCost, betaRead, continuityCheck, continuityCost, lineEdit, lineEditCost, loadVoices, PERSONAS, readAloud, stopReading, useReview, voiceCheck, voiceCheckCost, voicesFor } from '../review'
 import { refreshLT, useLT } from '../editor/lt'
 import { referenceTargets, useRefs } from '../lib/references'
 import { speakerStats } from '../lib/speakers'
 import { numLocale, useT } from '../i18n'
+import { ShowEverything } from './BibleView'
 
 const n = (x: number, d = 0) => x.toLocaleString(numLocale(), { maximumFractionDigits: d, minimumFractionDigits: d })
 
@@ -25,7 +26,9 @@ export default function ReviewPanel() {
   const { scene, chapter, label } = found
   const report = useReview(s => s.report)
   const [scope, setScope] = useState<Scope>('scene')
-  const [open, setOpen] = useState<string | null>('strong')
+  const [open, setOpen] = useState<string | null>(null)
+  const [all, setAll] = useState(false)
+  const simple = useStore(s => s.prefs.simple)
   const t = useT()
   const text = scope === 'scene' ? scene.text : chapter.scenes.map(s => s.text).join('\n')
   const refList = useRefs(s => s.list)
@@ -34,6 +37,7 @@ export default function ReviewPanel() {
   // Leaving Review takes the highlights away.
   useEffect(() => () => useReview.setState({ report: null }), [])
 
+  const top = topProblems(r.results)
   const color = r.score >= 75 ? 'pl-good' : r.score >= 50 ? 'pl-ok' : 'pl-bad'
   return (
     <aside className="pl-context pl-review-panel">
@@ -54,7 +58,19 @@ export default function ReviewPanel() {
 
       <SpellingStatus />
 
-      {CATEGORIES.filter(c => c.id !== 'readability').map(c => {
+      <section className="pl-cat">
+        <div className="sk-label">{t('Worth a look first')}</div>
+        {!r.words ? <span className="sk-hint">{t('Nothing to review yet.')}</span>
+          : top.length === 0 ? <span className="sk-hint">{t('Every report is within its target.')}</span>
+          : top.map(x => <ReportRow key={x.def.id} r={x} active={report === x.def.id} />)}
+        {simple ? <ShowEverything /> : (
+          <button type="button" className="pl-quiet pl-allreports" aria-expanded={all} onClick={() => setAll(!all)}>
+            <ChevronDown size={14} className={all ? 'pl-rot' : ''} /> {t(all ? 'Hide the other reports' : 'All reports')}
+          </button>
+        )}
+      </section>
+
+      {all && !simple && CATEGORIES.filter(c => c.id !== 'readability').map(c => {
         const rs = r.results.filter(x => x.def.category === c.id)
         const bad = rs.filter(x => x.status === 'bad').length, ok = rs.filter(x => x.status === 'ok').length
         return (
@@ -80,7 +96,7 @@ export default function ReviewPanel() {
         )
       })}
 
-      <section className="pl-cat">
+      {all && !simple && <section className="pl-cat">
         <button type="button" className="pl-cat-head" onClick={() => setOpen(open === 'readability' ? null : 'readability')} aria-expanded={open === 'readability'}>
           <span className={`pl-dotstatus ${r.readability >= 50 && r.readability <= 85 ? 'pl-good' : 'pl-ok'}`} />
           <span className="pl-grow">{t('Readability')}</span>
@@ -98,13 +114,13 @@ export default function ReviewPanel() {
             <Rhythm lengths={r.sentenceLengths} />
           </div>
         )}
-      </section>
+      </section>}
 
-      <Speakers text={text} scenes={scope === 'scene' ? [scene] : chapter.scenes} />
+      {all && !simple && <Speakers text={text} scenes={scope === 'scene' ? [scene] : chapter.scenes} />}
 
       <AIChecks sceneId={scene.id} chapterId={chapter.id} chapterText={chapter.scenes.map(s => s.text).join('\n')} />
       <ReadAloud />
-      <Figures scene={scene.text} chapter={chapter.scenes.map(s => s.text).join('\n')} label={label} />
+      {!simple && <Figures scene={scene.text} chapter={chapter.scenes.map(s => s.text).join('\n')} label={label} />}
     </aside>
   )
 }

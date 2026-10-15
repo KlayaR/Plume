@@ -18,18 +18,23 @@ import { chapterMenu, newThingsMenu, sceneMenu } from '../menus'
 import Dashboard from './Dashboard'
 import Revision from './Revision'
 import Tension from './Tension'
+import { ShowEverything } from './BibleView'
 
 const TABS: [PlanTab, string][] = [['board', 'Board'], ['structure', 'Structure'], ['timeline', 'Timeline'], ['lines', 'Story lines'], ['dashboard', 'Dashboard'], ['revision', 'Revision']]
 
 export default function PlanView() {
-  const tab = useStore(s => s.planTab)
+  const simple = useStore(s => s.prefs.simple)
+  const chosen = useStore(s => s.planTab)
+  // Beginner mode keeps the Board and Structure; the other tabs come with "Show everything".
+  const tab = simple && !['board', 'structure'].includes(chosen) ? 'board' : chosen
   const pinned = useStore(s => s.prefs.chatOpen)
   const t = useT()
   return (
     <div className="pl-withdock" data-pin={pinned}>
       <div className="pl-plan">
         <nav className="pl-switch pl-plan-tabs" aria-label={t('Plan')}>
-          {TABS.map(([id, label]) => <button key={id} type="button" aria-pressed={tab === id} onClick={() => useStore.setState({ planTab: id })}>{t(label)}</button>)}
+          {TABS.filter(([id]) => !simple || id === 'board' || id === 'structure').map(([id, label]) => <button key={id} type="button" aria-pressed={tab === id} onClick={() => useStore.setState({ planTab: id })}>{t(label)}</button>)}
+          {simple && <ShowEverything />}
         </nav>
         {tab === 'board' && <Board />}
         {tab === 'structure' && <Structure />}

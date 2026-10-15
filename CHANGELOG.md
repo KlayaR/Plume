@@ -7,6 +7,13 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.20.0
+**Voice, Review, Settings and a simpler start** (UX plan, phase 4)
+- **Settings → Voice in three steps:** 1. Your voice (tense, adult fiction, fantasy defaults, then your voice materials), 2. Your rules, 3. Your prompt. Scene rules, the style profile and reference books are under Advanced.
+- **Review opens on the three reports worth a look first** (furthest above their target). **All reports** shows every category, readability and Who says what. The Claude checks keep their own section.
+- **Settings → Writing:** the LanguageTool server, Premium account and connection test are folded under **Advanced connections**.
+- **Beginner mode for new installs:** the Plan shows Board and Structure, the bible hides its More tab, and Review shows only the top reports. **Show everything** (at the end of each tab bar, or Settings → Appearance) brings everything back. If you already used Plume, nothing is hidden.
+
 ## 0.19.0
 **A simpler bible** (UX plan, phase 3)
 - **Five families** in the bible list: People, Places, Things (objects, creatures), Lore (lore and rules, magic, events, factions, themes) and Story lines. Click a family to fold it; the New entry menu is grouped the same way. Nothing changes on disk.

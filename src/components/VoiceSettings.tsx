@@ -30,9 +30,7 @@ export default function VoiceSettings() {
 
   return (
     <>
-      <PromptLibrary />
-
-      <SettingsSection title={t('This book’s voice')} description={t('Sent with every request for this book.')}>
+      <SettingsSection title={t('1. Your voice')} description={t('How this book is told. Sent with every request for this book.')}>
         <SettingRow label={t('Fantasy defaults')} description={t('Plume’s fantasy preset: deep point of view, the world shown through action, magic with a cost, no info-dumps, no clichés. Sets the prompt, scene rules, your rules and two word lists (your tense, adult setting, voice description and taste are kept).')}>
           <button type="button" className="sk-btn sk-btn-sm" onClick={() => { applyFantasyDefaults(useStore.getState().book!, true); useStore.getState().notify('ok', t('Fantasy voice settings applied.')) }}>{t('Apply')}</button>
         </SettingRow>
@@ -42,17 +40,11 @@ export default function VoiceSettings() {
         <SettingRow label={t('Adult literary fiction')} description={t('Tells Claude the book is adult fiction that may treat dark themes seriously. No other wording is added.')}>
           <Switch checked={voice.adult} onChange={v => set({ adult: v })} label={t('Adult literary fiction')} />
         </SettingRow>
-        <div className="pl-opt-group">{t('Scene rules')}</div>
-        {SCENE_RULES.map(r => (
-          <SettingRow key={r.id} label={t(r.label)}>
-            <Switch checked={voice.sceneRules.includes(r.id)} onChange={v => toggleScene(r.id, v)} label={t(r.label)} />
-          </SettingRow>
-        ))}
       </SettingsSection>
 
       <VoiceMaterials />
 
-      <SettingsSection title={t('Your rules')} description={t('Every proposal is checked against these, without the AI. A failed rule gets "Retry fixing these".')}>
+      <SettingsSection title={t('2. Your rules')} description={t('Every proposal is checked against these, without the AI. A failed rule gets "Retry fixing these".')}>
         <SettingRow label={t('Passive voice, at most')} description={t('% of sentences')}>
           <input className="sk-input pl-num" type="number" min={0} max={50} value={voice.rules.passiveMax} onChange={e => setRule({ passiveMax: Number(e.target.value) || 0 })} />
         </SettingRow>
@@ -71,8 +63,20 @@ export default function VoiceSettings() {
         <p className="sk-hint">{t('Banned words come from your word lists (Your voice materials, above).')}</p>
       </SettingsSection>
 
-      <StyleProfile />
-      <ReferenceBooks />
+      <PromptLibrary />
+
+      <details className="pl-advanced pl-voiceadv">
+        <summary>{t('Advanced')} <span className="sk-hint">{t('scene rules, style profile, reference books')}</span></summary>
+        <SettingsSection title={t('Scene rules')} description={t('Sent with every request for this book.')}>
+          {SCENE_RULES.map(r => (
+            <SettingRow key={r.id} label={t(r.label)}>
+              <Switch checked={voice.sceneRules.includes(r.id)} onChange={v => toggleScene(r.id, v)} label={t(r.label)} />
+            </SettingRow>
+          ))}
+        </SettingsSection>
+        <StyleProfile />
+        <ReferenceBooks />
+      </details>
     </>
   )
 }
@@ -98,7 +102,7 @@ function PromptLibrary() {
   const all = allPrompts()
 
   return (
-    <SettingsSection title={t('Prompt library')} description={t('Your own instruction sets, kept on this computer for all your books. Each book picks one; each action can override it in the Claude panel.')}>
+    <SettingsSection title={t('3. Your prompt')} description={t('Your own instruction sets, kept on this computer for all your books. Each book picks one; each action can override it in the Claude panel.')}>
       <SettingRow label={t('This book uses')}>
         <select className="sk-select" value={voice.prompt} onChange={e => { useStore.getState().updateMeta({ voice: { ...voice, prompt: e.target.value } }); setTimeout(() => refreshSnapshots(useStore.getState().book!), 0) }}>
           <option value="">{t('No prompt')}</option>
