@@ -134,6 +134,10 @@ export async function loadBook(root: string): Promise<Book> {
       }
     } catch { /* series folder moved or not synced yet */ }
   }
+  let seriesPlan: Book['seriesPlan']
+  if (sroot) {
+    try { const plan = JSON.parse(await read(sroot, 'series.json')).plan; if (plan && typeof plan === 'object') seriesPlan = plan } catch { /* no plan yet */ }
+  }
   // Scene files dropped into the folder by hand join their chapter, at the end.
   const order = meta.order.map(o => ({ folder: o.folder, scenes: [...o.scenes] }))
   for (const p of await list(root, 'manuscript')) {
@@ -146,7 +150,7 @@ export async function loadBook(root: string): Promise<Book> {
   const chapters: Chapter[] = []
   for (const o of order) chapters.push(await readChapter(root, o.folder, o.scenes))
   meta.order = order
-  return { root, meta, entries, chapters }
+  return { root, meta, entries, chapters, seriesPlan }
 }
 
 export const orderOf = (chapters: Chapter[]) =>
@@ -154,6 +158,15 @@ export const orderOf = (chapters: Chapter[]) =>
 
 export const saveMeta = (book: Book) =>
   write(book.root, 'plume.json', JSON.stringify({ ...book.meta, order: orderOf(book.chapters) }, null, 2) + '\n')
+
+/** Writes the series plan into series.json, keeping what else the file holds. */
+export async function saveSeriesPlan(book: Book) {
+  const sroot = seriesRootOf(book.root, book.meta.series)
+  if (!sroot) return
+  let data: Record<string, unknown> = {}
+  try { data = JSON.parse(await read(sroot, 'series.json')) } catch { /* new file */ }
+  await write(sroot, 'series.json', JSON.stringify({ ...data, plan: book.seriesPlan ?? {} }, null, 2) + '\n')
+}
 
 export const saveScene = (root: string, s: Scene) => guarded(root, s.path, serializeScene(s))
 export const saveEntry = (root: string, e: Entry) => guarded(root, e.path, serializeEntry(e))

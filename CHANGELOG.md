@@ -7,6 +7,15 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.32.0
+**Series: Claude knows what comes next, without putting it in this book**
+- **The series** (Plan → Outline, above The story, for books in a series): the series' arc and endgame, one line per book, and the big reveals with the book each belongs to. Saved in the series folder, so every book of the series shares it.
+- Every outline request (Outline from a premise, Detail, Regenerate, scene cards, Check, Missing entries) reads it with a firm rule: this book tells only its own part; plant and foreshadow what comes later, never resolve, reveal or start later books' events.
+- **Later in the series** on bible entries ("Book 3: she is the queen's daughter"): read when planning, so Claude can plant clues, never sent when Claude writes prose. Facts dated in later books ([b3 …]) work the same way. Missing entries fills it from the series plan.
+- **Seeds for later books** on scene cards: the clues a scene plants for later books. Detail writes them; when Claude writes the scene, a seed goes in as a passing detail, never named or explained.
+- **Check the outline** also flags seeds the series needs from this book that it never plants, and anything that resolves, reveals or starts too early what the series keeps for a later book.
+- Books outside a series see none of this.
+
 ## 0.31.1
 **"Mostly one scene" now means it**
 - Claude split chapters into two scenes whenever the character changed place. A scene is now one unbroken stretch of time with one point of view: the character can walk from the ballroom to the garden inside it.

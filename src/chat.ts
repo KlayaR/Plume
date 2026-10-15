@@ -38,6 +38,8 @@ export interface Proposal {
   voice?: Partial<VoiceCard>
   knows?: string
   unaware?: string
+  /** Series: what the entry becomes in later books. */
+  later?: string
 }
 
 const VOICE_KEYS = Object.keys(EMPTY_VOICE) as (keyof VoiceCard)[]
@@ -254,7 +256,8 @@ ${fr ? 'Pour "full", un bloc par sujet, en texte simple (pas de Markdown). Titre
 ${TYPES.map(ty => `${ty}: ${typeInfo(ty).headings[book.meta.language].join(', ')}`).join('\n')}
 ${fr ? 'Pour un personnage, ajoute aussi' : 'For a character, also add'} "voice": {"register": "${fr ? 'registre' : 'formal, slangy…'}", "sentences": "${fr ? 'longueur des phrases' : 'sentence length'}", "tic": "${fr ? 'tic de langage' : 'verbal tic'}", "gesture": "${fr ? 'geste signature' : 'signature gesture'}", "never": "${fr ? 'ce qu’il ne dit jamais' : 'what they never say'}", "inner": "${fr ? 'voix intérieure' : 'inner voice'}", "lines": "${fr ? '3 à 5 répliques types, une par ligne' : '3 to 5 sample lines, one per line'}"}, "knows": "${fr ? 'ce qu’il sait' : 'what they know'}", "unaware": "${fr ? 'ce qu’il ignore' : 'what they don’t know'}" ${full
     ? (fr ? '(remplis tout ; ne mets pas la voix dans "full").' : '(fill in everything; don’t put the voice in "full").')
-    : (fr ? '(laisse vide ce que la conversation ne dit pas ; ne mets pas la voix dans "full").' : '(leave empty what the conversation doesn’t say; don’t put the voice in "full").')}`
+    : (fr ? '(laisse vide ce que la conversation ne dit pas ; ne mets pas la voix dans "full").' : '(leave empty what the conversation doesn’t say; don’t put the voice in "full").')}${book.meta.series ? `
+${fr ? 'Série : ajoute aussi "later", ce que l’entrée devient dans les tomes suivants d’après <series> (vide si rien ; jamais dans "full" ni dans "facts").' : 'Series: also add "later", what the entry becomes in later books, from <series> (empty if nothing; never in "full" or "facts").'}` : ''}`
 }
 
 /** Claude's entry drafts as review proposals. */
@@ -266,6 +269,7 @@ export function readDrafts(book: Book, list: Partial<Proposal>[]): Proposal[] {
     name: String(p.name), aliases: Array.isArray(p.aliases) ? p.aliases.map(String) : [],
     short: String(p.short ?? ''), full: toBlocks(p.full as unknown as string | Record<string, unknown>), facts: Array.isArray(p.facts) ? p.facts.map(String) : [], why: String(p.why ?? ''),
     ...(p.type === 'character' ? readCharacter(p) : {}),
+    ...(p.later ? { later: String(p.later) } : {}),
   }))
 }
 
@@ -332,6 +336,7 @@ export function acceptProposal(id: string) {
       ...(p.voice ? { voice: { ...EMPTY_VOICE, ...Object.fromEntries(Object.entries(p.voice).filter(([k]) => !e.voice?.[k as keyof VoiceCard]?.trim())), ...Object.fromEntries(Object.entries(e.voice ?? {}).filter(([, v]) => v.trim())) } } : {}),
       ...(p.knows ? { knows: [e.knows?.trim(), p.knows].filter(Boolean).join('\n') } : {}),
       ...(p.unaware ? { unaware: [e.unaware?.trim(), p.unaware].filter(Boolean).join('\n') } : {}),
+      ...(p.later ? { later: [e.later?.trim(), p.later].filter(Boolean).join('\n') } : {}),
     })
   } else {
     const e = st.addEntry(p.type, p.name)
@@ -340,6 +345,7 @@ export function acceptProposal(id: string) {
       ...(p.voice ? { voice: { ...EMPTY_VOICE, ...p.voice } } : {}),
       ...(p.knows ? { knows: p.knows } : {}),
       ...(p.unaware ? { unaware: p.unaware } : {}),
+      ...(p.later ? { later: p.later } : {}),
     })
   }
   rejectProposal(id)

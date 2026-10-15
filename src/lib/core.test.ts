@@ -8,7 +8,7 @@ import { checkBible } from './bibleCheck'
 import { jumpItems, rankJump } from './quickjump'
 import { aiBlocks, joinBlocks, parseBlocks, toBlocks } from './blocks'
 import { tidy } from '../contextMenu'
-import { addVersion, cardPatch, foundationText, mergeCards, outlineRules, readChapterProposal, turningPointsText, versionOf, versionProposal } from './outline'
+import { addVersion, cardPatch, cardSpec, foundationText, seriesText, mergeCards, outlineRules, readChapterProposal, turningPointsText, versionOf, versionProposal } from './outline'
 import { sessionOf, worthShowing } from './session'
 import { addDirection, ordered, togglePin, type Direction } from './directions'
 import { EMPTY_RATE, learnCall, learnWindow, shareOf } from './windowCost'
@@ -119,6 +119,12 @@ describe('context', () => {
     expect(b.system).toContain('Past tense.')
     expect(b.message).toContain('Carries Aube.')
     expect(b.message).not.toContain('Blind')
+  })
+  it('never sends what an entry becomes later in the series with prose', () => {
+    const later = { ...book, meta: { ...book.meta, series: { path: '../S', index: 1 } }, entries: book.entries.map(e => (e.slug === 'elise' ? { ...e, later: 'Book 3: queen’s daughter.' } : e)) }
+    const b = buildContext({ ...base, book: later, pov: 'elise' })
+    expect(b.message).not.toContain('queen’s daughter')
+    expect(b.system).not.toContain('queen’s daughter')
   })
   it('sends the full version for the POV and for @-mentions', () => {
     expect(buildContext({ ...base, pov: 'elise' }).picked.find(p => p.slug === 'elise')!.mode).toBe('full')
@@ -980,6 +986,19 @@ describe('story foundation, turning points and outline versions', () => {
     expect(sys).toContain('<tone>\nGrim, morally gray.\n</tone>')
     expect(sys).not.toContain('Abercrombie')
     expect(turningPointsText(book)).toContain('- Midpoint (50 %): She sees her death. → The diner')
+  })
+  it('tells a series book to plant later books and never play them out, and sends seeds as passing details', () => {
+    const book = bookOf([{ ...scene('a', ''), seeds: 'A crown-shaped scar.' }], [])
+    expect(seriesText(book)).toBe('')
+    book.meta.series = { path: '../S', index: 2 }
+    book.seriesPlan = { books: 'Book 2: the siege.\nBook 3: the queen.' }
+    const s = seriesText(book)
+    expect(s).toContain('This book is book 2 of a series.')
+    expect(s).toContain('Book 3: the queen.')
+    expect(s).toContain('never resolve, reveal or start the events of later books')
+    expect(outlineLines(book, book.chapters[0].scenes[0], 'en').join('\n')).toContain('Seeds for later books (a passing detail; never name, explain or resolve them) : A crown-shaped scar.')
+    expect(cardSpec('en', true)).toContain('"seeds"')
+    expect(cardSpec('en')).not.toContain('"seeds"')
   })
   it('keeps earlier versions (never empty ones) and brings one back as a proposal', () => {
     const c = { ...bookOf([{ ...scene('a', ''), note: 'Old summary.', beats: ['x'] }], []).chapters[0], goal: 'Old goal.' }

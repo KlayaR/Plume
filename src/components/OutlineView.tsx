@@ -8,11 +8,11 @@ import { create } from 'zustand'
 import { ask as askDialog } from '@tauri-apps/plugin-dialog'
 import { ArrowDown, ArrowUp, BookPlus, Check, CheckCheck, ChevronDown, ChevronRight, Combine, History, Lock, LockOpen, MessagesSquare, MoreHorizontal, PenLine, Plus, Scissors, SearchCheck, Sparkles, Wand2, X } from 'lucide-react'
 import { useStore } from '../store'
-import { FOUNDATION_KEYS, type Book, type Chapter, type Foundation, type Scene } from '../lib/types'
+import { FOUNDATION_KEYS, SERIES_KEYS, type Book, type Chapter, type Foundation, type Scene } from '../lib/types'
 import { TEMPLATES, templateBeats } from '../lib/structures'
 import { chapterLabels } from '../lib/chapters'
 import { countWords, foldText } from '../lib/text'
-import { FOUNDATION_HINTS, FOUNDATION_LABELS, chapterBeats, mergeCards, outlineMarkdown, type CardDraft } from '../lib/outline'
+import { FOUNDATION_HINTS, FOUNDATION_LABELS, SERIES_LABELS, chapterBeats, mergeCards, outlineMarkdown, type CardDraft } from '../lib/outline'
 import { acceptAll, acceptFoundation, createEntriesFromOutline, stopEntries, acceptOutline, acceptTurningPoints, checkOutline, cleanOutline, detailAll, fixIssue, interviewFoundation, issueChapter, loadVersions, planChapter, planScene, proposeFoundation, proposeTurningPoints, rejectOutline, restoreVersion, useOutline } from '../outline'
 import { writeChapter, writeFromPlan } from '../editor/actions'
 import { askText, showMenu } from '../contextMenu'
@@ -82,6 +82,7 @@ export default function OutlineView() {
         <button type="button" className="sk-btn sk-btn-sm sk-btn-ghost sk-btn-icon" onClick={more} aria-label={t('More')}><MoreHorizontal size={14} /></button>
       </div>
 
+      {book.meta.series && <SeriesSection book={book} />}
       <StorySection book={book} />
 
       {issues && (
@@ -263,6 +264,7 @@ function SceneCard({ book, c, s, k }: { book: Book; c: Chapter; s: Scene; k: num
       {beats.length > 0 && <ol className="pl-ol-beatlist">{beats.map((b, i) => <li key={i}>{b}</li>)}</ol>}
       {s.cast?.length ? <div className="pl-ol-small"><b>{t('Who is there')}</b> {s.cast.join(', ')}</div> : null}
       {s.reveals?.trim() && <div className="pl-ol-small"><b>{t('What the reader learns')}</b> {s.reveals}</div>}
+      {s.seeds?.trim() && <div className="pl-ol-small"><b>{t('Seeds for later books')}</b> {s.seeds}</div>}
       {s.arc?.trim() && <div className="pl-ol-small"><b>{t('Arc')}</b> {s.arc}</div>}
       {s.pace?.trim() && <div className="pl-ol-small"><b>{t('Pace and tone')}</b> {s.pace}</div>}
     </article>
@@ -326,6 +328,7 @@ function SceneForm({ book, c, s, k, update, lock, tools }: { book: Book; c: Chap
       </ol>
       <div className="pl-ol-extra">
         <label><span className="sk-label">{t('What the reader learns')}</span><Grow value={s.reveals ?? ''} placeholder={t('Revelations, clues planted or paid off')} onChange={v => update({ reveals: v })} /></label>
+        {book.meta.series && <label><span className="sk-label">{t('Seeds for later books')}</span><Grow value={s.seeds ?? ''} placeholder={t('Clues planted for later books, shown in passing')} onChange={v => update({ seeds: v })} /></label>}
         <label><span className="sk-label">{t('Arc')}</span><Grow value={s.arc ?? ''} placeholder={t('At the start → at the end')} onChange={v => update({ arc: v })} /></label>
         <label><span className="sk-label">{t('Pace and tone')}</span><Grow value={s.pace ?? ''} placeholder={t('Fast and tense, slow and inward…')} onChange={v => update({ pace: v })} /></label>
       </div>
@@ -350,6 +353,7 @@ function ProposalPanel({ book, c }: { book: Book; c: Chapter }) {
         {old?.note && old.note !== d.note && <p className="pl-ol-old">{old.note}</p>}
         {d.beats.length > 0 && <ol>{d.beats.map((b, i) => <li key={i}>{b}</li>)}</ol>}
         {d.reveals && <span className="sk-hint"><b>{t('What the reader learns')}</b> · {d.reveals}</span>}
+        {d.seeds && <span className="sk-hint"><b>{t('Seeds for later books')}</b> · {d.seeds}</span>}
         {d.arc && <span className="sk-hint"><b>{t('Arc')}</b> · {d.arc}</span>}
         {d.pace && <span className="sk-hint"><b>{t('Pace and tone')}</b> · {d.pace}</span>}
       </div>
@@ -366,6 +370,44 @@ function ProposalPanel({ book, c }: { book: Book; c: Chapter }) {
       {(p.ending && p.ending !== c.ending) && <span className="sk-hint"><b>{t('How it ends')}</b> · {p.ending}</span>}
       {p.scenes.map(card)}
       {kept.length > 0 && <span className="sk-hint">{t('Not in the new outline, kept as they are (remove them yourself if you want): {list}', { list: kept.map(s => s.title).join(', ') })}</span>}
+    </section>
+  )
+}
+
+/** In a series, above the story: the plan of the whole series, shared by every book (series folder). */
+function SeriesSection({ book }: { book: Book }) {
+  const t = useT()
+  const editing = useEditing(s => s.id === 'series')
+  const [open, setOpen] = useState(true)
+  const lang = book.meta.language
+  const p = book.seriesPlan ?? {}
+  const n = book.meta.series?.index ?? 1
+  const filled = SERIES_KEYS.filter(k => p[k]?.trim()).length
+  const hint: Record<keyof typeof SERIES_LABELS, string> = {
+    arc: t('The premise of the whole series, how it unfolds across the books, how it ends'),
+    books: t('Book 1: …, ends when …\nBook 2: …\nBook 3: …'),
+    reveals: t('The big twists, and the book each one belongs to'),
+  }
+  return (
+    <section className="pl-ol-story">
+      <header className="pl-ol-chhead">
+        <button type="button" className="pl-quiet" onClick={() => setOpen(!open)} aria-expanded={open}>{open ? <ChevronDown size={15} /> : <ChevronRight size={15} />}</button>
+        <b className="pl-grow">{t('The series')}</b>
+        <span className="sk-hint">{t('This is book {n}', { n })} · {t('Seen when planning, never when writing prose')}</span>
+      </header>
+      {open && (editing ? (
+        <div className="pl-ol-storyform" data-editing="true">
+          {SERIES_KEYS.map((k, i) => (
+            <label key={k} className="sk-field"><span className="sk-label">{SERIES_LABELS[k][lang]}</span><Grow autoFocus={i === 0} value={p[k] ?? ''} placeholder={hint[k]} onChange={v => useStore.getState().updateSeriesPlan({ [k]: v })} /></label>
+          ))}
+          <button type="button" className="sk-btn sk-btn-sm sk-btn-primary pl-ol-done" onClick={() => edit(null)}><Check size={13} /> {t('Done')}</button>
+        </div>
+      ) : (
+        <button type="button" className="pl-ol-storyread" onClick={() => edit('series')}>
+          {SERIES_KEYS.filter(k => p[k]?.trim()).map(k => <span key={k} className="pl-ol-small" style={{ whiteSpace: 'pre-line' }}><b>{SERIES_LABELS[k][lang]}</b> {p[k]}</span>)}
+          {filled === 0 && <span className="pl-ol-ghost">{t('+ The series: its arc and endgame, one line per book, the big reveals and when they land')}</span>}
+        </button>
+      ))}
     </section>
   )
 }

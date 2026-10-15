@@ -7,12 +7,12 @@ import { ask, parseJSON } from './ai'
 import { addDrafts, entryFormat, readDrafts } from './chat'
 import { useStore } from './store'
 import { t } from './i18n'
-import { ENTRY_TYPES, FOUNDATION_KEYS, WORLD_TYPES, type Book, type EntryType, type Foundation, type Scene } from './lib/types'
+import { ENTRY_TYPES, FOUNDATION_KEYS, WORLD_TYPES, type Book, type Entry, type EntryType, type Foundation, type Scene } from './lib/types'
 import { templateBeats } from './lib/structures'
 import { foldText } from './lib/text'
 import {
   CHAPTER_JSON, SCENE_JSON, addVersion, findEntrySlug, cardOf, cardPatch, cardSpec, chapterText, foundationText, outlineRules, outlineText,
-  readCard, readChapterProposal, turningPointsText, versionOf, versionProposal, type OutlineProposal, type OutlineVersion,
+  readCard, readChapterProposal, seriesText, turningPointsText, versionOf, versionProposal, type OutlineProposal, type OutlineVersion,
 } from './lib/outline'
 
 export interface OutlineIssue { n?: number; chapter: string; issue: string; fix: string }
@@ -33,9 +33,17 @@ const fr = (book: Book) => book.meta.language === 'fr'
 
 /** What every outline request starts from: premise and foundation, turning points, the bible's short versions. */
 export function grounding(book: Book): string {
+  const n = book.meta.series?.index ?? 1
+  const F = fr(book)
+  // In a series, what an entry becomes in later books (its "later" field and its facts dated in later books), for planning only.
+  const later = (e: Entry) => book.meta.series ? [
+    e.later?.trim() ? `\n  ${F ? 'Plus tard dans la série' : 'Later in the series'} : ${e.later.trim()}` : '',
+    ...e.facts.filter(f => f.book && f.book > n).map(f => `\n  [${F ? 'tome' : 'book'} ${f.book}] ${f.text}`),
+  ].join('') : ''
   const bible = book.entries.filter(e => WORLD_TYPES.includes(e.type) && e.include !== 'secret' && e.short)
-    .map(e => `- ${e.name} (${e.type}): ${e.short}`).join('\n')
+    .map(e => `- ${e.name} (${e.type}): ${e.short}${later(e)}`).join('\n')
   return [
+    seriesText(book),
     foundationText(book),
     turningPointsText(book),
     bible ? `<bible>\n${bible}\n</bible>` : '',
@@ -83,7 +91,7 @@ export async function planChapter(chapterId: string, kind: 'detail' | 'regenerat
     `<chapter>\n${chapterText(book, c, i + 1, true)}\n</chapter>`,
     next ? `<next_chapter>\n${chapterText(book, next, i + 2)}\n</next_chapter>` : '',
     outlineRules(book.meta.language, book.meta.sceneMode ?? { kind: 'one' }),
-    cardSpec(book.meta.language),
+    cardSpec(book.meta.language, !!book.meta.series),
     `<task>\n${task}${direction.trim() ? `\n${F ? 'Consigne de l’auteur' : 'Author’s direction'} : ${direction.trim()}` : ''}\n${F ? 'Le chapitre suivant (<next_chapter>) doit rester possible : n’en reprends pas les événements.' : 'The next chapter (<next_chapter>) must stay possible: don’t take over its events.'}\n</task>`,
     `JSON: ${CHAPTER_JSON}`,
   ].filter(Boolean).join('\n\n')
@@ -107,7 +115,7 @@ export async function planScene(sceneId: string, direction = '') {
     i > 0 ? `<outline_so_far>\n${outlineText(book, i)}\n</outline_so_far>` : '',
     `<chapter>\n${chapterText(book, c, i + 1, true)}\n</chapter>`,
     outlineRules(book.meta.language, book.meta.sceneMode ?? { kind: 'one' }),
-    cardSpec(book.meta.language),
+    cardSpec(book.meta.language, !!book.meta.series),
     `<task>\n${F ? `Réécris uniquement la fiche de la scène "${sceneId}" ; les autres scènes restent telles quelles.` : `Rewrite only the card of scene "${sceneId}"; the other scenes stay as they are.`}${direction.trim() ? `\n${F ? 'Consigne de l’auteur' : 'Author’s direction'} : ${direction.trim()}` : ''}\n</task>`,
     `JSON: ${SCENE_JSON}`,
   ].filter(Boolean).join('\n\n')
@@ -183,7 +191,8 @@ export async function checkOutline() {
 - rythme : trop de chapitres calmes ou trop de chapitres d’action à la suite (lignes Pace) ;
 - magie : un problème réglé par la magie sans que ce pouvoir ait été établi avant, une limite ou un prix qui ne coûtent jamais rien à personne ;
 - ton : des scènes ou des personnages qui trahissent le ton et les livres comparables des fondations (un personnage tout bon ou tout mauvais dans une histoire aux personnages gris, par exemple) ;
-- cohérence avec la bible, le pitch et les fondations.
+- cohérence avec la bible, le pitch et les fondations.${book.meta.series ? `
+- série : une graine que <series> demande à ce tome et qu’il ne pose jamais (lignes Seeds) ; un événement, une révélation ou un fil que <series> garde pour un tome suivant et que ce plan résout, révèle ou commence trop tôt.` : ''}
 Pour chacun : "n" (le numéro du chapitre concerné), "chapter" (son titre), le problème et une correction concrète. En français.`
       : `Read this outline as an editor, at the level of the genre's great novels. List at most 12 real problems, most important first:
 - cause and effect: gaps, coincidences that solve problems, dropped threads, characters who vanish;
@@ -192,7 +201,8 @@ Pour chacun : "n" (le numéro du chapitre concerné), "chapter" (son titre), le 
 - pace: too many quiet or too many action chapters in a row (Pace lines);
 - magic: a problem solved by magic that wasn't set up before, a limit or cost that never costs anyone anything;
 - tone: scenes or characters that break the foundation's tone and comparable books (a purely good or purely evil character in a story of gray characters, say);
-- consistency with the bible, the premise and the foundation.
+- consistency with the bible, the premise and the foundation.${book.meta.series ? `
+- series: a seed <series> needs from this book that it never plants (Seeds lines); an event, revelation or thread <series> keeps for a later book that this outline resolves, reveals or starts too early.` : ''}
 For each: "n" (the number of the chapter it concerns), "chapter" (its title), the problem and a concrete fix.`,
     'JSON: [{"n": 1, "chapter": "…", "issue": "…", "fix": "…"}]',
   ].filter(Boolean).join('\n\n')
@@ -333,7 +343,7 @@ export async function cleanOutline() {
     useStore.getState().updateChapter(cur.id, { goal: undefined, ending: undefined })
     for (const s of cur.scenes) {
       if (!s.text.trim()) await useStore.getState().removeScene(s.id)
-      else useStore.getState().updateScene(s.id, { note: undefined, beats: undefined, reveals: undefined, arc: undefined, pace: undefined, cast: undefined, locked: undefined })
+      else useStore.getState().updateScene(s.id, { note: undefined, beats: undefined, reveals: undefined, seeds: undefined, arc: undefined, pace: undefined, cast: undefined, locked: undefined })
     }
   }
   const b = useStore.getState().book!

@@ -2,7 +2,7 @@
 // book's outline as compact text, and Claude's JSON turned into a proposal
 // that the Outline tab shows before anything changes. No screen, no calls.
 import { foldText } from './text'
-import { FOUNDATION_KEYS, type Book, type Chapter, type EntryType, type Foundation, type Lang, type Scene, type SceneMode } from './types'
+import { FOUNDATION_KEYS, SERIES_KEYS, type SeriesPlan, type Book, type Chapter, type EntryType, type Foundation, type Lang, type Scene, type SceneMode } from './types'
 
 /** How many scenes a chapter gets: mostly one (the default), as each chapter needs, or within a range. */
 export type { SceneMode } from './types'
@@ -37,10 +37,13 @@ What a chapter is (about 3,000 to 4,500 words):
 }
 
 /** What a detailed card holds, for the request that fills it. */
-export function cardSpec(lang: Lang): string {
-  return lang === 'fr'
+export function cardSpec(lang: Lang, series = false): string {
+  const seeds = !series ? '' : lang === 'fr'
+    ? ' Et "seeds" : les indices posés ici pour les tomes suivants d’après <series>, montrés en passant, jamais expliqués (vide si aucun).'
+    : ' And "seeds": clues planted here for later books, from <series>, shown in passing, never explained (empty if none).'
+  return (lang === 'fr'
     ? `Pour chaque scène : "summary" (2 à 3 phrases : qui veut quoi, l’obstacle, ce qui change), "pov" et "place" (noms de la bible si possible), "beats" (5 à 10 étapes concrètes, dans l’ordre, chacune une phrase : ce qui se passe, pas des intentions), "cast" (les personnages présents), "reveals" (ce que le lecteur apprend, les indices posés ou repris), "arc" (l’état du point de vue au début → à la fin), "pace" (rythme et ton, quelques mots).`
-    : `For each scene: "summary" (2 to 3 sentences: who wants what, the obstacle, what changes), "pov" and "place" (bible names when possible), "beats" (5 to 10 concrete steps, in order, one sentence each: what happens, not intentions), "cast" (characters present), "reveals" (what the reader learns, clues planted or paid off), "arc" (the point-of-view character's state at the start → at the end), "pace" (pace and tone, a few words).`
+    : `For each scene: "summary" (2 to 3 sentences: who wants what, the obstacle, what changes), "pov" and "place" (bible names when possible), "beats" (5 to 10 concrete steps, in order, one sentence each: what happens, not intentions), "cast" (characters present), "reveals" (what the reader learns, clues planted or paid off), "arc" (the point-of-view character's state at the start → at the end), "pace" (pace and tone, a few words).`) + seeds
 }
 
 export const SCENE_JSON = '{"id": "…", "title": "…", "summary": "…", "pov": "…", "place": "…", "beats": ["…"], "cast": ["…"], "reveals": "…", "arc": "… → …", "pace": "…"}'
@@ -81,6 +84,26 @@ export function foundationText(book: Book): string {
   ].filter(Boolean).join('\n\n')
 }
 
+export const SERIES_LABELS: Record<keyof SeriesPlan, { en: string; fr: string }> = {
+  arc: { en: 'Series arc and endgame', fr: 'Arc de la série et dénouement' },
+  books: { en: 'The books', fr: 'Les tomes' },
+  reveals: { en: 'Big reveals, and in which book', fr: 'Grandes révélations, et dans quel tome' },
+}
+
+/** The series plan, for planning only: this book plants what comes later and never plays it out. */
+export function seriesText(book: Book): string {
+  if (!book.meta.series) return ''
+  const fr = book.meta.language === 'fr'
+  const p = book.seriesPlan ?? {}
+  const lines = SERIES_KEYS.filter(k => p[k]?.trim()).map(k => `${SERIES_LABELS[k][book.meta.language]} :\n${p[k]!.trim()}`)
+  const n = book.meta.series.index
+  return `<series>
+${fr ? `Ce livre est le tome ${n} d’une série.` : `This book is book ${n} of a series.`}
+${lines.join('\n\n')}
+${fr ? `Règle : ce tome ne raconte que le tome ${n}. Prépare et annonce ce qui vient ensuite (des indices, des graines), mais ne résous, ne révèle et ne commence jamais les événements des tomes suivants.` : `Rule: this book tells only book ${n}. Plant and foreshadow what comes later (clues, seeds), but never resolve, reveal or start the events of later books.`}
+</series>`
+}
+
 /** The book's turning points (Structure), with what happens at each and where it falls. */
 export function turningPointsText(book: Book): string {
   const beats = book.meta.structure.beats
@@ -102,6 +125,7 @@ export function sceneText(book: Book, s: Scene, withId = false): string {
     `- ${withId ? `[${s.id}]${s.locked ? ' [locked]' : ''} ` : ''}${s.title}${s.pov ? ` (POV ${nameOf(book, s.pov)})` : ''}${s.place ? ` @ ${nameOf(book, s.place)}` : ''}: ${s.note?.trim() ?? ''}`,
     ...(s.beats ?? []).map((b, i) => `    ${i + 1}. ${b}`),
     s.reveals?.trim() ? `    Reveals: ${s.reveals.trim()}` : '',
+    s.seeds?.trim() ? `    Seeds: ${s.seeds.trim()}` : '',
     s.pace?.trim() ? `    Pace: ${s.pace.trim()}` : '',
   ].filter(Boolean).join('\n')
 }
@@ -139,6 +163,7 @@ export interface CardDraft {
   beats: string[]
   cast: string[]
   reveals: string
+  seeds?: string
   arc: string
   pace: string
 }
@@ -166,6 +191,7 @@ export function readCard(book: Book, chapter: Chapter, raw: Record<string, unkno
     beats: list(raw.beats),
     cast: list(raw.cast),
     reveals: str(raw.reveals),
+    seeds: str(raw.seeds) || undefined,
     arc: str(raw.arc),
     pace: str(raw.pace),
   }
@@ -187,7 +213,7 @@ export function readChapterProposal(book: Book, chapter: Chapter, raw: unknown, 
 
 /** The outline fields of a scene, to compare, apply or put back. */
 export const cardOf = (s: Scene): Omit<CardDraft, 'id'> => ({
-  title: s.title, note: s.note ?? '', pov: s.pov, place: s.place ?? null, beats: s.beats ?? [], cast: s.cast ?? [], reveals: s.reveals ?? '', arc: s.arc ?? '', pace: s.pace ?? '',
+  title: s.title, note: s.note ?? '', pov: s.pov, place: s.place ?? null, beats: s.beats ?? [], cast: s.cast ?? [], reveals: s.reveals ?? '', seeds: s.seeds || undefined, arc: s.arc ?? '', pace: s.pace ?? '',
 })
 
 /** The patch that gives a scene a draft's outline (keeping what the draft leaves empty). */
@@ -200,6 +226,7 @@ export function cardPatch(d: CardDraft, s?: Scene): Partial<Scene> {
     beats: d.beats.length ? d.beats : s?.beats,
     cast: d.cast.length ? d.cast : s?.cast,
     reveals: d.reveals || s?.reveals,
+    seeds: d.seeds || s?.seeds,
     arc: d.arc || s?.arc,
     pace: d.pace || s?.pace,
   }
@@ -213,6 +240,7 @@ export function mergeCards(a: Scene, b: Scene): Partial<Scene> {
     beats: [...(a.beats ?? []), ...(b.beats ?? [])],
     cast: [...new Set([...(a.cast ?? []), ...(b.cast ?? [])])],
     reveals: join(a.reveals, b.reveals),
+    seeds: join(a.seeds, b.seeds),
     arc: a.arc && b.arc ? `${a.arc.split('→')[0].trim()} → ${(b.arc.split('→').pop() ?? '').trim()}` : a.arc || b.arc,
     pace: a.pace || b.pace,
     text: [a.text.trim(), b.text.trim()].filter(Boolean).join('\n\n'),
@@ -254,6 +282,7 @@ export function outlineMarkdown(book: Book): string {
       s.note ?? '',
       ...(s.beats ?? []).map((b, j) => `${j + 1}. ${b}`),
       s.reveals ? `*${fr ? 'Le lecteur apprend' : 'Reveals'} :* ${s.reveals}` : '',
+      s.seeds ? `*${fr ? 'Graines pour la suite' : 'Seeds'} :* ${s.seeds}` : '',
       s.arc ? `*Arc :* ${s.arc}` : '',
       s.pace ? `*${fr ? 'Rythme' : 'Pace'} :* ${s.pace}` : '',
     ].filter(Boolean).join('\n\n')),

@@ -1,11 +1,11 @@
 // App state. Edits update memory at once and are written to disk after a short pause.
 import { create } from 'zustand'
-import type { Book, Chapter, Entry, EntryType, Scene } from './lib/types'
+import type { Book, Chapter, Entry, EntryType, Scene, SeriesPlan } from './lib/types'
 import type { Limits, Usage } from './lib/claude'
 import { DEFAULT_PRESETS, type Fallback, type Preset } from './lib/presets'
 import { findClaude, setLimitsListener } from './lib/claude'
 import { chapterLabels } from './lib/chapters'
-import { Conflict, loadBook, makeChapter, makeEntry, makeScene, reread, saveChapter, saveEntry, saveMeta, saveScene, seriesRootOf, trash } from './lib/project'
+import { Conflict, loadBook, makeChapter, makeEntry, makeScene, reread, saveChapter, saveEntry, saveMeta, saveScene, saveSeriesPlan, seriesRootOf, trash } from './lib/project'
 import { parseEntry, parseScene } from './lib/bible'
 import { t } from './i18n'
 import { bookCounts } from './lib/stats'
@@ -286,6 +286,8 @@ interface State {
   updateEntry: (slug: string, patch: Partial<Entry>) => void
   removeEntry: (slug: string) => Promise<void>
   updateMeta: (patch: Partial<Book['meta']>) => void
+  /** Changes the series plan (saved in the series folder, shared by every book). */
+  updateSeriesPlan: (patch: Partial<SeriesPlan>) => void
   /** Moves an entry between the book and its series' shared bible. */
   shareEntry: (slug: string, shared: boolean) => Promise<void>
   setSettings: (s: Partial<Settings>) => void
@@ -670,6 +672,7 @@ export const useStore = create<State>((set, get) => {
       } })
     },
     updateMeta: patch => { mutate(b => ({ ...b, meta: { ...b.meta, ...patch } })); metaLater() },
+    updateSeriesPlan: patch => { mutate(b => ({ ...b, seriesPlan: { ...b.seriesPlan, ...patch } })); later('series.json', () => saveSeriesPlan(get().book!)) },
     shareEntry: async (slug, shared) => {
       const b = get().book!
       const e = b.entries.find(x => x.slug === slug)

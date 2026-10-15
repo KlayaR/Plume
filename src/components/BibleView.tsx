@@ -290,6 +290,13 @@ export function EntryEditor({ entry }: { entry: Entry }) {
             <label htmlFor="ee-notes">{t('Private notes')}</label>
             <textarea id="ee-notes" className="sk-input" rows={3} value={entry.notes ?? ''} onChange={e => update({ notes: e.target.value })} placeholder={t('Reminders, ideas, research. Never sent to the AI.')} />
           </div>
+          {book.meta.series && (
+            <div className="sk-field">
+              <label htmlFor="ee-later">{t('Later in the series')}</label>
+              <textarea id="ee-later" className="sk-input" rows={3} value={entry.later ?? ''} onChange={e => update({ later: e.target.value })} placeholder={t('Book 3: she is the queen’s daughter. Book 2: he betrays them.')} />
+              <span className="sk-hint">{t('Read when Claude plans the outline, so it can plant clues; never sent when Claude writes prose.')}</span>
+            </div>
+          )}
         </details>
       )}
 

@@ -82,6 +82,7 @@ export function parseEntry(path: string, text: string): Entry {
     voice,
     knows: str(data.knows),
     unaware: str(data.unaware),
+    later: str(data.later),
     notes: str(data.notes),
     sends: data.sends && typeof data.sends === 'object' ? Object.fromEntries(Object.entries(data.sends as object).filter(([, v]) => v === 'always' || v === 'full' || v === 'never')) as Entry['sends'] : undefined,
     tags: data.tags ? asList(data.tags) : undefined,
@@ -103,8 +104,8 @@ export function parseEntry(path: string, text: string): Entry {
   }
 }
 
-const ENTRY_KEYS = ['type', 'name', 'aliases', 'include', 'links', 'voice', 'knows', 'unaware', 'notes', 'sends', 'tags', 'image', 'kind', 'resolved']
-const SCENE_KEYS = ['id', 'title', 'pov', 'status', 'note', 'time', 'place', 'lines', 'summary', 'summaryOf', 'comments', 'tension', 'passes', 'beats', 'reveals', 'arc', 'pace', 'cast', 'locked']
+const ENTRY_KEYS = ['type', 'name', 'aliases', 'include', 'links', 'voice', 'knows', 'unaware', 'later', 'notes', 'sends', 'tags', 'image', 'kind', 'resolved']
+const SCENE_KEYS = ['id', 'title', 'pov', 'status', 'note', 'time', 'place', 'lines', 'summary', 'summaryOf', 'comments', 'tension', 'passes', 'beats', 'reveals', 'seeds', 'arc', 'pace', 'cast', 'locked']
 const rest = (data: Record<string, unknown>, known: string[]) => Object.fromEntries(Object.entries(data).filter(([k]) => !known.includes(k)))
 const filled = (v: VoiceCard | undefined) => (v && Object.values(v).some(x => x.trim()) ? v : undefined)
 
@@ -113,7 +114,7 @@ export function serializeEntry(e: Entry): string {
   if (e.aliases.length) data.aliases = e.aliases
   data.include = e.include
   if (e.links.length) data.links = e.links
-  Object.assign(data, { voice: filled(e.voice), knows: e.knows, unaware: e.unaware, notes: e.notes || undefined, sends: e.sends && Object.keys(e.sends).length ? e.sends : undefined, tags: e.tags?.length ? e.tags : undefined, image: e.image, kind: e.kind, resolved: e.resolved }, e.extra)
+  Object.assign(data, { voice: filled(e.voice), knows: e.knows, unaware: e.unaware, later: e.later || undefined, notes: e.notes || undefined, sends: e.sends && Object.keys(e.sends).length ? e.sends : undefined, tags: e.tags?.length ? e.tags : undefined, image: e.image, kind: e.kind, resolved: e.resolved }, e.extra)
   const body = [
     `## Short\n${e.short.trim()}`,
     `## Full\n${e.full.trim()}`,
@@ -142,6 +143,7 @@ export function parseScene(path: string, text: string): Scene {
     passes: data.passes ? asList(data.passes) : undefined,
     beats: Array.isArray(data.beats) ? data.beats.map(String).filter(b => b.trim()) : undefined,
     reveals: data.reveals ? String(data.reveals) : undefined,
+    seeds: data.seeds ? String(data.seeds) : undefined,
     arc: data.arc ? String(data.arc) : undefined,
     pace: data.pace ? String(data.pace) : undefined,
     cast: data.cast ? asList(data.cast) : undefined,
@@ -158,7 +160,7 @@ export function serializeScene(s: Scene): string {
     id: s.id, title: s.title, pov: s.pov ?? undefined, status: s.status,
     note: s.note, time: s.time, place: s.place ?? undefined, lines: s.lines?.length ? s.lines : undefined,
     summary: s.summary, summaryOf: s.summaryOf, tension: s.tension, passes: s.passes?.length ? s.passes : undefined, comments: s.comments?.length ? s.comments : undefined,
-    beats: s.beats?.length ? s.beats : undefined, reveals: s.reveals || undefined, arc: s.arc || undefined, pace: s.pace || undefined, cast: s.cast?.length ? s.cast : undefined, locked: s.locked || undefined,
+    beats: s.beats?.length ? s.beats : undefined, reveals: s.reveals || undefined, seeds: s.seeds || undefined, arc: s.arc || undefined, pace: s.pace || undefined, cast: s.cast?.length ? s.cast : undefined, locked: s.locked || undefined,
     ...s.extra,
   }, `\n${s.text}`)
 }

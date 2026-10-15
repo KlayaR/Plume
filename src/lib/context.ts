@@ -256,6 +256,7 @@ export function outlineLines(book: Book, sc: Scene, lang: Lang): string[] {
     sc.beats?.length ? `${fr ? 'Étapes, dans l’ordre' : 'Beats, in order'} :\n${sc.beats.map((b, i) => `${i + 1}. ${b}`).join('\n')}` : '',
     sc.cast?.length ? `${fr ? 'Présents' : 'Present'} : ${sc.cast.join(', ')}` : '',
     sc.reveals?.trim() ? `${fr ? 'Ce que le lecteur apprend' : 'What the reader learns'} : ${sc.reveals.trim()}` : '',
+    sc.seeds?.trim() ? `${fr ? 'Graines pour la suite (un détail en passant ; ne les nomme, ne les explique et ne les résous jamais)' : 'Seeds for later books (a passing detail; never name, explain or resolve them)'} : ${sc.seeds.trim()}` : '',
     sc.arc?.trim() ? `${fr ? 'Trajet intérieur du point de vue' : 'Point-of-view arc'} : ${sc.arc.trim()}` : '',
     sc.pace?.trim() ? `${fr ? 'Rythme et ton' : 'Pace and tone'} : ${sc.pace.trim()}` : '',
     last && ch?.ending?.trim() ? `${fr ? 'Fin du chapitre' : 'Chapter ending'} : ${ch.ending.trim()}` : '',

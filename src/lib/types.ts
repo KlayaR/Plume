@@ -114,6 +114,8 @@ export interface Entry {
   voice?: VoiceCard
   knows?: string
   unaware?: string
+  /** Series: what this becomes in later books. Read when planning, never when writing prose. */
+  later?: string
   /** Your own notes on the entry: kept in the file, never sent to the AI. */
   notes?: string
   /** What the AI may read of each block (### Heading) of the full text; unlisted blocks go with the full version. */
@@ -170,6 +172,8 @@ export interface Scene {
   beats?: string[]
   /** What the reader learns here: revelations, clues planted, earlier clues paid off. */
   reveals?: string
+  /** Series: clues planted here for later books, shown in passing, never explained. */
+  seeds?: string
   /** The point-of-view character's state at the start → at the end. */
   arc?: string
   /** Pace and tone: fast and tense, slow and inward… */
@@ -320,7 +324,20 @@ export interface Book {
   meta: BookMeta
   entries: Entry[]
   chapters: Chapter[]
+  /** The plan of the whole series (series.json in the series folder), when the book is in one. */
+  seriesPlan?: Partial<SeriesPlan>
 }
+
+/** The whole series, seen when planning any of its books, never when writing prose. */
+export interface SeriesPlan {
+  /** The series' premise, its arc across the books, and its endgame. */
+  arc: string
+  /** One line per book: what it covers and how it ends. */
+  books: string
+  /** The big reveals and twists, and the book each belongs to. */
+  reveals: string
+}
+export const SERIES_KEYS: (keyof SeriesPlan)[] = ['arc', 'books', 'reveals']
 
 export const DEFAULT_AI: BookMeta['ai'] = {
   actions: {
