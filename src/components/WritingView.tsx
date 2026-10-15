@@ -162,7 +162,7 @@ function SheetScene({ scene, first, solo, active, characters, update, t }: {
             {!first && !solo && <div className="pl-break" aria-label={t('Scene break')}>* * *</div>}
             {(prefs.showSceneTitle || prefs.showPov || prefs.showStatus || prefs.showWhere) && (
               <div className="pl-scene-head">
-                {prefs.showSceneTitle && <input className="pl-head-scene" value={scene.title} onChange={e => update(scene.id, { title: e.target.value })} aria-label={t('Scene title')} />}
+                {prefs.showSceneTitle && <input data-lt className="pl-head-scene" value={scene.title} onChange={e => update(scene.id, { title: e.target.value })} aria-label={t('Scene title')} />}
                 {(prefs.showPov || prefs.showStatus || prefs.showWhere) && (
                   <div className="pl-head-meta">
                     {prefs.showPov && (
@@ -240,7 +240,7 @@ function SceneTree() {
                 {c.kind === 'chapter' ? labels[ci].number : c.kind === 'prologue' ? 'P' : 'É'}
               </button>
               {c.scenes.some(s => countPlaceholders(s.text) > 0) && <span className="pl-redot" title={t('Placeholders to fill in this chapter')} />}
-              <input className="pl-chapter-title" value={c.title} placeholder={t('Untitled')} onChange={e => st().updateChapter(c.id, { title: e.target.value })} aria-label={t('Chapter title')} />
+              <input data-lt className="pl-chapter-title" value={c.title} placeholder={t('Untitled')} onChange={e => st().updateChapter(c.id, { title: e.target.value })} aria-label={t('Chapter title')} />
               <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm sk-btn-icon" title={t('New scene')}
                 onClick={() => st().addScene(c.id, fr ? `Scène ${c.scenes.length + 1}` : `Scene ${c.scenes.length + 1}`)}>
                 <FilePlus2 size={14} />

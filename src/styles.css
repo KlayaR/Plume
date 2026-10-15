@@ -653,6 +653,9 @@ body.pl-typing .pl-toolbar { opacity: 0.08; }
 .cm-lt-grammar { text-decoration-color: #5f86b0; }
 .cm-lt-style { text-decoration-color: #d39b3a; text-decoration-style: dotted; }
 .cm-ltcard { max-width: 24rem; }
+/* The same underlines in the other text boxes: a see-through copy drawn over the box. */
+.pl-ltf { position: fixed; z-index: 120; overflow: hidden; pointer-events: none; }
+.pl-ltf-card { position: fixed; z-index: 160; background: var(--surface-1); border: 1px solid var(--border-strong); border-radius: 8px; box-shadow: var(--shadow); }
 .pl-lt-status { display: flex; flex-direction: column; gap: 6px; }
 
 /* Italics and bold in the text: the markers fade, the words change. */

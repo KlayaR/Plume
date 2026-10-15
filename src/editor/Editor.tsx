@@ -80,7 +80,7 @@ const spellingExt = (on: boolean) => EditorView.contentAttributes.of({ spellchec
 const windowsSpell = () => { const p = useStore.getState().prefs; return p.mode === 'review' && p.spell === 'windows' }
 
 /** LanguageTool on one scene's text, without the bible's names and the words you added to the dictionary. */
-async function checkWithLT(text: string) {
+export async function checkWithLT(text: string) {
   const { book, prefs } = useStore.getState()
   if (!book) return []
   const dict = new Set((book.meta.dictionary ?? []).map(w => w.toLowerCase()))

@@ -149,7 +149,7 @@ export function AgentDialog({ onClose }: { onClose: () => void }) {
             <div className="pl-grow">
               <b>{t(task.label)}</b>
               <div className="sk-hint">{t(task.hint)}</div>
-              {task.id === 'research' && <input className="sk-input" value={question} placeholder={t('Your question, e.g. "How did a 1850 steam train brake?"')} onChange={e => setQuestion(e.target.value)} />}
+              {task.id === 'research' && <input data-lt className="sk-input" value={question} placeholder={t('Your question, e.g. "How did a 1850 steam train brake?"')} onChange={e => setQuestion(e.target.value)} />}
             </div>
             <div className="pl-agent-run">
               <span className="sk-hint">≈ {n(estimate(task.id))} {t('tokens')}</span>

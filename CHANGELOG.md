@@ -7,6 +7,13 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.30.0
+**Spelling and grammar everywhere you write**
+- LanguageTool now checks every text box, not only the manuscript: bible entries (blocks, short version, voice card, facts, notes), the outline and its scene cards, Outline from a premise, chapter and scene titles, beats, notes, the chat, voice and style settings, front matter.
+- Same underlines as in the manuscript (red spelling, blue grammar, yellow style). Hover one for the explanation and one-click fixes, Add to dictionary or Ignore this rule; a fix can be undone with Ctrl+Z.
+- The box you type in is checked a moment after you pause. Names, aliases, tags, searches and keys are never sent.
+- Choose LanguageTool in Settings → Writing → Spelling and grammar. The manuscript keeps its own rule (Review mode, or while you write if you turn that on).
+
 ## 0.29.0
 **Bible entries from the outline**
 - **Missing entries** (Plan → Outline bar): Claude reads the whole outline, the foundation, the turning points and the bible, lists every character, place, object, faction, creature, magic or past event the story uses but the bible lacks, then writes full entries for them: main characters one at a time, the rest three at a time, each knowing the whole story and the other new entries.

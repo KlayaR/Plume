@@ -138,7 +138,7 @@ function SpellSection() {
   const publicServer = /languagetool(plus)?\.(org|com)/.test(prefs.ltServer || LT_DEFAULT)
   const words = book?.meta.dictionary ?? []
   return (
-    <SettingsSection title={t('Spelling and grammar')} description={t('Used in Review mode, and while you write if you turn that on.')}>
+    <SettingsSection title={t('Spelling and grammar')} description={t('The manuscript: in Review mode, and while you write if you turn that on. Every other text box (bible, outline, notes, chat): a moment after you pause in it.')}>
       <SettingRow label={t('Checker')} description={t('Windows’ spellchecker only knows the languages installed in Windows, which may not be the book’s. LanguageTool always checks in the book’s language.')}>
         <select className="sk-select" value={prefs.spell} onChange={e => setPrefs({ spell: e.target.value as typeof prefs.spell })}>
           <option value="languagetool">LanguageTool</option>

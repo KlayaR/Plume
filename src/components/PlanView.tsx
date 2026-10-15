@@ -130,7 +130,7 @@ function Board() {
           </div>
           {loose.map(l => (
             <div key={l.id} className="pl-card pl-card-loose" draggable onDragStart={() => setDrag({ kind: 'loose', id: l.id })} onDragEnd={() => setDrag(null)}>
-              <input className="pl-card-input" value={l.title} placeholder={t('Idea')} onChange={e => setLoose(loose.map(x => x.id === l.id ? { ...x, title: e.target.value } : x))} />
+              <input data-lt className="pl-card-input" value={l.title} placeholder={t('Idea')} onChange={e => setLoose(loose.map(x => x.id === l.id ? { ...x, title: e.target.value } : x))} />
               <textarea className="pl-card-note" rows={3} value={l.note} placeholder={t('What happens…')} onChange={e => setLoose(loose.map(x => x.id === l.id ? { ...x, note: e.target.value } : x))} />
               <button type="button" className="pl-quiet pl-card-x" aria-label={t('Delete')} onClick={() => setLoose(loose.filter(x => x.id !== l.id))}><X size={12} /></button>
             </div>
@@ -144,9 +144,9 @@ function Board() {
             <div className="pl-col-head" onContextMenu={e => { e.stopPropagation(); showMenu(e, chapterMenu(c.id)) }} draggable onDragStart={e => { e.stopPropagation(); setDrag({ kind: 'chapter', id: c.id }) }} onDragEnd={() => setDrag(null)}>
               <GripVertical size={13} className="pl-grip" />
               <span className="pl-col-num">{c.kind === 'chapter' ? labels[ci].number : labels[ci].label}</span>
-              <input className="pl-col-title" value={c.title} placeholder={t('Untitled')} onChange={e => st().updateChapter(c.id, { title: e.target.value })} />
+              <input data-lt className="pl-col-title" value={c.title} placeholder={t('Untitled')} onChange={e => st().updateChapter(c.id, { title: e.target.value })} />
             </div>
-            <input className="pl-col-part" value={c.part ?? ''} placeholder={t('Starts a part: its title')} title={t('A part page goes before this chapter in exports')} onChange={e => st().updateChapter(c.id, { part: e.target.value })} />
+            <input data-lt className="pl-col-part" value={c.part ?? ''} placeholder={t('Starts a part: its title')} title={t('A part page goes before this chapter in exports')} onChange={e => st().updateChapter(c.id, { part: e.target.value })} />
             {c.scenes.map((s, si) => (
               <Card key={s.id} scene={s} active={selected === s.id} tint={tintOf(s)} dim={dimmed(s)}
                 onSelect={() => setSelected(selected === s.id ? null : s.id)}
@@ -206,7 +206,7 @@ function Inspector({ scene, onClose }: { scene: Scene; onClose: () => void }) {
   return (
     <aside className="pl-inspector">
       <div className="pl-row">
-        <input className="pl-entryname pl-grow" value={scene.title} onChange={e => update({ title: e.target.value })} aria-label={t('Scene title')} />
+        <input data-lt className="pl-entryname pl-grow" value={scene.title} onChange={e => update({ title: e.target.value })} aria-label={t('Scene title')} />
         <button type="button" className="sk-btn sk-btn-sm" onClick={() => useStore.getState().selectScene(scene.id)}><PenLine size={13} /> {t('Write it')}</button>
         <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm sk-btn-icon" onClick={onClose} aria-label={t('Close')}><X size={14} /></button>
       </div>
@@ -316,7 +316,7 @@ function Structure() {
           <div key={i} className="pl-beat">
             <div className="pl-row">
               {template === 'custom'
-                ? <input className="sk-input pl-grow" value={b.name} onChange={e => patch({ name: e.target.value })} />
+                ? <input data-lt className="sk-input pl-grow" value={b.name} onChange={e => patch({ name: e.target.value })} />
                 : <span className="pl-beat-name pl-grow">{b.name}</span>}
               {template === 'custom'
                 ? <input className="sk-input pl-num" type="number" min={0} max={100} value={b.at} onChange={e => patch({ at: Number(e.target.value) || 0 })} />

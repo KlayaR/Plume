@@ -344,7 +344,7 @@ function VoiceEditor({ entry, update }: { entry: Entry; update: (patch: Partial<
             <label>{t(label)}</label>
             {k === 'lines'
               ? <textarea className="sk-input" rows={4} value={voice[k]} placeholder={t(hint)} onChange={e => update({ voice: { ...voice, [k]: e.target.value } })} />
-              : <input className="sk-input" value={voice[k]} placeholder={t(hint)} onChange={e => update({ voice: { ...voice, [k]: e.target.value } })} />}
+              : <input data-lt className="sk-input" value={voice[k]} placeholder={t(hint)} onChange={e => update({ voice: { ...voice, [k]: e.target.value } })} />}
           </div>
         ))}
       </div>

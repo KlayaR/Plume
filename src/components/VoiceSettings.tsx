@@ -35,7 +35,7 @@ export default function VoiceSettings() {
           <button type="button" className="sk-btn sk-btn-sm" onClick={() => { applyFantasyDefaults(useStore.getState().book!, true); useStore.getState().notify('ok', t('Fantasy voice settings applied.')) }}>{t('Apply')}</button>
         </SettingRow>
         <SettingRow label={t('Tense and person')} description={t('Also fills {book.tense} in your prompts')}>
-          <input className="sk-input pl-wide" value={voice.tense} placeholder={book.meta.language === 'fr' ? 'passé simple, troisième personne' : 'past tense, third person'} onChange={e => set({ tense: e.target.value })} />
+          <input data-lt className="sk-input pl-wide" value={voice.tense} placeholder={book.meta.language === 'fr' ? 'passé simple, troisième personne' : 'past tense, third person'} onChange={e => set({ tense: e.target.value })} />
         </SettingRow>
         <SettingRow label={t('Adult literary fiction')} description={t('Tells Claude the book is adult fiction that may treat dark themes seriously. No other wording is added.')}>
           <Switch checked={voice.adult} onChange={v => set({ adult: v })} label={t('Adult literary fiction')} />

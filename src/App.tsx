@@ -23,6 +23,7 @@ import ShortcutsDialog from './components/ShortcutsDialog'
 import QuickJump from './components/QuickJump'
 import DualView, { ViewBody } from './components/DualView'
 import ContextMenuHost from './components/ContextMenuHost'
+import LTFields from './components/LTFields'
 import HelpDialog from './components/HelpDialog'
 import SnapshotsDialog from './components/SnapshotsDialog'
 
@@ -161,6 +162,7 @@ export default function App() {
       {book && printing && <PrintView />}
       {book && !prefs.seen?.includes('basics') && <TipCard />}
       <ContextMenuHost />
+      <LTFields />
       <Toasts />
     </div>
   )

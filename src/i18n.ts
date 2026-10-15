@@ -706,7 +706,7 @@ const FR: Record<string, string> = {
   'Lines are given to the name next to them, else to the last name before. Approximate.': 'Chaque réplique est donnée au nom qui l’accompagne, sinon au dernier nom cité avant. Approximatif.',
   'Typewriter scrolling': 'Défilement machine à écrire',
   'The line you are writing stays in the middle of the screen, so your eyes stay still.': 'La ligne que vous écrivez reste au milieu de l’écran, pour que le regard ne bouge pas.',
-  'Used in Review mode, and while you write if you turn that on.': 'Utilisé en mode Relecture, et pendant l’écriture si vous l’activez.',
+  'The manuscript: in Review mode, and while you write if you turn that on. Every other text box (bible, outline, notes, chat): a moment after you pause in it.': 'Le manuscrit : en mode Relecture, et pendant l’écriture si vous l’activez. Toutes les autres zones de texte (bible, plan, notes, chat) : un instant après chaque pause.',
   'Check while writing': 'Vérifier pendant l’écriture',
   'Off by default. When on, the scene’s text is sent to the server a moment after you stop typing, in Write mode too.': 'Désactivé par défaut. Activé, le texte de la scène est envoyé au serveur un instant après que vous cessez de taper, en mode Écriture aussi.',
   'Snapshot taken.': 'Instantané pris.',

@@ -144,7 +144,7 @@ function ChapterBlock({ book, c, n, label, open, onFold }: { book: Book; c: Chap
       <header className="pl-ol-chhead">
         <button type="button" className="pl-quiet" onClick={onFold} aria-expanded={open}>{open ? <ChevronDown size={15} /> : <ChevronRight size={15} />}</button>
         <span className="pl-ol-num">{label}</span>
-        <input className="pl-ol-title" value={c.title} placeholder={t('Chapter title')} onChange={e => st().updateChapter(c.id, { title: e.target.value })} />
+        <input data-lt className="pl-ol-title" value={c.title} placeholder={t('Chapter title')} onChange={e => st().updateChapter(c.id, { title: e.target.value })} />
         {chapterBeats(book, c).map(b => <span key={b.name} className="sk-badge pl-ol-beatbadge" title={b.note}>{b.name}</span>)}
         <span className="sk-hint">{[c.scenes.length > 1 ? t('{n} scenes', { n: c.scenes.length }) : '', words ? t('{n} words', { n: words.toLocaleString() }) : ''].filter(Boolean).join(' · ')}</span>
         <span className="pl-ol-tools">
@@ -290,7 +290,7 @@ function SceneForm({ book, c, s, k, update, lock, tools }: { book: Book; c: Chap
   return (
     <article className={`pl-ol-card pl-ol-form ${s.locked ? 'pl-ol-locked' : ''}`} data-editing="true">
       <div className="pl-row pl-ol-cardhead">
-        <input className="pl-ol-scenetitle pl-grow" value={s.title} onChange={e => update({ title: e.target.value })} aria-label={t('Scene title')} />
+        <input data-lt className="pl-ol-scenetitle pl-grow" value={s.title} onChange={e => update({ title: e.target.value })} aria-label={t('Scene title')} />
         {lock}{tools}
         <button type="button" className="sk-btn sk-btn-sm sk-btn-primary" onClick={() => edit(null)}><Check size={13} /> {t('Done')}</button>
       </div>
@@ -320,7 +320,7 @@ function SceneForm({ book, c, s, k, update, lock, tools }: { book: Book; c: Chap
           </li>
         ))}
         <li className="pl-ol-newbeat">
-          <input className="sk-input sk-btn-sm" value={beat} placeholder={t('Add a beat (Enter)')} onChange={e => setBeat(e.target.value)}
+          <input data-lt className="sk-input sk-btn-sm" value={beat} placeholder={t('Add a beat (Enter)')} onChange={e => setBeat(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter' && beat.trim()) { setBeats([...beats, beat.trim()]); setBeat('') } }} />
         </li>
       </ol>

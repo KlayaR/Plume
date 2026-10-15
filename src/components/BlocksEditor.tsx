@@ -75,7 +75,7 @@ export default function BlocksEditor({ entry, update }: { entry: Entry; update: 
           <div className="pl-row">
             {b.title === '' && i === 0
               ? <span className="sk-label pl-grow">{t('Overview')}</span>
-              : <input className="pl-block-title pl-grow" value={b.title} aria-label={t('Block title')} onChange={e => rename(i, e.target.value)} />}
+              : <input data-lt className="pl-block-title pl-grow" value={b.title} aria-label={t('Block title')} onChange={e => rename(i, e.target.value)} />}
             <span className="sk-hint">≈ {estimateTokens(b.text)}</span>
             <select className="sk-select sk-btn-sm" value={sendOf(entry, b.title)} aria-label={t('What the AI may read')} title={t('What the AI may read of this block')} onChange={e => setSend(b.title, e.target.value as Send)}>
               {SENDS.map(([id, label]) => <option key={id} value={id}>{t(label)}</option>)}
