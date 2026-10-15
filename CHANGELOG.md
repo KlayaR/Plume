@@ -7,6 +7,13 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.26.0
+**Fixes that use the Review report, and scenes that reach their length**
+- **The scorecard under a proposal now includes the Review report:** the three reports furthest from their target (echoes, repeated phrases, adverbs…) are listed with your rules, for passages of 150 words or more. **Retry fixing** sends them back with a few exact quotes, and Claude changes only those sentences.
+- **Repeated images:** Claude is told to use a striking image once (twice at most in a chapter) and to vary how comparisons are built. A new AI tell flags the same simile construction used again and again ("the way…", "comme si…").
+- **Scenes written from the plan reach their length:** the length is now a minimum ("at least 3,000 words, up to about 4,500"). If a scene still comes out well short, Claude is asked once to carry it on to its end, in the same proposal.
+- **Chapters written from the plan are checked too:** each scene gets the scorecard after it's written; if some miss your rules or targets, the message offers **Fix them**, which fixes only what failed, scene by scene.
+
 ## 0.25.1
 **Fix: removing entries and scenes**
 - Removing an entry or a scene whose file was missing on disk (never saved, or moved outside Plume) silently did nothing. It now removes it from the book; there's simply nothing to put in the trash.

@@ -34,7 +34,8 @@ Règles :
 - Respecte chaque fait de la bible (<bible>). Ne le contredis jamais. N'invente pas de fait majeur qui n'y figure pas.
 - Réponds uniquement avec la prose : pas de titre, pas de préambule, pas de commentaire, pas de Markdown, pas de guillemets autour de la réponse.
 - Typographie française : guillemets « », tiret cadratin (—) pour les dialogues, points de suspension (…).
-- Les italiques s'écrivent *comme ceci* (pensées, mots étrangers, insistance) : conserve ceux du texte et n'en mets qu'avec parcimonie.`
+- Les italiques s'écrivent *comme ceci* (pensées, mots étrangers, insistance) : conserve ceux du texte et n'en mets qu'avec parcimonie.
+- Une image frappante sert une fois, deux au plus dans un chapitre : n'y reviens pas. Varie la façon de construire les comparaisons (pas toujours « comme… », « de la façon dont… ») et n'en mets pas dans chaque paragraphe.`
   }
   return `You are a fiction co-writer inside Plume, a novel-writing app. You write prose for the book "${title}", in English.
 
@@ -43,7 +44,8 @@ Rules:
 - Respect every fact in the bible (<bible>). Never contradict it. Don't invent major facts that aren't there.
 - Reply with the prose only: no title, no preamble, no notes, no Markdown, no quotation marks around the reply.
 - Typography: curly quotes, em dashes, ellipsis character (…).
-- Italics are written *like this* (thoughts, foreign words, emphasis): keep the ones in the text and use them sparingly.`
+- Italics are written *like this* (thoughts, foreign words, emphasis): keep the ones in the text and use them sparingly.
+- A striking image is used once, twice at most in a chapter: don't come back to it. Vary how comparisons are built (not always "the way…", "like…") and don't put one in every paragraph.`
 }
 
 interface Story { before: string; selection: string; after: string }
@@ -111,7 +113,7 @@ export function taskMessage(lang: Lang, action: ActionId, instruction: string, s
   }
   if (action === 'scene') {
     const [a, b] = at?.range ?? ai.chapterWords
-    const range = fr ? `environ ${a} à ${b} mots` : `about ${a} to ${b} words`
+    const range = fr ? `au moins ${a} mots, jusqu’à environ ${b}` : `at least ${a} words, up to about ${b}`
     return [
       storyBlock,
       fr

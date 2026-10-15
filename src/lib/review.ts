@@ -9,7 +9,7 @@ import {
   PLAIN_TAGS, phrases, readability, repeatedPhrases, repeatedStarts, sentences, STOPWORDS, TELLING_WORDS, words, type Finding,
 } from './analysis'
 import { foldText } from './text'
-import { listWords, wordLists } from './voice'
+import { listWords, wordLists, type Check } from './voice'
 
 export type Category = 'pacing' | 'dialogue' | 'strong' | 'choice' | 'repetition' | 'readability'
 
@@ -263,6 +263,29 @@ export function review(text: string, book: Book, refs?: Record<string, number> |
 export function topProblems(results: ReportResult[], n = 3): ReportResult[] {
   const over = (r: ReportResult) => r.rate / Math.max(r.target, 0.1)
   return results.filter(r => r.status !== 'good' && r.count > 0).sort((a, b) => over(b) - over(a)).slice(0, n)
+}
+
+/** A finding shown with a little of the text around it, so Claude knows which words to change. */
+const quoteOf = (text: string, f: Finding) => {
+  const a = Math.max(0, f.from - 25), b = Math.min(text.length, f.to + 25)
+  return `${a > 0 ? '…' : ''}${text.slice(a, b).replace(/\s+/g, ' ').trim()}${b < text.length ? '…' : ''}`
+}
+
+/**
+ * The Review reports furthest above their target, as scorecard items: they show
+ * under the proposal and "Retry fixing" sends them back with a few quotes. Only
+ * for passages long enough for rates to mean something.
+ */
+export function reviewChecks(text: string, book: Book): Check[] {
+  const lang = book.meta.language
+  if (words(text).length < 150) return []
+  return topProblems(review(text, book).results).map(r => ({
+    id: `review-${r.def.id}`,
+    label: r.def.label,
+    ok: false,
+    detail: String(r.count),
+    fix: `${r.def.label}: ${r.def.help} ${lang === 'fr' ? 'Exemples' : 'For example'} : ${r.findings.slice(0, 3).map(f => `« ${quoteOf(text, f)} »`).join(', ')}.`,
+  }))
 }
 
 /** Every occurrence of one word (for the overused-words list). */

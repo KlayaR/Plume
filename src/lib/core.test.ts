@@ -23,7 +23,7 @@ import type { Book, Entry, Scene } from './types'
 import { DEFAULT_AI, DEFAULT_VOICE, ENTRY_TYPES, FAMILIES, VOICE_TYPES, familyOf } from './types'
 import { adverbs, passives, echoes } from './analysis'
 import { aiTells, checkRules, expandVariables } from './voice'
-import { review, topProblems } from './review'
+import { review, reviewChecks, topProblems } from './review'
 import { parseStoryTime } from './structures'
 import { makeZip, readZip, utf8, fromUtf8 } from './zip'
 import { scenePositions, timeFlags } from './structures'
@@ -884,7 +884,7 @@ describe('writing from the plan', () => {
     const three = bookOf([scene('a', ''), scene('b', ''), scene('c', '')], [])
     expect(sceneWords(three, 'b')).toEqual([1000, 1500])
     const b = buildContext({ book: one, chapter: 1, pov: null, action: 'scene', instruction: '', before: '', selection: '', after: '', overrides: {}, scene: one.chapters[0].scenes[0] })
-    expect(b.message).toContain('about 3000 to 4500 words')
+    expect(b.message).toContain('at least 3000 words, up to about 4500')
     expect(b.message).toContain('Jasper wants a calm morning.')
     expect(b.message).toContain('<scope>')
   })
@@ -899,5 +899,22 @@ describe('chapter craft when writing from the plan', () => {
     expect(run('b')).toContain('This scene ends the chapter')
     expect(run('b')).not.toContain('This scene opens the chapter')
     expect(run('b')).toContain('“yes, but…”')
+  })
+})
+
+describe('scorecard from the review', () => {
+  it('flags the same simile construction used again and again', () => {
+    const t = 'It went the way a stone goes. He moved the way a cat moves. She smiled the way the sea does. They left the way it ends.'
+    expect(aiTells(t, 'en').map(x => x.kind)).toContain('similes')
+    expect(aiTells('It went the way a stone goes. Then he left.', 'en').map(x => x.kind)).not.toContain('similes')
+  })
+  it('turns the reports furthest from target into fixes with quotes, for long enough passages', () => {
+    const book = bookOf([], [])
+    expect(reviewChecks('Too short.', book)).toEqual([])
+    const long = Array.from({ length: 40 }, () => 'He was very really quite slowly walking and he was very really quite slowly talking.').join(' ')
+    const checks = reviewChecks(long, book)
+    expect(checks.length).toBeGreaterThan(0)
+    expect(checks.length).toBeLessThanOrEqual(3)
+    expect(checks[0].fix).toContain('« ')
   })
 })

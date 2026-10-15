@@ -1052,6 +1052,10 @@ const FR: Record<string, string> = {
   'Ending': 'Fin',
   'Could not move the entry to the trash: {e}': 'Impossible de mettre la fiche à la corbeille : {e}',
   'Could not move the scene to the trash: {e}': 'Impossible de mettre la scène à la corbeille : {e}',
+  '{n} scene(s) written; {k} miss some of your rules or targets. Snapshots can put the chapter back as it was.': '{n} scène(s) écrite(s) ; {k} ne respectent pas toutes vos règles ou cibles. Les instantanés peuvent remettre le chapitre comme avant.',
+  'Fix them': 'Les corriger',
+  'Fixing “{title}”…': 'Correction de « {title} »…',
+  '{n} scene(s) fixed.': '{n} scène(s) corrigée(s).',
 }
 
 const SHELL = {

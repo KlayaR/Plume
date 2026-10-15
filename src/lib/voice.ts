@@ -161,17 +161,24 @@ export function checkRules(text: string, book: Book): Check[] {
 // Constructions that make prose read as machine-written. Each is fine once in a
 // while in a human text; it's the habit that gives it away, hence the thresholds.
 
-type Tell = 'contrast' | 'dashes' | 'openers' | 'triads'
+type Tell = 'contrast' | 'dashes' | 'openers' | 'triads' | 'similes'
 const TELL_FIX: Record<Tell, Record<Lang, string>> = {
   contrast: { en: 'the "not X, but Y" / "It wasn\'t X. It was Y." contrast, used more than once: say the thing directly', fr: 'l\'opposition « ce n\'est pas X, c\'est Y » / « non pas X, mais Y », plus d\'une fois : dis la chose directement' },
   dashes: { en: 'too many em dashes inside sentences: use commas, full stops or nothing', fr: 'trop de tirets au milieu des phrases : mets des virgules, des points, ou rien' },
   openers: { en: 'three sentences in a row start with the same word: vary the openings', fr: 'trois phrases de suite commencent par le même mot : varie les débuts' },
   triads: { en: 'lists of three ("X, Y and Z") again and again: keep one, cut or merge the others', fr: 'des énumérations par trois (« X, Y et Z ») à répétition : garde-en une, coupe ou fonds les autres' },
+  similes: { en: 'comparisons built the same way again and again ("the way…"): keep the best, say the others plainly or build them differently', fr: 'des comparaisons construites toujours pareil (« de la façon dont… », « comme si… ») : garde la meilleure, dis les autres simplement ou autrement' },
 }
 
 const CONTRAST: Record<Lang, RegExp[]> = {
   en: [/\bnot\s+(?:just\s+|only\s+|merely\s+)?[^.,;!?\n]{1,40},\s*but\b/gi, /\b(?:wasn't|isn't|weren't|was not|is not)\s+[^.!?\n]{1,40}[.;]\s+(?:It|That|This|He|She|They)\s+(?:was|is|were)\b/g],
   fr: [/\bce\s+n['’](?:est|était)\s+pas\s+[^.!?\n]{1,40}[.,;]\s*(?:c['’](?:est|était)|mais)\b/gi, /\b(?:non\s+pas|pas\s+seulement|pas\s+juste)\s+[^.,;!?\n]{1,40},?\s*mais\b/gi],
+}
+
+/** Comparison openers a model leans on: "the way…" in English, "de la façon dont / comme si…" in French. */
+const SIMILE: Record<Lang, RegExp> = {
+  en: /\bthe way (?:a|an|the|you|one|he|she|they|it|I|we|his|her|their|my)\b/gi,
+  fr: /\b(?:de la (?:même )?(?:façon|manière) dont|comme si)\b/gi,
 }
 
 /** AI tells in a passage, at most one of each kind, with a short quote. Zero tokens. */
@@ -189,6 +196,8 @@ export function aiTells(text: string, lang: Lang): { kind: Tell; quote: string }
   if (at >= 0) out.push({ kind: 'openers', quote: firsts[at] })
   const triads = [...text.matchAll(/\b[\p{L}'’-]+,\s+[\p{L}'’-]+,?\s+(?:and|et|or|ou)\s+[\p{L}'’-]+/gu)].map(m => m[0])
   if (triads.length >= 3) out.push({ kind: 'triads', quote: triads[0].slice(0, 60) })
+  const similes = [...text.matchAll(SIMILE[lang])].map(m => m[0])
+  if (similes.length > Math.max(2, n / 300)) out.push({ kind: 'similes', quote: similes[0] })
   return out
 }
 
