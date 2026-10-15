@@ -245,6 +245,12 @@ export function sceneWords(book: Book, sceneId: string): [number, number] {
   return [r(a), r(b)]
 }
 
+/** The length to aim for, and whether the scene opens or closes its chapter. */
+export function scenePlace(book: Book, sceneId: string): { range: [number, number]; first: boolean; last: boolean } {
+  const scenes = book.chapters.find(c => c.scenes.some(s => s.id === sceneId))?.scenes ?? []
+  return { range: sceneWords(book, sceneId), first: scenes[0]?.id === sceneId, last: scenes[scenes.length - 1]?.id === sceneId }
+}
+
 export function storyParts(input: Pick<ContextInput, 'action' | 'before' | 'selection' | 'after'>, windowWords: number) {
   if (isRewrite(input.action)) {
     return { before: lastWords(input.before, Math.min(400, windowWords)), selection: input.selection, after: firstWords(input.after, 150) }
@@ -350,7 +356,7 @@ export function buildContext(input: ContextInput): Built {
     so ? `<story_so_far>\n${so}\n</story_so_far>` : '',
     edges,
     info ? `<scene>\n${info}\n</scene>` : '',
-    taskMessage(lang, input.action, input.instruction, story, ai, sc ? sceneWords(book, sc.id) : undefined),
+    taskMessage(lang, input.action, input.instruction, story, ai, sc ? scenePlace(book, sc.id) : undefined),
     !isRewrite(input.action) && (edges || sc?.note?.trim()) ? SCOPE[lang] : '',
   ].filter(Boolean).join('\n\n')
   const parts = {

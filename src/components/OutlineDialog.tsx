@@ -9,7 +9,7 @@ import { WORLD_TYPES, type Book, type EntryType } from '../lib/types'
 import { ask, parseJSON } from '../ai'
 import { useT } from '../i18n'
 
-interface Outline { title: string; scenes: { title: string; note: string; pov?: string; place?: string }[] }
+interface Outline { title: string; goal?: string; ending?: string; scenes: { title: string; note: string; pov?: string; place?: string }[] }
 
 /** What makes a scene, said once to Claude so the outline isn't a grid of identical chapters. */
 const SCENE_RULES = {
@@ -18,13 +18,23 @@ const SCENE_RULES = {
 - Something changes: someone wants something, meets an obstacle, and the scene ends with the situation different (better, worse, a revelation, a decision). If nothing changes, it is not a scene.
 - Action scenes are often followed by a quieter reaction scene (feeling, dilemma, decision).
 - In fantasy a scene runs about 1,000 to 4,000 words, a chapter about 2,000 to 5,000.
-- The number of scenes per chapter follows what the chapter needs: a battle or a confrontation can be one long scene, a journey or a setup chapter several short ones. Never give every chapter the same number of scenes.`,
+- The number of scenes per chapter follows what the chapter needs: a battle or a confrontation can be one long scene, a journey or a setup chapter several short ones. Never give every chapter the same number of scenes.
+
+What a chapter is:
+- A concrete, immediate goal for the point-of-view character (get past the guard, decode one line), not the big quest.
+- It escalates: each attempt gives “yes, but…” or “no, and what’s more…”.
+- It ends on a turn: the problem solved reveals a worse one, a revelation forces a new plan, a quiet chapter lands on an image or a realisation, or a question is left that the next chapter answers. No mid-action cliffhanger.`,
   fr: `Ce qu’est une scène :
 - Un seul moment continu : un lieu, un temps sans coupure, un personnage de point de vue. Si l’un des trois change, c’est une nouvelle scène.
 - Quelque chose change : quelqu’un veut quelque chose, rencontre un obstacle, et la scène finit sur une situation différente (meilleure, pire, une révélation, une décision). Si rien ne change, ce n’est pas une scène.
 - Une scène d’action est souvent suivie d’une scène de réaction plus calme (émotion, dilemme, décision).
 - En fantasy, une scène fait environ 1 000 à 4 000 mots, un chapitre environ 2 000 à 5 000.
-- Le nombre de scènes par chapitre suit ce dont le chapitre a besoin : une bataille ou une confrontation peut être une seule longue scène, un voyage ou un chapitre d’installation plusieurs courtes. Ne donne jamais le même nombre de scènes à tous les chapitres.`,
+- Le nombre de scènes par chapitre suit ce dont le chapitre a besoin : une bataille ou une confrontation peut être une seule longue scène, un voyage ou un chapitre d’installation plusieurs courtes. Ne donne jamais le même nombre de scènes à tous les chapitres.
+
+Ce qu’est un chapitre :
+- Un but concret et immédiat pour le personnage du point de vue (passer le garde, déchiffrer une ligne), pas la grande quête.
+- Il monte en tension : chaque tentative donne « oui, mais… » ou « non, et en plus… ».
+- Il finit sur un tournant : le problème réglé en révèle un pire, une révélation oblige à revoir le plan, un chapitre calme se pose sur une image ou une prise de conscience, ou il laisse une question à laquelle le chapitre suivant répond. Pas de suspense coupé en pleine action.`,
 }
 
 /** A bible entry named (or aliased) exactly so, of one of these types. */
@@ -61,8 +71,8 @@ export default function OutlineDialog({ onClose }: { onClose: () => void }) {
           ? 'Tu aides un romancier de fantasy à bâtir le plan de son livre. Réponds uniquement en JSON valide, en français.'
           : 'You help a fantasy novelist build the outline of their book. Reply with valid JSON only.',
         message: `<premise>\n${premise.trim()}\n</premise>\n${bible ? `<bible>\n${bible}\n</bible>\n` : ''}${beats ? `<structure>\n${beats}\n</structure>\n` : ''}\n${lang === 'fr'
-          ? `${SCENE_RULES.fr}\n\nPropose ${chapters} chapitres pour un livre d’environ ${words.toLocaleString('fr-FR')} mots${range ? `, de ${range[0]} à ${range[1]} scènes par chapitre selon ce que chacun demande` : ''}. Chaque scène a un titre court, une note d’une ou deux phrases (qui veut quoi, ce qui l’en empêche, ce qui change à la fin), son personnage de point de vue et son lieu, avec les noms de la bible quand ils y sont. Respecte la structure donnée si elle existe.`
-          : `${SCENE_RULES.en}\n\nPropose ${chapters} chapters for a book of about ${words.toLocaleString('en-US')} words${range ? `, ${range[0]} to ${range[1]} scenes per chapter as each one needs` : ''}. Each scene gets a short title, a one-or-two-sentence note (who wants what, what stands in the way, what changes by the end), its point-of-view character and its place, using the bible's names when they are there. Follow the given structure if there is one.`}\nJSON: [{"title": "...", "scenes": [{"title": "...", "note": "...", "pov": "...", "place": "..."}]}]`,
+          ? `${SCENE_RULES.fr}\n\nPropose ${chapters} chapitres pour un livre d’environ ${words.toLocaleString('fr-FR')} mots${range ? `, de ${range[0]} à ${range[1]} scènes par chapitre selon ce que chacun demande` : ''}. Chaque scène a un titre court, une note d’une ou deux phrases (qui veut quoi, ce qui l’en empêche, ce qui change à la fin), son personnage de point de vue et son lieu, avec les noms de la bible quand ils y sont. Chaque chapitre a son but immédiat (goal) et sa fin (ending : le tournant ou la question sur lesquels il se termine). Respecte la structure donnée si elle existe.`
+          : `${SCENE_RULES.en}\n\nPropose ${chapters} chapters for a book of about ${words.toLocaleString('en-US')} words${range ? `, ${range[0]} to ${range[1]} scenes per chapter as each one needs` : ''}. Each scene gets a short title, a one-or-two-sentence note (who wants what, what stands in the way, what changes by the end), its point-of-view character and its place, using the bible's names when they are there. Each chapter gets its immediate goal (goal) and its ending (the turn or question it lands on). Follow the given structure if there is one.`}\nJSON: [{"title": "...", "goal": "...", "ending": "...", "scenes": [{"title": "...", "note": "...", "pov": "...", "place": "..."}]}]`,
       })
       const list = parseJSON<Outline[]>(reply)
       if (!list?.length) throw new Error(t('Claude’s reply could not be read. Try again.'))
@@ -76,8 +86,15 @@ export default function OutlineDialog({ onClose }: { onClose: () => void }) {
     const st = useStore.getState()
     let made = 0
     outline.forEach((c, ci) => {
-      const scenes = c.scenes.filter((_, si) => !off.has(`${ci}-${si}`))
-      if (!scenes.length) return
+      const kept = c.scenes.filter((_, si) => !off.has(`${ci}-${si}`))
+      if (!kept.length) return
+      // The chapter's goal goes in its first scene's note, its ending in its last one's: writing from the plan reads them there.
+      const fr = lang === 'fr'
+      const scenes = kept.map((s, i) => ({ ...s, note: [
+        String(s.note ?? '').trim(),
+        i === 0 && c.goal?.trim() ? `${fr ? 'But du chapitre' : 'Chapter goal'} : ${c.goal.trim()}` : '',
+        i === kept.length - 1 && c.ending?.trim() ? `${fr ? 'Fin du chapitre' : 'Chapter ending'} : ${c.ending.trim()}` : '',
+      ].filter(Boolean).join('\n') }))
       made++
       // A chapter that already has this title receives the scenes; otherwise a new chapter is made.
       const same = useStore.getState().book!.chapters.find(x => x.title.trim() && foldText(x.title) === foldText(String(c.title ?? '')))
@@ -142,6 +159,7 @@ export default function OutlineDialog({ onClose }: { onClose: () => void }) {
           {outline.map((c, i) => (
             <div key={i} className="pl-outline-ch">
               <b>{i + 1}. {c.title}</b>
+              {(c.goal || c.ending) && <span className="sk-hint">{[c.goal && `${t('Goal')} : ${c.goal}`, c.ending && `${t('Ending')} : ${c.ending}`].filter(Boolean).join(' · ')}</span>}
               {c.scenes.map((s, j) => (
                 <label key={j} className="pl-outline-sc pl-row pl-check-label">
                   <input type="checkbox" className="sk-check" checked={!off.has(`${i}-${j}`)} onChange={() => toggle(`${i}-${j}`)} />

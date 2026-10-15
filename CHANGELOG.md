@@ -7,6 +7,11 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.25.0
+**How a chapter is built**
+- **Writing from the plan follows the craft of a chapter:** a concrete, immediate goal for the point-of-view character (not the big quest); every attempt complicates things ("yes, but…" / "no, and what's more…"); the world shown through action, never in a pause to explain it. The scene that opens a chapter is anchored at once in the now (no waking up, no recap); the one that ends it lands on a turn or a question for the next chapter, not a mid-action cliffhanger or a summary. Scenes in between end where they turn.
+- **Outline from a premise** gives each chapter its **goal** and its **ending** (the turn or question it lands on). They are written into the notes of the chapter's first and last scenes, where writing from the plan reads them.
+
 ## 0.24.0
 **Write from the plan**
 - **Write a scene from its plan card:** right-click a card (Plan) or a scene (Manuscript) → **Write it from the plan**, or **From the plan** in the Assistant, or Ctrl+K. Claude writes the scene (or the rest of it) from the card's note, POV, time and place, with the scenes around it for continuity; it arrives as a proposal to accept or discard.

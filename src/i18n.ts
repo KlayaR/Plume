@@ -1048,6 +1048,8 @@ const FR: Record<string, string> = {
   'Write the chapter from the plan (Claude)': 'Écrire le chapitre d’après le plan (Claude)',
   'From the plan': 'D’après le plan',
   'Writes the scene (or the rest of it) from its plan card note': 'Écrit la scène (ou sa suite) d’après la note de sa carte du plan',
+  'Goal': 'But',
+  'Ending': 'Fin',
 }
 
 const SHELL = {

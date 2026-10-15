@@ -889,3 +889,15 @@ describe('writing from the plan', () => {
     expect(b.message).toContain('<scope>')
   })
 })
+
+describe('chapter craft when writing from the plan', () => {
+  it('opens and lands the chapter only in the scenes that hold its opening and end', () => {
+    const book = bookOf([scene('a', '', { note: 'Get past the guard.' }), scene('b', '', { note: 'The vault.' })], [])
+    const run = (id: string) => buildContext({ book, chapter: 1, pov: null, action: 'scene', instruction: '', before: '', selection: '', after: '', overrides: {}, scene: book.chapters[0].scenes.find(s => s.id === id)! }).message
+    expect(run('a')).toContain('This scene opens the chapter')
+    expect(run('a')).toContain('the chapter goes on after it')
+    expect(run('b')).toContain('This scene ends the chapter')
+    expect(run('b')).not.toContain('This scene opens the chapter')
+    expect(run('b')).toContain('“yes, but…”')
+  })
+})

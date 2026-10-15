@@ -48,7 +48,25 @@ Rules:
 
 interface Story { before: string; selection: string; after: string }
 
-export function taskMessage(lang: Lang, action: ActionId, instruction: string, story: Story, ai: BookMeta['ai'], sceneRange?: [number, number]): string {
+/** Where the scene stands in its chapter, for writing from the plan. */
+export interface ScenePlace { range: [number, number]; first: boolean; last: boolean }
+
+/** How a scene written from the plan is built, and how the chapter opens and lands when this scene holds its opening or its end. */
+function craft(lang: Lang, at: ScenePlace): string {
+  const fr = lang === 'fr'
+  return [
+    fr ? 'Construction :' : 'How to build it:',
+    fr ? '- Donne au personnage du point de vue un but concret et immédiat dans cette scène (tiré de la note), pas la grande quête.' : '- Give the point-of-view character a concrete, immediate goal in this scene (from the note), not the big quest.',
+    fr ? '- Chaque tentative complique la situation : « oui, mais… » ou « non, et en plus… ». Ne la résous pas trop facilement.' : '- Every attempt complicates things: “yes, but…” or “no, and what’s more…”. Don’t resolve it too easily.',
+    fr ? '- Le monde se révèle dans l’action et la difficulté, jamais dans une pause pour l’expliquer.' : '- The world shows through action and struggle, never in a pause to explain it.',
+    at.first ? (fr ? '- Cette scène ouvre le chapitre : ancre-le tout de suite dans le présent (lieu, moment, un détail sensoriel), au plus près de ce qui dérange. Pas de réveil, pas de monologue, pas de résumé du chapitre précédent.' : '- This scene opens the chapter: anchor it at once in the now (place, time, a sensory detail), as close to the disruption as possible. No waking up, no long inner monologue, no recap of the previous chapter.') : '',
+    at.last
+      ? (fr ? '- Cette scène termine le chapitre : finis sur un tournant (le problème réglé en révèle un pire, une révélation qui oblige à revoir le plan, ou pour un chapitre calme une image forte, une prise de conscience muette, une résolution), ou sur une question à laquelle le chapitre suivant répondra. Pas de suspense coupé en pleine action, pas de résumé.' : '- This scene ends the chapter: land it on a turn (the problem solved reveals a worse one, a revelation that forces a new plan, or in a quiet chapter a striking image, an unspoken realisation, a resolve), or on a question the next chapter will answer. No mid-action cliffhanger, no summary.')
+      : (fr ? '- Termine la scène là où elle bascule : le chapitre continue après elle.' : '- End the scene where it turns: the chapter goes on after it.'),
+  ].filter(Boolean).join('\n')
+}
+
+export function taskMessage(lang: Lang, action: ActionId, instruction: string, story: Story, ai: BookMeta['ai'], at?: ScenePlace): string {
   const fr = lang === 'fr'
   const dir = instruction.trim()
   const words = (n: number) => fr ? `environ ${n} mots` : `about ${n} words`
@@ -92,13 +110,13 @@ export function taskMessage(lang: Lang, action: ActionId, instruction: string, s
     ].join('\n\n')
   }
   if (action === 'scene') {
-    const [a, b] = sceneRange ?? ai.chapterWords
+    const [a, b] = at?.range ?? ai.chapterWords
     const range = fr ? `environ ${a} à ${b} mots` : `about ${a} to ${b} words`
     return [
       storyBlock,
       fr
-        ? `<task>\nÉcris cette scène en entier d'après son plan (<scene>)${story.before.trim() ? ", en reprenant exactement là où le texte s'arrête" : ''} : entre dans le moment, mène-la jusqu'à ce que sa note dit qui change, et termine là. Longueur indicative : ${range} ; plus courte ou plus longue si la scène le demande.${dir ? `\nConsigne de l'auteur : ${dir}` : ''}\n</task>`
-        : `<task>\nWrite this scene in full from its plan (<scene>)${story.before.trim() ? ', picking up exactly where the story stops' : ''}: go into the moment, carry it to what its note says changes, and end there. Length as a guide: ${range}; shorter or longer if the scene needs it.${dir ? `\nAuthor's direction: ${dir}` : ''}\n</task>`,
+        ? `<task>\nÉcris cette scène en entier d'après son plan (<scene>)${story.before.trim() ? ", en reprenant exactement là où le texte s'arrête" : ''} : entre dans le moment, mène-la jusqu'à ce que sa note dit qui change, et termine là. Longueur indicative : ${range} ; plus courte ou plus longue si la scène le demande.\n${craft(lang, at ?? { range: ai.chapterWords, first: true, last: true })}${dir ? `\nConsigne de l'auteur : ${dir}` : ''}\n</task>`
+        : `<task>\nWrite this scene in full from its plan (<scene>)${story.before.trim() ? ', picking up exactly where the story stops' : ''}: go into the moment, carry it to what its note says changes, and end there. Length as a guide: ${range}; shorter or longer if the scene needs it.\n${craft(lang, at ?? { range: ai.chapterWords, first: true, last: true })}${dir ? `\nAuthor's direction: ${dir}` : ''}\n</task>`,
     ].join('\n\n')
   }
   if (action === 'beats') {
