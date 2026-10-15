@@ -2,7 +2,7 @@
 // book's outline as compact text, and Claude's JSON turned into a proposal
 // that the Outline tab shows before anything changes. No screen, no calls.
 import { foldText } from './text'
-import type { Book, Chapter, EntryType, Lang, Scene } from './types'
+import { FOUNDATION_KEYS, type Book, type Chapter, type EntryType, type Foundation, type Lang, type Scene } from './types'
 
 /** How many scenes a chapter gets: mostly one (the default), as each chapter needs, or within a range. */
 export type SceneMode = { kind: 'one' } | { kind: 'auto' } | { kind: 'range'; min: number; max: number }
@@ -48,18 +48,57 @@ export const CHAPTER_JSON = `{"goal": "…", "ending": "…", "scenes": [${SCENE
 
 const nameOf = (book: Book, slug: string | null | undefined) => (slug ? book.entries.find(e => e.slug === slug)?.name ?? slug : '')
 
+/** Labels of the foundation's fields, in the book's language. */
+export const FOUNDATION_LABELS: Record<keyof Foundation, { en: string; fr: string }> = {
+  logline: { en: 'Logline', fr: 'Pitch en une phrase' },
+  want: { en: 'What the protagonist wants', fr: 'Ce que veut le protagoniste' },
+  need: { en: 'What they need', fr: 'Ce dont il a besoin' },
+  antagonist: { en: 'Antagonist and their plan', fr: 'Antagoniste et son plan' },
+  stakes: { en: 'Stakes', fr: 'Enjeux' },
+  theme: { en: 'Theme', fr: 'Thème' },
+  magic: { en: 'Magic: limits and cost', fr: 'Magie : limites et prix' },
+}
+
+/** The premise and the foundation, as Claude reads them. */
+export function foundationText(book: Book): string {
+  const lang = book.meta.language
+  const f = book.meta.foundation ?? {}
+  const lines = FOUNDATION_KEYS.filter(k => f[k]?.trim()).map(k => `${FOUNDATION_LABELS[k][lang]} : ${f[k]!.trim()}`)
+  return [
+    book.meta.summary?.trim() ? `<premise>\n${book.meta.summary.trim()}\n</premise>` : '',
+    lines.length ? `<foundation>\n${lines.join('\n')}\n</foundation>` : '',
+  ].filter(Boolean).join('\n\n')
+}
+
+/** The book's turning points (Structure), with what happens at each and where it falls. */
+export function turningPointsText(book: Book): string {
+  const beats = book.meta.structure.beats
+  if (!beats.length) return ''
+  const where = (id: string | null) => {
+    if (!id) return ''
+    const i = book.chapters.findIndex(c => c.scenes.some(s => s.id === id))
+    return i >= 0 ? ` → ${book.chapters[i].title || `#${i + 1}`}` : ''
+  }
+  return `<turning_points>\n${beats.map(b => `- ${b.name} (${b.at} %)${b.note.trim() ? `: ${b.note.trim()}` : ''}${where(b.sceneId)}`).join('\n')}\n</turning_points>`
+}
+
+/** The turning points that fall on a chapter's scenes. */
+export const chapterBeats = (book: Book, c: Chapter) => book.meta.structure.beats.filter(b => b.sceneId && c.scenes.some(s => s.id === b.sceneId))
+
 /** One scene's card as compact text (what Claude reads of the outline). */
 export function sceneText(book: Book, s: Scene, withId = false): string {
   return [
     `- ${withId ? `[${s.id}]${s.locked ? ' [locked]' : ''} ` : ''}${s.title}${s.pov ? ` (POV ${nameOf(book, s.pov)})` : ''}${s.place ? ` @ ${nameOf(book, s.place)}` : ''}: ${s.note?.trim() ?? ''}`,
     ...(s.beats ?? []).map((b, i) => `    ${i + 1}. ${b}`),
-  ].join('\n')
+    s.reveals?.trim() ? `    Reveals: ${s.reveals.trim()}` : '',
+    s.pace?.trim() ? `    Pace: ${s.pace.trim()}` : '',
+  ].filter(Boolean).join('\n')
 }
 
 /** A chapter's outline as compact text. */
 export function chapterText(book: Book, c: Chapter, n: number, withIds = false): string {
   return [
-    `## ${n}. ${c.title || '…'}`,
+    `## ${n}. ${c.title || '…'}${chapterBeats(book, c).map(b => ` [${b.name}]`).join('')}`,
     c.goal ? `Goal: ${c.goal}` : '',
     c.ending ? `Ending: ${c.ending}` : '',
     ...c.scenes.map(s => sceneText(book, s, withIds)),
@@ -95,7 +134,7 @@ export interface CardDraft {
 
 export interface OutlineProposal {
   chapterId: string
-  kind: 'detail' | 'regenerate' | 'scene'
+  kind: 'detail' | 'regenerate' | 'scene' | 'version'
   goal?: string
   ending?: string
   scenes: CardDraft[]
@@ -167,6 +206,28 @@ export function mergeCards(a: Scene, b: Scene): Partial<Scene> {
     pace: a.pace || b.pace,
     text: [a.text.trim(), b.text.trim()].filter(Boolean).join('\n\n'),
   }
+}
+
+/** What a chapter's outline was, to keep as an earlier version. */
+export interface OutlineVersion { at: string; label: string; goal?: string; ending?: string; cards: (ReturnType<typeof cardOf> & { id: string })[] }
+
+export const versionOf = (c: Chapter, label: string): OutlineVersion => ({
+  at: new Date().toISOString(), label, goal: c.goal, ending: c.ending, cards: c.scenes.map(s => ({ id: s.id, ...cardOf(s) })),
+})
+
+/** An earlier version as a proposal, so it shows beside the current outline before it comes back. */
+export function versionProposal(c: Chapter, v: OutlineVersion): OutlineProposal {
+  return {
+    chapterId: c.id, kind: 'version', goal: v.goal, ending: v.ending,
+    scenes: v.cards.map(x => ({ ...x, id: c.scenes.some(s => s.id === x.id && !s.locked) ? x.id : null })),
+  }
+}
+
+/** Keeps the last few versions of each chapter, newest first. */
+export function addVersion(all: Record<string, OutlineVersion[]>, chapterId: string, v: OutlineVersion, keep = 10): Record<string, OutlineVersion[]> {
+  const empty = !v.goal && !v.ending && v.cards.every(x => !x.note && !x.beats.length)
+  if (empty) return all
+  return { ...all, [chapterId]: [v, ...(all[chapterId] ?? [])].slice(0, keep) }
 }
 
 /** The outline as Markdown, to copy elsewhere. */

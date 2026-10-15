@@ -249,6 +249,22 @@ export const DEFAULT_VOICE: Voice = {
 export type MatterKey = 'copyright' | 'dedication' | 'epigraph' | 'acknowledgments' | 'about'
 
 export interface Beat { name: string; at: number; note: string; sceneId: string | null }
+
+/** The story's foundation (Plan → Outline): what every outline request starts from. */
+export interface Foundation {
+  /** One sentence: who, what they want, what stands in the way, what's at stake. */
+  logline: string
+  /** What the protagonist wants (outer goal) and what they need (inner change). */
+  want: string
+  need: string
+  /** Who or what opposes them, and their plan. */
+  antagonist: string
+  stakes: string
+  theme: string
+  /** What magic (or the world's great rule) can do, its limits and its cost. */
+  magic: string
+}
+export const FOUNDATION_KEYS: (keyof Foundation)[] = ['logline', 'want', 'need', 'antagonist', 'stakes', 'theme', 'magic']
 export interface LooseCard { id: string; title: string; note: string }
 
 export interface BookMeta {
@@ -286,6 +302,7 @@ export interface BookMeta {
   dictionary?: string[]
   ltIgnored?: string[]
   summary?: string
+  foundation?: Partial<Foundation>
 }
 
 export interface Book {

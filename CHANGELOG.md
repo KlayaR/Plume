@@ -7,6 +7,15 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.28.0
+**From an idea to a full outline**
+- **The story** (top of Plan → Outline): your premise, the **foundation** (logline, what the protagonist wants and needs, antagonist and their plan, stakes, theme, the limits and cost of magic) and the book's **turning points** (three acts, hero's journey…). Fill them by hand, or **Ask me questions** (Claude interviews you in the chat) then **Propose**; both come back as proposals. Every outline request (from a premise, Detail, Regenerate, Check) now reads them, and *Outline from a premise* places each turning point in its chapter (shown as a badge).
+- **Check the outline** goes further: setups never paid off and payoffs never set up, rising stakes, pace (quiet or action chapters in a row), consistency with the foundation. Each problem has a **Fix** button (Claude regenerates that chapter with the fix as direction, as a proposal).
+- **Accept all** when several proposals wait; **+ Chapter** at the end of the Outline; **Move up / Move down** for a scene (across chapters at the ends).
+- **Earlier versions:** every change Claude makes to a chapter keeps the outline it had. Chapter menu → *Earlier versions* → **Compare** shows one beside the current outline, to bring it back or not.
+- **Clean outline** (⋯ in the Outline bar): chapters and scenes with no text go to the trash, written scenes keep their text and lose their cards, goals, endings and turning point notes are cleared. Each chapter's outline is kept as an earlier version; the foundation stays.
+- **Fewer tabs:** Plan has Outline, Board, Structure and **Analysis** (Timeline, Story lines, Dashboard). Revision passes moved to Manuscript → Review (this scene's passes, progress, next scene, and the full table).
+
 ## 0.27.2
 **Merging scenes gives one scene, not two side by side**
 - After a merge, Claude rewrites the merged card as a single scene: one summary, the beats in order with no repeats, one arc. It comes back as a proposal (Accept / Reject); rejecting it keeps the plain merge. The written text is joined but never rewritten. A locked card isn't sent to Claude.

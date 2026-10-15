@@ -8,7 +8,7 @@ import { checkBible } from './bibleCheck'
 import { jumpItems, rankJump } from './quickjump'
 import { aiBlocks, joinBlocks, parseBlocks, toBlocks } from './blocks'
 import { tidy } from '../contextMenu'
-import { cardPatch, mergeCards, outlineRules, readChapterProposal } from './outline'
+import { addVersion, cardPatch, foundationText, mergeCards, outlineRules, readChapterProposal, turningPointsText, versionOf, versionProposal } from './outline'
 import { sessionOf, worthShowing } from './session'
 import { addDirection, ordered, togglePin, type Direction } from './directions'
 import { EMPTY_RATE, learnCall, learnWindow, shareOf } from './windowCost'
@@ -958,5 +958,31 @@ describe('outline', () => {
     expect(lines).toContain('Chapter goal : Get in.')
     expect(lines).toContain('1. He waits.')
     expect(lines).toContain('Chapter ending : The door was open all along.')
+  })
+})
+
+describe('story foundation, turning points and outline versions', () => {
+  it('sends the premise, the foundation and where each turning point falls', () => {
+    const book = bookOf([scene('a', '')], [])
+    book.meta.summary = 'A seer hunts her own future.'
+    book.meta.foundation = { logline: 'Alice must stop a vision.', stakes: 'Her family.' }
+    book.chapters[0].title = 'The diner'
+    book.meta.structure = { template: 'three-acts', beats: [{ name: 'Midpoint', at: 50, note: 'She sees her death.', sceneId: 'a' }] }
+    const f = foundationText(book)
+    expect(f).toContain('<premise>\nA seer hunts her own future.')
+    expect(f).toContain('Logline : Alice must stop a vision.')
+    expect(f).not.toContain('Theme')
+    expect(turningPointsText(book)).toContain('- Midpoint (50 %): She sees her death. → The diner')
+  })
+  it('keeps earlier versions (never empty ones) and brings one back as a proposal', () => {
+    const c = { ...bookOf([{ ...scene('a', ''), note: 'Old summary.', beats: ['x'] }], []).chapters[0], goal: 'Old goal.' }
+    let all = addVersion({}, c.id, versionOf(c, 'Before Detail'))
+    expect(all[c.id]).toHaveLength(1)
+    const empty = { ...c, goal: undefined, scenes: [scene('b', '')] }
+    all = addVersion(all, c.id, versionOf(empty, 'Empty'))
+    expect(all[c.id]).toHaveLength(1)
+    const p = versionProposal(c, all[c.id][0])
+    expect(p.goal).toBe('Old goal.')
+    expect(p.scenes[0]).toMatchObject({ id: 'a', note: 'Old summary.', beats: ['x'] })
   })
 })

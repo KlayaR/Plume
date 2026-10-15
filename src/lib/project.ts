@@ -90,6 +90,7 @@ function normalizeMeta(raw: Partial<BookMeta>): BookMeta {
     passes: Array.isArray(raw.passes) ? raw.passes : undefined,
     matter: raw.matter && typeof raw.matter === 'object' ? raw.matter : undefined,
     summary: raw.summary,
+    foundation: raw.foundation && typeof raw.foundation === 'object' ? raw.foundation : undefined,
   }
 }
 

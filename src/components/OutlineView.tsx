@@ -6,13 +6,14 @@
 import { useEffect, useState } from 'react'
 import { create } from 'zustand'
 import { ask as askDialog } from '@tauri-apps/plugin-dialog'
-import { ArrowDown, ArrowUp, Check, ChevronDown, ChevronRight, ClipboardCopy, Combine, Lock, LockOpen, MoreHorizontal, PenLine, Plus, Scissors, SearchCheck, Sparkles, Wand2, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, Check, CheckCheck, ChevronDown, ChevronRight, Combine, History, Lock, LockOpen, MessagesSquare, MoreHorizontal, PenLine, Plus, Scissors, SearchCheck, Sparkles, Wand2, X } from 'lucide-react'
 import { useStore } from '../store'
-import type { Book, Chapter, Scene } from '../lib/types'
+import { FOUNDATION_KEYS, type Book, type Chapter, type Foundation, type Scene } from '../lib/types'
+import { TEMPLATES, templateBeats } from '../lib/structures'
 import { chapterLabels } from '../lib/chapters'
 import { countWords, foldText } from '../lib/text'
-import { mergeCards, outlineMarkdown, type CardDraft } from '../lib/outline'
-import { acceptOutline, checkOutline, detailAll, planChapter, planScene, rejectOutline, useOutline } from '../outline'
+import { FOUNDATION_LABELS, chapterBeats, mergeCards, outlineMarkdown, type CardDraft } from '../lib/outline'
+import { acceptAll, acceptFoundation, acceptOutline, acceptTurningPoints, checkOutline, cleanOutline, detailAll, fixIssue, interviewFoundation, issueChapter, loadVersions, planChapter, planScene, proposeFoundation, proposeTurningPoints, rejectOutline, restoreVersion, useOutline } from '../outline'
 import { writeChapter, writeFromPlan } from '../editor/actions'
 import { askText, showMenu } from '../contextMenu'
 import { chapterMenu, sceneMenu } from '../menus'
@@ -36,6 +37,7 @@ export default function OutlineView() {
   const busy = useOutline(s => s.busy)
   const issues = useOutline(s => s.issues)
   const editing = useEditing(s => s.id)
+  const pending = useOutline(s => Object.keys(s.proposals).length)
   const t = useT()
   const [query, setQuery] = useState('')
   const [closed, setClosed] = useState<Set<string>>(new Set())
@@ -56,7 +58,15 @@ export default function OutlineView() {
     window.addEventListener('keydown', key)
     return () => { window.removeEventListener('mousedown', down); window.removeEventListener('keydown', key) }
   }, [editing])
-  useEffect(() => () => edit(null), [])
+  useEffect(() => { loadVersions(); return () => edit(null) }, [])
+  const clean = async () => {
+    if (await askDialog(t('Remove the whole outline? Chapters and scenes with no text go to the book’s trash; written scenes keep their text but lose their cards; goals, endings and turning point notes are cleared. Each chapter’s outline is kept in its earlier versions. The story foundation stays.'), { title: t('Clean outline'), kind: 'warning' })) cleanOutline()
+  }
+  const more = (e: React.MouseEvent) => showMenu(e, [
+    { label: t('Copy the outline as Markdown'), onClick: copy },
+    { separator: true },
+    { label: t('Clean outline…'), danger: true, disabled: !book.chapters.length, onClick: clean },
+  ])
 
   return (
     <div className="pl-ol">
@@ -65,15 +75,19 @@ export default function OutlineView() {
         <button type="button" className="sk-btn sk-btn-sm" disabled={!!busy} onClick={() => useStore.setState({ dialog: 'outline' })}><Sparkles size={13} /> {t('Outline from a premise')}</button>
         <button type="button" className="sk-btn sk-btn-sm" disabled={!!busy} onClick={detailAll} title={t('Claude details every chapter that has no beats yet, one after the other. Each comes back as a proposal.')}><Wand2 size={13} /> {t('Detail all')}</button>
         <button type="button" className="sk-btn sk-btn-sm" disabled={!!busy || !book.chapters.length} onClick={checkOutline} title={t('Claude reads the whole outline and lists gaps, dropped threads, contradictions with the bible and chapters with no turn.')}><SearchCheck size={13} /> {busy === 'check' ? t('Reading…') : t('Check the outline')}</button>
-        <button type="button" className="sk-btn sk-btn-sm sk-btn-ghost" onClick={copy} title={t('Copy the outline as Markdown')}><ClipboardCopy size={13} /></button>
+        {pending > 1 && <button type="button" className="sk-btn sk-btn-sm sk-btn-primary" onClick={acceptAll}><CheckCheck size={13} /> {t('Accept all ({n})', { n: pending })}</button>}
+        <button type="button" className="sk-btn sk-btn-sm sk-btn-ghost sk-btn-icon" onClick={more} aria-label={t('More')}><MoreHorizontal size={14} /></button>
       </div>
+
+      <StorySection book={book} />
 
       {issues && (
         <section className="pl-ol-issues">
           <div className="pl-row"><b className="pl-grow">{issues.length ? t('What Claude would look at') : t('Claude found nothing to fix.')}</b><button type="button" className="sk-btn sk-btn-ghost sk-btn-sm sk-btn-icon" onClick={() => useOutline.setState({ issues: null })} aria-label={t('Close')}><X size={13} /></button></div>
           {issues.map((x, k) => (
             <div key={k} className="pl-ol-issue">
-              <span className="sk-label">{x.chapter}</span>
+              <div className="pl-row"><span className="sk-label pl-grow">{issueChapter(book, x)?.title || x.chapter}</span>
+                <button type="button" className="sk-btn sk-btn-sm" disabled={!!busy || !issueChapter(book, x)} onClick={() => fixIssue(x)} title={t('Claude regenerates this chapter’s outline with this fix as direction (a proposal)')}><Wand2 size={12} /> {t('Fix')}</button></div>
               <span>{x.issue}</span>
               <span className="sk-hint">→ {x.fix}</span>
             </div>
@@ -86,6 +100,11 @@ export default function OutlineView() {
       {shown.map(({ c, i }) => (
         <ChapterBlock key={c.id} book={book} c={c} n={i} label={names[i]} open={!closed.has(c.id) || !!q} onFold={() => fold(c.id)} />
       ))}
+      <button type="button" className="sk-btn sk-btn-ghost pl-ol-addch" onClick={() => {
+        const id = useStore.getState().addChapter(`${book.meta.language === 'fr' ? 'Chapitre' : 'Chapter'} ${book.chapters.filter(c => c.kind === 'chapter').length + 1}`, { stay: true })
+        const sc = useStore.getState().book!.chapters.find(c => c.id === id)?.scenes[0]
+        if (sc) edit(sc.id)
+      }}><Plus size={14} /> {t('Chapter')}</button>
     </div>
   )
 }
@@ -110,16 +129,20 @@ function ChapterBlock({ book, c, n, label, open, onFold }: { book: Book; c: Chap
     { label: t('Regenerate the chapter…'), disabled: !!busy, onClick: regenerate },
     { label: t('Write the chapter from the plan (Claude)'), onClick: () => writeChapter(c.id) },
     next && { label: t('Merge with the next chapter'), onClick: mergeNext },
+    { label: t('Earlier versions ({n})', { n: versions.length }), disabled: !versions.length, onClick: () => useOutline.setState({ versionsOf: c.id }) },
     { separator: true },
     ...chapterMenu(c.id),
   ]) }
   const thinking = busy === `detail:${c.id}` || busy === `regenerate:${c.id}`
+  const versions = useOutline(s => s.versions[c.id] ?? [])
+  const showVersions = useOutline(s => s.versionsOf === c.id)
   return (
     <section className="pl-ol-ch" onContextMenu={more}>
       <header className="pl-ol-chhead">
         <button type="button" className="pl-quiet" onClick={onFold} aria-expanded={open}>{open ? <ChevronDown size={15} /> : <ChevronRight size={15} />}</button>
         <span className="pl-ol-num">{label}</span>
         <input className="pl-ol-title" value={c.title} placeholder={t('Chapter title')} onChange={e => st().updateChapter(c.id, { title: e.target.value })} />
+        {chapterBeats(book, c).map(b => <span key={b.name} className="sk-badge pl-ol-beatbadge" title={b.note}>{b.name}</span>)}
         <span className="sk-hint">{[c.scenes.length > 1 ? t('{n} scenes', { n: c.scenes.length }) : '', words ? t('{n} words', { n: words.toLocaleString() }) : ''].filter(Boolean).join(' · ')}</span>
         <span className="pl-ol-tools">
           {thinking && <span className="sk-hint">{t('Thinking…')}</span>}
@@ -141,6 +164,19 @@ function ChapterBlock({ book, c, n, label, open, onFold }: { book: Book; c: Chap
               {c.ending && <span><b>{t('Ends on')}</b> {c.ending}</span>}
             </> : <span className="pl-ol-ghost">{t('+ The chapter’s goal and how it ends')}</span>}
           </button>
+        )}
+        {showVersions && (
+          <section className="pl-ol-versions">
+            <div className="pl-row"><b className="pl-grow">{t('Earlier versions of this chapter’s outline')}</b><button type="button" className="sk-btn sk-btn-ghost sk-btn-sm sk-btn-icon" onClick={() => useOutline.setState({ versionsOf: null })} aria-label={t('Close')}><X size={13} /></button></div>
+            {versions.map((v, k) => (
+              <div key={k} className="pl-row pl-ol-version">
+                <History size={13} />
+                <span className="pl-grow">{v.label} · {new Date(v.at).toLocaleString()}</span>
+                <span className="sk-hint">{v.cards.length > 1 ? t('{n} scenes', { n: v.cards.length }) : ''}</span>
+                <button type="button" className="sk-btn sk-btn-sm" onClick={() => restoreVersion(c.id, v)} title={t('Shows this version beside the current outline, to accept or reject')}>{t('Compare')}</button>
+              </div>
+            ))}
+          </section>
         )}
         {proposal && <ProposalPanel book={book} c={c} />}
         {c.scenes.map((s, k) => (
@@ -186,6 +222,9 @@ function SceneCard({ book, c, s, k }: { book: Book; c: Chapter; s: Scene; k: num
   const update = (patch: Partial<Scene>) => st().updateScene(s.id, patch)
   const beats = s.beats ?? []
   const next = c.scenes[k + 1]
+  const ci = book.chapters.findIndex(x => x.id === c.id)
+  const prevCh = book.chapters[ci - 1]
+  const nextCh = book.chapters[ci + 1]
   const words = countWords(s.text)
   const regenerate = async () => { const d = await askText(t('Direction for Claude (optional)'), '', t('e.g. darker, Alice doesn’t show up, end on the letter')); if (d !== null) planScene(s.id, d) }
   const detail = () => planScene(s.id, book.meta.language === 'fr' ? 'Garde ses événements ; remplis la fiche en entier.' : 'Keep its events; fill in the whole card.')
@@ -196,6 +235,9 @@ function SceneCard({ book, c, s, k }: { book: Book; c: Chapter; s: Scene; k: num
     { label: t('Regenerate this card…'), disabled: !!busy || s.locked, onClick: regenerate },
     next && { label: t('Merge with the next scene'), onClick: merge },
     { label: s.locked ? t('Unlock') : t('Lock (Claude leaves it alone)'), onClick: () => update({ locked: s.locked ? undefined : true }) },
+    { separator: true },
+    { label: t('Move up'), disabled: k === 0 && !prevCh, onClick: () => k > 0 ? st().moveScene(s.id, c.id, k - 1) : prevCh && st().moveScene(s.id, prevCh.id, prevCh.scenes.length) },
+    { label: t('Move down'), disabled: !next && !nextCh, onClick: () => next ? st().moveScene(s.id, c.id, k + 1) : nextCh && st().moveScene(s.id, nextCh.id, 0) },
     { separator: true },
     ...sceneMenu(s.id, { card: true }),
   ]) }
@@ -213,7 +255,7 @@ function SceneCard({ book, c, s, k }: { book: Book; c: Chapter; s: Scene; k: num
   if (!editing) return (
     <article className={`pl-ol-card pl-ol-read ${s.locked ? 'pl-ol-locked' : ''}`} onClick={() => edit(s.id)} onContextMenu={more} title={t('Click to edit')}>
       <div className="pl-row pl-ol-cardhead"><b className="pl-grow">{s.title}</b>{lock}{tools}</div>
-      {meta && <div className="pl-ol-metaline">{meta}</div>}
+      {(meta || book.meta.structure.beats.some(b => b.sceneId === s.id)) && <div className="pl-ol-metaline">{meta}{book.meta.structure.beats.filter(b => b.sceneId === s.id).map(b => <span key={b.name} className="sk-badge pl-ol-beatbadge">{b.name}</span>)}</div>}
       {s.note?.trim() ? <p className="pl-ol-summarytext">{s.note}</p> : <p className="pl-ol-ghost">{t('+ What happens in this scene')}</p>}
       {beats.length > 0 && <ol className="pl-ol-beatlist">{beats.map((b, i) => <li key={i}>{b}</li>)}</ol>}
       {s.cast?.length ? <div className="pl-ol-small"><b>{t('Who is there')}</b> {s.cast.join(', ')}</div> : null}
@@ -293,8 +335,8 @@ function ProposalPanel({ book, c }: { book: Book; c: Chapter }) {
   const t = useT()
   const p = useOutline(s => s.proposals[c.id])!
   const used = new Set(p.scenes.map(d => d.id).filter(Boolean))
-  const kept = p.kind === 'regenerate' ? c.scenes.filter(s => !used.has(s.id)) : []
-  const title = p.kind === 'detail' ? t('Claude’s detailed outline') : p.kind === 'scene' ? t('Claude’s new card') : t('Claude’s new outline for this chapter')
+  const kept = p.kind === 'regenerate' || p.kind === 'version' ? c.scenes.filter(s => !used.has(s.id)) : []
+  const title = p.kind === 'detail' ? t('Claude’s detailed outline') : p.kind === 'scene' ? t('Claude’s new card') : p.kind === 'version' ? t('Earlier version of this chapter’s outline') : t('Claude’s new outline for this chapter')
   const card = (d: CardDraft, k: number) => {
     const old = d.id ? c.scenes.find(s => s.id === d.id) : undefined
     return (
@@ -321,6 +363,89 @@ function ProposalPanel({ book, c }: { book: Book; c: Chapter }) {
       {(p.ending && p.ending !== c.ending) && <span className="sk-hint"><b>{t('How it ends')}</b> · {p.ending}</span>}
       {p.scenes.map(card)}
       {kept.length > 0 && <span className="sk-hint">{t('Not in the new outline, kept as they are (remove them yourself if you want): {list}', { list: kept.map(s => s.title).join(', ') })}</span>}
+    </section>
+  )
+}
+
+/** Above the chapters: the premise, the story's foundation and the book's turning points, each built with Claude or by hand. */
+function StorySection({ book }: { book: Book }) {
+  const t = useT()
+  const busy = useOutline(s => s.busy)
+  const proposed = useOutline(s => s.foundation)
+  const points = useOutline(s => s.points)
+  const editing = useEditing(s => s.id === 'story')
+  const [open, setOpen] = useState(true)
+  const lang = book.meta.language
+  const f = book.meta.foundation ?? {}
+  const beats = book.meta.structure.beats
+  const st = useStore.getState
+  const setF = (k: keyof Foundation, v: string) => st().updateMeta({ foundation: { ...(st().book!.meta.foundation ?? {}), [k]: v } })
+  const setBeat = (i: number, note: string) => st().updateMeta({ structure: { ...st().book!.meta.structure, beats: st().book!.meta.structure.beats.map((b, j) => (j === i ? { ...b, note } : b)) } })
+  const choose = (id: string) => st().updateMeta({ structure: { template: id, beats: id ? templateBeats(id, lang) : [] } })
+  const where = (id: string | null) => { const i = id ? book.chapters.findIndex(c => c.scenes.some(s => s.id === id)) : -1; return i >= 0 ? book.chapters[i].title || `#${i + 1}` : '' }
+  const filled = FOUNDATION_KEYS.filter(k => f[k]?.trim()).length
+  return (
+    <section className="pl-ol-story">
+      <header className="pl-ol-chhead">
+        <button type="button" className="pl-quiet" onClick={() => setOpen(!open)} aria-expanded={open}>{open ? <ChevronDown size={15} /> : <ChevronRight size={15} />}</button>
+        <b className="pl-grow">{t('The story')}</b>
+        <span className="sk-hint">{t('{n} of {m} foundations', { n: filled, m: FOUNDATION_KEYS.length })}{beats.length ? ` · ${t('{n} turning points', { n: beats.length })}` : ''}</span>
+        <span className="pl-ol-tools">
+          <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm" onClick={interviewFoundation} title={t('Claude asks you questions in the chat, one at a time; then Propose reads your answers.')}><MessagesSquare size={13} /> {t('Ask me questions')}</button>
+          <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm" disabled={!!busy} onClick={proposeFoundation} title={t('Claude fills the foundation from your premise, the bible and the chat (a proposal)')}><Wand2 size={13} /> {busy === 'foundation' ? t('Thinking…') : t('Propose')}</button>
+        </span>
+      </header>
+      {open && <>
+        {editing ? (
+          <div className="pl-ol-storyform" data-editing="true">
+            <label className="sk-field"><span className="sk-label">{t('Premise')}</span><Grow autoFocus value={book.meta.summary ?? ''} placeholder={t('Your premise: who, what they want, what stands in the way, how it might end…')} onChange={v => st().updateMeta({ summary: v })} /></label>
+            {FOUNDATION_KEYS.map(k => (
+              <label key={k} className="sk-field"><span className="sk-label">{FOUNDATION_LABELS[k][lang]}</span><Grow value={f[k] ?? ''} onChange={v => setF(k, v)} /></label>
+            ))}
+            <button type="button" className="sk-btn sk-btn-sm sk-btn-primary pl-ol-done" onClick={() => edit(null)}><Check size={13} /> {t('Done')}</button>
+          </div>
+        ) : (
+          <button type="button" className="pl-ol-storyread" onClick={() => edit('story')}>
+            {book.meta.summary?.trim() ? <p>{book.meta.summary}</p> : <p className="pl-ol-ghost">{t('+ Your premise')}</p>}
+            {FOUNDATION_KEYS.filter(k => f[k]?.trim()).map(k => <span key={k} className="pl-ol-small"><b>{FOUNDATION_LABELS[k][lang]}</b> {f[k]}</span>)}
+            {filled === 0 && <span className="pl-ol-ghost">{t('+ The foundation: logline, what the protagonist wants and needs, antagonist, stakes, theme, magic')}</span>}
+          </button>
+        )}
+        {proposed && (
+          <section className="pl-ol-proposal">
+            <div className="pl-row"><b className="pl-grow">{t('Claude’s foundation')}</b>
+              <button type="button" className="sk-btn sk-btn-sm sk-btn-primary" onClick={acceptFoundation}>{t('Accept')}</button>
+              <button type="button" className="sk-btn sk-btn-sm sk-btn-ghost" onClick={() => useOutline.setState({ foundation: null })}>{t('Reject')}</button></div>
+            {FOUNDATION_KEYS.filter(k => proposed[k]).map(k => <span key={k} className="pl-ol-small"><b>{FOUNDATION_LABELS[k][lang]}</b> {proposed[k]}{f[k] && f[k] !== proposed[k] ? <span className="pl-ol-old"> {f[k]}</span> : null}</span>)}
+          </section>
+        )}
+        <div className="pl-ol-points">
+          <div className="pl-row">
+            <span className="sk-label pl-grow">{t('Turning points')}</span>
+            <select className="sk-select sk-btn-sm" value={book.meta.structure.template} onChange={e => choose(e.target.value)} aria-label={t('Structure')}>
+              <option value="">{t('No structure template')}</option>
+              {TEMPLATES.map(x => <option key={x.id} value={x.id}>{t(x.name)}</option>)}
+            </select>
+            <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm" disabled={!!busy} onClick={proposeTurningPoints} title={t('Claude writes what happens at each turning point, from the foundation (three acts if none is chosen)')}><Wand2 size={13} /> {busy === 'points' ? t('Thinking…') : t('Propose')}</button>
+          </div>
+          {beats.map((b, i) => (
+            <div key={i} className="pl-ol-point">
+              <span className="pl-ol-pointname">{b.name} <span className="sk-hint">{b.at} %</span></span>
+              <Grow value={b.note} placeholder={t('What happens here')} onChange={v => setBeat(i, v)} />
+              <span className="sk-hint">{where(b.sceneId) ? `→ ${where(b.sceneId)}` : ''}</span>
+            </div>
+          ))}
+          {!beats.length && <span className="sk-hint">{t('Choose a structure, or let Claude propose the turning points (three acts).')}</span>}
+          {points && (
+            <section className="pl-ol-proposal">
+              <div className="pl-row"><b className="pl-grow">{t('Claude’s turning points')}</b>
+                <button type="button" className="sk-btn sk-btn-sm sk-btn-primary" onClick={acceptTurningPoints}>{t('Accept')}</button>
+                <button type="button" className="sk-btn sk-btn-sm sk-btn-ghost" onClick={() => useOutline.setState({ points: null })}>{t('Reject')}</button></div>
+              {points.map((x, k) => <span key={k} className="pl-ol-small"><b>{x.name}</b> {x.note}</span>)}
+            </section>
+          )}
+        </div>
+      </>}
     </section>
   )
 }

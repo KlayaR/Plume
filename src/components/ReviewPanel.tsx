@@ -14,6 +14,7 @@ import { referenceTargets, useRefs } from '../lib/references'
 import { speakerStats } from '../lib/speakers'
 import { numLocale, useT } from '../i18n'
 import { ShowEverything } from './BibleView'
+import { RevisionSection } from './Revision'
 import { costText } from '../cost'
 
 const n = (x: number, d = 0) => x.toLocaleString(numLocale(), { maximumFractionDigits: d, minimumFractionDigits: d })
@@ -121,6 +122,7 @@ export default function ReviewPanel() {
 
       <AIChecks sceneId={scene.id} chapterId={chapter.id} chapterText={chapter.scenes.map(s => s.text).join('\n')} />
       <ReadAloud />
+      {!simple && <RevisionSection scene={scene} />}
       {!simple && <Figures scene={scene.text} chapter={chapter.scenes.map(s => s.text).join('\n')} label={label} />}
     </aside>
   )

@@ -1,6 +1,8 @@
 // Plan → Revision: tick off each pass scene by scene, see how far each pass is,
 // and jump to the next scene to do. Also the small checklist in a scene's Notes.
-import { ArrowRight, Plus, Trash2 } from 'lucide-react'
+import { useState } from 'react'
+import { ArrowRight, ChevronDown, Plus, Table, Trash2 } from 'lucide-react'
+import { Dialog } from '../studio-kit/shell.js'
 import { useStore } from '../store'
 import { chapterLabels } from '../lib/chapters'
 import { newId } from '../lib/text'
@@ -21,6 +23,37 @@ export function PassChecks({ scene }: { scene: Scene }) {
             onChange={() => useStore.getState().updateScene(scene.id, { passes: togglePass(scene.passes, p.id) })} /> {p.name}
         </label>
       ))}
+    </section>
+  )
+}
+
+/** Manuscript → Review: this scene's passes, each pass's progress, the next scene to do, and the full table. */
+export function RevisionSection({ scene }: { scene: Scene }) {
+  const book = useStore(s => s.book)!
+  const t = useT()
+  const [open, setOpen] = useState(false)
+  const [table, setTable] = useState(false)
+  const prog = progress(book)
+  const next = nextToDo(book)
+  return (
+    <section className="pl-cat">
+      <button type="button" className="pl-cat-head" onClick={() => setOpen(!open)} aria-expanded={open}>
+        <span className="pl-grow">{t('Revision passes')}</span>
+        <ChevronDown size={14} className={open ? 'pl-rot' : ''} />
+      </button>
+      {open && <>
+        <PassChecks scene={scene} />
+        {prog.map(({ pass, done, total }) => (
+          <div key={pass.id} className="pl-row">
+            <span className="pl-grow sk-hint">{pass.name}</span>
+            <div className="pl-rev-bar pl-grow"><i style={{ width: `${total ? (done / total) * 100 : 0}%` }} /></div>
+            <span className="sk-num">{done} / {total}</span>
+          </div>
+        ))}
+        {next && <button type="button" className="sk-btn sk-btn-sm" onClick={() => useStore.getState().selectScene(next.scene.id)}><ArrowRight size={13} /> {t('Next: {scene} ({pass})', { scene: next.scene.title, pass: next.pass.name })}</button>}
+        <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm" onClick={() => setTable(true)}><Table size={13} /> {t('All scenes and passes')}</button>
+      </>}
+      {table && <Dialog wide title={t('Revision passes')} onClose={() => setTable(false)}><Revision /></Dialog>}
     </section>
   )
 }

@@ -6,12 +6,12 @@ import { foldText } from '../lib/text'
 import { ListTree, Sparkles } from 'lucide-react'
 import { Dialog } from '../studio-kit/shell.js'
 import { useStore } from '../store'
-import { WORLD_TYPES } from '../lib/types'
 import { findEntrySlug, outlineRules, type SceneMode } from '../lib/outline'
 import { ask, parseJSON } from '../ai'
+import { grounding } from '../outline'
 import { useT } from '../i18n'
 
-interface Outline { title: string; goal?: string; ending?: string; scenes: { title: string; summary?: string; note?: string; pov?: string; place?: string }[] }
+interface Outline { title: string; goal?: string; ending?: string; beat?: string; scenes: { title: string; summary?: string; note?: string; pov?: string; place?: string }[] }
 
 export default function OutlineDialog({ onClose }: { onClose: () => void }) {
   const book = useStore(s => s.book)!
@@ -33,17 +33,18 @@ export default function OutlineDialog({ onClose }: { onClose: () => void }) {
   const generate = async () => {
     setBusy(true)
     try {
-      const bible = book.entries.filter(e => WORLD_TYPES.includes(e.type) && e.include !== 'secret' && e.short)
-        .map(e => `- ${e.name} (${e.type}): ${e.short}`).join('\n')
-      const beats = book.meta.structure.beats.map(b => `- ${b.name} (${b.at} %)`).join('\n')
+      // The premise is kept with the book; the foundation and turning points come with it.
+      if (premise.trim() !== (book.meta.summary ?? '').trim()) useStore.getState().updateMeta({ summary: premise.trim() })
+      const fresh = useStore.getState().book!
+      const points = fresh.meta.structure.beats.length > 0
       const reply = await ask({
         model: 'sonnet', effort: 'medium',
         system: fr
           ? 'Tu aides un romancier de fantasy à bâtir le plan de son livre. Réponds uniquement en JSON valide, en français.'
           : 'You help a fantasy novelist build the outline of their book. Reply with valid JSON only.',
-        message: `<premise>\n${premise.trim()}\n</premise>\n${bible ? `<bible>\n${bible}\n</bible>\n` : ''}${beats ? `<structure>\n${beats}\n</structure>\n` : ''}\n${outlineRules(lang, mode)}\n\n${fr
-          ? `Propose ${chapters} chapitres pour un livre d’environ ${words.toLocaleString('fr-FR')} mots. Chaque chapitre a son but immédiat (goal) et sa fin (ending : le tournant ou la question sur lesquels il se termine). Chaque scène a un titre court, un résumé de 2 à 3 phrases (qui veut quoi, ce qui l’en empêche, ce qui change à la fin), son personnage de point de vue et son lieu, avec les noms de la bible quand ils y sont. Pas encore d’étapes détaillées : elles viendront chapitre par chapitre. Respecte la structure donnée si elle existe.`
-          : `Propose ${chapters} chapters for a book of about ${words.toLocaleString('en-US')} words. Each chapter gets its immediate goal (goal) and its ending (the turn or question it lands on). Each scene gets a short title, a 2-to-3-sentence summary (who wants what, what stands in the way, what changes by the end), its point-of-view character and its place, using the bible's names when they are there. No detailed beats yet: they come chapter by chapter. Follow the given structure if there is one.`}\nJSON: [{"title": "...", "goal": "...", "ending": "...", "scenes": [{"title": "...", "summary": "...", "pov": "...", "place": "..."}]}]`,
+        message: `${grounding(fresh)}\n\n${outlineRules(lang, mode)}\n\n${fr
+          ? `Propose ${chapters} chapitres pour un livre d’environ ${words.toLocaleString('fr-FR')} mots. Chaque chapitre a son but immédiat (goal) et sa fin (ending : le tournant ou la question sur lesquels il se termine). Chaque scène a un titre court, un résumé de 2 à 3 phrases (qui veut quoi, ce qui l’en empêche, ce qui change à la fin), son personnage de point de vue et son lieu, avec les noms de la bible quand ils y sont. Pas encore d’étapes détaillées : elles viendront chapitre par chapitre.${points ? ' Place chaque tournant de <turning_points> dans le chapitre où il se produit, en respectant sa position (en % du livre) : ce chapitre reçoit "beat" avec le nom du tournant.' : ''}`
+          : `Propose ${chapters} chapters for a book of about ${words.toLocaleString('en-US')} words. Each chapter gets its immediate goal (goal) and its ending (the turn or question it lands on). Each scene gets a short title, a 2-to-3-sentence summary (who wants what, what stands in the way, what changes by the end), its point-of-view character and its place, using the bible's names when they are there. No detailed beats yet: they come chapter by chapter.${points ? ' Place each turning point of <turning_points> in the chapter where it happens, at its position (% of the book): that chapter gets "beat" with the turning point\'s name.' : ''}`}\nJSON: [{"title": "...", "goal": "...", "ending": "...", "beat": "", "scenes": [{"title": "...", "summary": "...", "pov": "...", "place": "..."}]}]`,
       })
       const list = parseJSON<Outline[]>(reply)
       if (!list?.length) throw new Error(t('Claude’s reply could not be read. Try again.'))
@@ -87,6 +88,16 @@ export default function OutlineDialog({ onClose }: { onClose: () => void }) {
         else put(id, s)
       })
     })
+    const placed: Record<string, string> = {}
+    outline.forEach(c => {
+      if (!c.beat?.trim()) return
+      const ch = useStore.getState().book!.chapters.find(x => foldText(x.title) === foldText(String(c.title ?? '')))
+      if (ch?.scenes[0]) placed[foldText(c.beat)] = ch.scenes[0].id
+    })
+    if (Object.keys(placed).length) {
+      const meta = useStore.getState().book!.meta
+      useStore.getState().updateMeta({ structure: { ...meta.structure, beats: meta.structure.beats.map(b => placed[foldText(b.name)] ? { ...b, sceneId: placed[foldText(b.name)] } : b) } })
+    }
     st.notify('ok', t('{n} chapters added to the plan. Next: Detail each chapter in Plan → Outline.', { n: made }))
     useStore.setState({ view: 'plan', planTab: 'outline' })
     onClose()
@@ -129,7 +140,7 @@ export default function OutlineDialog({ onClose }: { onClose: () => void }) {
         <div className="pl-find-list">
           {outline.map((c, i) => (
             <div key={i} className="pl-outline-ch">
-              <b>{i + 1}. {c.title}</b>
+              <b>{i + 1}. {c.title}</b>{c.beat ? <span className="sk-badge pl-ol-beatbadge">{c.beat}</span> : null}
               {(c.goal || c.ending) && <span className="sk-hint">{[c.goal && `${t('Goal')} : ${c.goal}`, c.ending && `${t('Ending')} : ${c.ending}`].filter(Boolean).join(' · ')}</span>}
               {c.scenes.map((s, j) => (
                 <label key={j} className="pl-outline-sc pl-row pl-check-label">

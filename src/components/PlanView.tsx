@@ -16,34 +16,40 @@ import { ChatDock } from './ChatPanel'
 import { showMenu } from '../contextMenu'
 import { chapterMenu, newThingsMenu, sceneMenu } from '../menus'
 import Dashboard from './Dashboard'
-import Revision from './Revision'
 import Tension from './Tension'
 import { ShowEverything } from './BibleView'
 import OutlineView from './OutlineView'
 
-const TABS: [PlanTab, string][] = [['outline', 'Outline'], ['board', 'Board'], ['structure', 'Structure'], ['timeline', 'Timeline'], ['lines', 'Story lines'], ['dashboard', 'Dashboard'], ['revision', 'Revision']]
+const TABS: [PlanTab, string][] = [['outline', 'Outline'], ['board', 'Board'], ['structure', 'Structure']]
+/** Plan tabs grouped under "Analysis". Revision moved to Manuscript → Review. */
+const ANALYSIS: [PlanTab, string][] = [['timeline', 'Timeline'], ['lines', 'Story lines'], ['dashboard', 'Dashboard']]
+const isAnalysis = (t: PlanTab) => ANALYSIS.some(([id]) => id === t)
 
 export default function PlanView() {
   const simple = useStore(s => s.prefs.simple)
   const chosen = useStore(s => s.planTab)
   // Beginner mode keeps the Outline, the Board and Structure; the other tabs come with "Show everything".
-  const tab = simple && !['outline', 'board', 'structure'].includes(chosen) ? 'outline' : chosen
+  const tab = (simple && !['outline', 'board', 'structure'].includes(chosen)) || chosen === 'revision' ? 'outline' : chosen
   const pinned = useStore(s => s.prefs.chatOpen)
   const t = useT()
   return (
     <div className="pl-withdock" data-pin={pinned}>
       <div className="pl-plan">
         <nav className="pl-switch pl-plan-tabs" aria-label={t('Plan')}>
-          {TABS.filter(([id]) => !simple || id === 'outline' || id === 'board' || id === 'structure').map(([id, label]) => <button key={id} type="button" aria-pressed={tab === id} onClick={() => useStore.setState({ planTab: id })}>{t(label)}</button>)}
-          {simple && <ShowEverything />}
+          {TABS.map(([id, label]) => <button key={id} type="button" aria-pressed={tab === id} onClick={() => useStore.setState({ planTab: id })}>{t(label)}</button>)}
+          {simple ? <ShowEverything /> : <button type="button" aria-pressed={isAnalysis(tab)} onClick={() => !isAnalysis(tab) && useStore.setState({ planTab: 'timeline' })}>{t('Analysis')}</button>}
         </nav>
+        {isAnalysis(tab) && (
+          <nav className="pl-switch pl-plan-sub" aria-label={t('Analysis')}>
+            {ANALYSIS.map(([id, label]) => <button key={id} type="button" aria-pressed={tab === id} onClick={() => useStore.setState({ planTab: id })}>{t(label)}</button>)}
+          </nav>
+        )}
         {tab === 'outline' && <OutlineView />}
         {tab === 'board' && <Board />}
         {tab === 'structure' && <Structure />}
         {tab === 'timeline' && <Timeline />}
         {tab === 'lines' && <Lines />}
         {tab === 'dashboard' && <Dashboard />}
-        {tab === 'revision' && <Revision />}
       </div>
       <ChatDock />
     </div>
