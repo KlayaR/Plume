@@ -147,6 +147,16 @@ function bibleFor(book: Book, recent: string): string {
   return lines.join('\n')
 }
 
+/**
+ * How entries get made: the chat has no tools, so without this Claude says it
+ * "can't create entries". It writes them out instead; the author's button
+ * "Turn into entries" then drafts them into the review list.
+ */
+const ENTRIES_HOW = {
+  en: 'Creating bible entries: you can\'t change the bible yourself, but Plume can. When the author asks you to create or fill entries, write them out in full in your reply, one per entry: a heading with the name and the type (character, place, object, creature, lore, magic, event, faction, story line, theme), a one- or two-line summary, then the details that matter for writing (appearance, personality, relationships, rules, history, secrets). If the book continues or is set in a published work, use what you know of its canon, and say when something is uncertain. Skip what the bible already says unless the author asks. Then tell them to press "Turn into entries" to draft these into the review list. Never say you can\'t create entries.',
+  fr: 'Créer des fiches de bible : tu ne peux pas modifier la bible toi-même, mais Plume le peut. Quand l\'auteur te demande de créer ou de compléter des fiches, écris-les en entier dans ta réponse, une par fiche : un titre avec le nom et le type (personnage, lieu, objet, créature, univers, magie, événement, faction, intrigue, thème), un résumé d\'une ou deux lignes, puis les détails utiles pour écrire (apparence, caractère, relations, règles, histoire, secrets). Si le livre prolonge une œuvre publiée ou s\'y déroule, appuie-toi sur ce que tu sais de son canon, et signale ce qui est incertain. N\'y répète pas ce que la bible dit déjà, sauf si l\'auteur le demande. Dis-lui ensuite d\'appuyer sur « Transformer en fiches » pour les mettre en brouillon dans la liste à relire. Ne dis jamais que tu ne peux pas créer de fiches.',
+}
+
 function systemFor(book: Book, recent: string, interview: Entry | null): string {
   const fr = book.meta.language === 'fr'
   const style = book.entries.find(e => e.type === 'style')
@@ -155,8 +165,8 @@ function systemFor(book: Book, recent: string, interview: Entry | null): string 
       ? `Tu aides l’auteur du roman « ${book.meta.title} » à compléter la fiche « ${interview.name} » de sa bible. Pose UNE question à la fois, précise et concrète, sur ce qui manque ou reste flou dans la fiche. Rebondis sur ses réponses. N’invente rien à sa place. Réponds en français.`
       : `You help the author of the novel "${book.meta.title}" complete the "${interview.name}" entry of their story bible. Ask ONE question at a time, precise and concrete, about what is missing or vague in the entry. Build on their answers. Don't invent things for them. Reply in English.`)
     : (fr
-      ? `Tu es le partenaire de réflexion de l’auteur du roman « ${book.meta.title} ». Tu connais sa bible (<bible>). Propose des idées précises, pose des questions qui font avancer, signale ce qui contredit la bible. Réponses courtes, sans flatterie. Réponds en français.`
-      : `You are the brainstorming partner of the author of the novel "${book.meta.title}". You know their story bible (<bible>). Offer specific ideas, ask questions that move things forward, point out what contradicts the bible. Short answers, no flattery. Reply in English.`)
+      ? `Tu es le partenaire de réflexion de l’auteur du roman « ${book.meta.title} ». Tu connais sa bible (<bible>). Propose des idées précises, pose des questions qui font avancer, signale ce qui contredit la bible. Réponses courtes, sans flatterie. Réponds en français.\n\n${ENTRIES_HOW.fr}`
+      : `You are the brainstorming partner of the author of the novel "${book.meta.title}". You know their story bible (<bible>). Offer specific ideas, ask questions that move things forward, point out what contradicts the bible. Short answers, no flattery. Reply in English.\n\n${ENTRIES_HOW.en}`)
   return [
     head,
     style?.full.trim() ? `<style_guide>\n${style.full.trim()}\n</style_guide>` : '',
@@ -224,7 +234,8 @@ export async function turnIntoEntries() {
   const { messages, interview } = useChat.getState()
   if (!book || !messages.length) return
   const fr = book.meta.language === 'fr'
-  const existing = book.entries.filter(e => TYPES.includes(e.type)).map(e => `${e.slug}: ${e.name} (${e.type})`).join('\n')
+  // With their short version, so an "addition" that only repeats the entry can be told apart from real news.
+  const existing = book.entries.filter(e => TYPES.includes(e.type)).map(e => `${e.slug}: ${e.name} (${e.type})${e.short.trim() ? ` — ${e.short.trim().slice(0, 160)}` : ''}`).join('\n')
   useChat.setState({ busy: 'entries' })
   try {
     const reply = await ask({
@@ -233,8 +244,8 @@ export async function turnIntoEntries() {
         ? 'Tu transformes une conversation de travail sur un roman en fiches de bible. Réponds uniquement en JSON valide.'
         : 'You turn a working conversation about a novel into story-bible entries. Reply with valid JSON only.',
       message: `<existing_entries>\n${existing || '-'}\n</existing_entries>\n\n<conversation>\n${transcript(messages.slice(-30))}\n</conversation>\n\n${fr
-        ? `Extrais ce que l’auteur a décidé ou accepté (pas les idées qu’il a rejetées). ${interview ? `Tout concerne la fiche « ${interview} » : utilise target = "${interview}".` : 'Pour un élément nouveau, target = null ; pour un ajout à une fiche existante, target = son identifiant.'} Écris le texte des fiches en français.`
-        : `Extract what the author decided or accepted (not ideas they rejected). ${interview ? `Everything is about the "${interview}" entry: use target = "${interview}".` : 'For something new, target = null; for an addition to an existing entry, target = its id.'} Write the entries in English.`}
+        ? `Extrais ce que l’auteur a décidé ou accepté, et les fiches que Claude a écrites à sa demande (pas les idées qu’il a rejetées). Reprends tout le détail de ces fiches, ne les résume pas. ${interview ? `Tout concerne la fiche « ${interview} » : utilise target = "${interview}".` : 'Pour un élément nouveau, target = null ; pour un ajout à une fiche existante, target = son identifiant, et seulement si l’ajout apporte un fait ou un détail qui n’y est pas déjà.'} S’il n’y a rien de tel, réponds []. Écris le texte des fiches en français.`
+        : `Extract what the author decided or accepted, and the entries Claude wrote at their request (not ideas they rejected). Keep all the detail of those entries; don't summarise them. ${interview ? `Everything is about the "${interview}" entry: use target = "${interview}".` : 'For something new, target = null; for an addition to an existing entry, target = its id, and only if it adds a fact or detail the entry doesn\'t already have.'} If there is nothing of the kind, reply []. Write the entries in English.`}
 JSON: [{"target": null, "type": "${TYPES.join('|')}", "name": "...", "aliases": ["..."], "short": "one or two lines", "full": "### Heading, then text", "facts": ["a fact; start it with [ch 3+] only if you know from which chapter it holds, otherwise no brackets"], "why": "what in the conversation this comes from"}]`,
     })
     const list = parseJSON<Partial<Proposal>[]>(reply)
@@ -246,6 +257,7 @@ JSON: [{"target": null, "type": "${TYPES.join('|')}", "name": "...", "aliases": 
       name: String(p.name), aliases: Array.isArray(p.aliases) ? p.aliases.map(String) : [],
       short: String(p.short ?? ''), full: String(p.full ?? ''), facts: Array.isArray(p.facts) ? p.facts.map(String) : [], why: String(p.why ?? ''),
     }))
+    if (!proposals.length) { useStore.getState().notify('warn', t('Nothing new to draft from this conversation. Ask Claude to write the entries out first.')); useChat.setState({ busy: null }); return }
     useChat.setState(s => ({ proposals: [...s.proposals, ...proposals] }))
     saveReview()
     useStore.getState().notify('ok', t('{n} drafts in the review list.', { n: proposals.length }), { label: t('Review'), run: () => useStore.setState({ view: 'bible', entrySlug: null, bibleTab: 'review' }) })

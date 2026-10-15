@@ -1022,6 +1022,7 @@ const FR: Record<string, string> = {
   'Your excerpts are sent with every request as samples of your voice (about 1,100 words in all, with passages of your own revised scenes). Mix dialogue, action and description.': 'Vos extraits accompagnent chaque demande comme échantillons de votre voix (environ 1 100 mots en tout, avec des passages de vos propres scènes relues). Mélangez dialogue, action et description.',
   'Sample of my voice': 'Échantillon de ma voix',
   'AI tells': 'Tics d’IA',
+  'Nothing new to draft from this conversation. Ask Claude to write the entries out first.': 'Rien de nouveau à mettre en fiches dans cette conversation. Demandez d’abord à Claude d’écrire les fiches.',
 }
 
 const SHELL = {

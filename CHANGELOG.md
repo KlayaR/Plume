@@ -7,6 +7,11 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.22.1
+**Fix: the bible chat makes entries again**
+- Asked to create entries, the brainstorming chat answered that it couldn't. It now writes them out in full (and draws on the published canon when your book continues or is set in an existing work), then points you to **Turn into entries**.
+- **Turn into entries** now keeps the full detail of entries Claude wrote at your request, and no longer drafts "additions" to existing entries that bring nothing new. When there's nothing to draft, it says so instead of making thin drafts.
+
 ## 0.22.0
 **Better prose for fewer tokens**
 - **The prompt cache now works across requests.** Your rules, your prompt, your style guide and samples of your voice form a system prompt that stays the same in every scene, so it is served from the cache (about a tenth of the price) instead of being written again. The bible entries, which change with the passage, now travel with the story and the task. Scene details (POV, title, chapter) in your prompts are said with the task, not in the cached part.
