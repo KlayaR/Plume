@@ -181,6 +181,8 @@ export async function checkOutline() {
 - préparations et récompenses : un indice, un objet, une promesse ou une révélation posés (lignes Reveals) et jamais repris, ou une révélation qui tombe sans avoir été préparée ;
 - structure : tournants mal placés ou absents, chapitres sans but ou sans tournant, enjeux qui ne montent pas ;
 - rythme : trop de chapitres calmes ou trop de chapitres d’action à la suite (lignes Pace) ;
+- magie : un problème réglé par la magie sans que ce pouvoir ait été établi avant, une limite ou un prix qui ne coûtent jamais rien à personne ;
+- ton : des scènes ou des personnages qui trahissent le ton et les livres comparables des fondations (un personnage tout bon ou tout mauvais dans une histoire aux personnages gris, par exemple) ;
 - cohérence avec la bible, le pitch et les fondations.
 Pour chacun : "n" (le numéro du chapitre concerné), "chapter" (son titre), le problème et une correction concrète. En français.`
       : `Read this outline as an editor, at the level of the genre's great novels. List at most 12 real problems, most important first:
@@ -188,6 +190,8 @@ Pour chacun : "n" (le numéro du chapitre concerné), "chapter" (son titre), le 
 - setups and payoffs: a clue, object, promise or revelation planted (Reveals lines) and never paid off, or a revelation that lands without being set up;
 - structure: turning points missing or misplaced, chapters with no goal or no turn, stakes that don't rise;
 - pace: too many quiet or too many action chapters in a row (Pace lines);
+- magic: a problem solved by magic that wasn't set up before, a limit or cost that never costs anyone anything;
+- tone: scenes or characters that break the foundation's tone and comparable books (a purely good or purely evil character in a story of gray characters, say);
 - consistency with the bible, the premise and the foundation.
 For each: "n" (the number of the chapter it concerns), "chapter" (its title), the problem and a concrete fix.`,
     'JSON: [{"n": 1, "chapter": "…", "issue": "…", "fix": "…"}]',
@@ -228,8 +232,8 @@ export async function proposeFoundation() {
   const message = [
     grounding(book),
     chat ? `<conversation>\n${chat}\n</conversation>` : '',
-    F ? `Construis les fondations de cette histoire, comme pour un grand roman de fantasy. Garde ce qui est déjà écrit dans <foundation> et ce que l’auteur a décidé dans la conversation ; complète le reste. Chaque champ en une à trois phrases concrètes, propres à CE livre, sans généralités.`
-      : `Build this story's foundation, as for a great fantasy novel. Keep what is already in <foundation> and what the author decided in the conversation; fill in the rest. Each field in one to three concrete sentences, specific to THIS book, no generalities.`,
+    F ? `Construis les fondations de cette histoire, comme pour un grand roman de fantasy. Garde ce qui est déjà écrit dans <foundation> et ce que l’auteur a décidé dans la conversation ; complète le reste. Chaque champ en une à trois phrases concrètes, propres à CE livre, sans généralités. "magic" plus complet (jusqu’à six phrases) : sa source, ses règles, ses limites, son prix, qui peut s’en servir, comment elle se voit, ce qu’elle ne peut pas faire ; des limites et un prix qui créent des conflits. "comps" : deux ou trois livres ou auteurs comparables et ce qu’on prend à chacun ; ceux de l’auteur s’il en a cité.`
+      : `Build this story's foundation, as for a great fantasy novel. Keep what is already in <foundation> and what the author decided in the conversation; fill in the rest. Each field in one to three concrete sentences, specific to THIS book, no generalities. "magic" fuller (up to six sentences): its source, rules, limits, cost, who can use it, how it shows, what it can't do; limits and costs that create conflict. "comps": two or three comparable books or authors and what to take from each; the author's own if they named any.`,
     `JSON: {${FOUNDATION_KEYS.map(k => `"${k}": "…"`).join(', ')}}`,
   ].filter(Boolean).join('\n\n')
   const raw = await run<Partial<Foundation>>('foundation', message, book)
@@ -252,8 +256,8 @@ export async function interviewFoundation() {
   const chat = await import('./chat')
   chat.newChat()
   chat.send(fr(book)
-    ? 'Aide-moi à bâtir les fondations de mon histoire. Pose-moi UNE question à la fois, concrète, sur ce qui manque : le pitch, ce que veut mon protagoniste et ce dont il a besoin, l’antagoniste et son plan, les enjeux, le thème, les limites et le prix de la magie. Rebondis sur mes réponses, propose des pistes si je bloque.'
-    : 'Help me build my story’s foundation. Ask me ONE question at a time, concrete, about what is missing: the logline, what my protagonist wants and needs, the antagonist and their plan, the stakes, the theme, the limits and cost of magic. Build on my answers, suggest options when I’m stuck.')
+    ? 'Aide-moi à bâtir les fondations de mon histoire. Pose-moi UNE question à la fois, concrète, sur ce qui manque : le pitch, le sous-genre et la forme (points de vue, type de fin, tome unique ou série), le ton et ses limites, les livres comparables, ce que veut mon protagoniste et ce dont il a besoin, l’antagoniste et son plan, les enjeux, le thème, le système de magie (source, règles, limites, prix, ce qu’elle ne peut pas faire). Rebondis sur mes réponses, propose des pistes si je bloque.'
+    : 'Help me build my story’s foundation. Ask me ONE question at a time, concrete, about what is missing: the logline, the subgenre and shape (points of view, kind of ending, standalone or series), the tone and its limits, comparable books, what my protagonist wants and needs, the antagonist and their plan, the stakes, the theme, the magic system (source, rules, limits, cost, what it can’t do). Build on my answers, suggest options when I’m stuck.')
 }
 
 /** Claude places the book's turning points from the foundation (three acts if no structure is chosen yet). */
@@ -346,16 +350,16 @@ const NAMED: EntryType[] = ENTRY_TYPES.map(x => x.type).filter(x => !['style', '
 /** What makes an entry worth having, said to Claude when it writes them from the outline. */
 const ENTRY_CRAFT = {
   en: `Write these entries as a great novelist's story bible, for THIS story: everything specific to it, nothing generic or interchangeable.
-- A character: their part in the story; a few telling details of appearance; a personality with a contradiction and a flaw that matters to the plot; what they want and what they need; their secrets; their arc across the book, tied to the turning points and the chapters where it turns; their relationships with the other characters, by name. A full voice card, distinct from every other character's (register, rhythm, tics, what they never say, sample lines that could only be theirs). "knows" and "unaware": at the start of the book.
+- A character: their part in the story; a few telling details of appearance; a personality with a contradiction and a flaw that matters to the plot; what they want and what they need; their secrets; their arc across the book, tied to the turning points and the chapters where it turns; their relationships with the other characters, by name; what they are right about and what they are wrong about, and for an antagonist, a point the reader half agrees with; all of it in the tone of the foundation. A full voice card, distinct from every other character's (register, rhythm, tics, what they never say, sample lines that could only be theirs). "knows" and "unaware": at the start of the book.
 - A place: what it looks, sounds and smells like; who lives there; what happens there in the story; its danger or its secret.
-- Magic or lore: the rule, its limits, its cost, who can use it, how it shows; exactly as the foundation says.
+- Magic or lore: its source, the rule, its limits, its cost, who can use it, how it shows, what it can't do; exactly as the foundation says.
 - An object, faction, creature or event: what it is, its part in the plot, when it matters.
 - Facts that change during the book as dated facts ([ch 3+]).
 Everything consistent with the foundation, the turning points, the outline and the existing entries.`,
   fr: `Écris ces fiches comme la bible d’un grand romancier, pour CETTE histoire : tout lui est propre, rien de générique ou d’interchangeable.
-- Un personnage : son rôle dans l’histoire ; quelques détails d’apparence qui le disent ; une personnalité avec une contradiction et un défaut qui comptent pour l’intrigue ; ce qu’il veut et ce dont il a besoin ; ses secrets ; son arc sur tout le livre, lié aux tournants et aux chapitres où il bascule ; ses relations avec les autres personnages, nommés. Une fiche de voix complète, distincte de celle de chaque autre personnage (registre, rythme, tics, ce qu’il ne dit jamais, répliques qui ne pourraient être que les siennes). "knows" et "unaware" : au début du livre.
+- Un personnage : son rôle dans l’histoire ; quelques détails d’apparence qui le disent ; une personnalité avec une contradiction et un défaut qui comptent pour l’intrigue ; ce qu’il veut et ce dont il a besoin ; ses secrets ; son arc sur tout le livre, lié aux tournants et aux chapitres où il bascule ; ses relations avec les autres personnages, nommés ; ce sur quoi il a raison et ce sur quoi il a tort, et pour un antagoniste, un point que le lecteur lui accorde à moitié ; le tout dans le ton des fondations. Une fiche de voix complète, distincte de celle de chaque autre personnage (registre, rythme, tics, ce qu’il ne dit jamais, répliques qui ne pourraient être que les siennes). "knows" et "unaware" : au début du livre.
 - Un lieu : ce qu’on y voit, entend, sent ; qui y vit ; ce qui s’y passe dans l’histoire ; son danger ou son secret.
-- Magie ou univers : la règle, ses limites, son prix, qui peut s’en servir, comment elle se manifeste ; exactement comme le disent les fondations.
+- Magie ou univers : sa source, la règle, ses limites, son prix, qui peut s’en servir, comment elle se manifeste, ce qu’elle ne peut pas faire ; exactement comme le disent les fondations.
 - Un objet, une faction, une créature, un événement : ce que c’est, son rôle dans l’intrigue, quand il compte.
 - Ce qui change au fil du livre en faits datés ([ch 3+]).
 Tout cohérent avec les fondations, les tournants, le plan et les fiches existantes.`,

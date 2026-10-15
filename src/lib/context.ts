@@ -180,6 +180,7 @@ export function systemPrompt(book: Book, action: ActionId, chapter: number): str
   return [
     systemRules(lang, book.meta.title, { adult: voice.adult, sceneRules: voice.sceneRules, tense: body.includes('{book.tense}') ? '' : voice.tense, samples: samples.length > 0 }),
     body ? `<author_instructions>\n${expandVariables(body, vars)}\n</author_instructions>` : '',
+    book.meta.foundation?.tone?.trim() ? `<tone>\n${book.meta.foundation.tone.trim()}\n</tone>` : '',
     voice.description.trim() ? `<author_voice>\n${voice.description.trim()}\n</author_voice>` : '',
     voice.taste.trim() ? `<author_taste>\n${voice.taste.trim()}\n</author_taste>` : '',
     styleText ? `<style_guide>\n${expandVariables(styleText, vars)}\n</style_guide>` : '',

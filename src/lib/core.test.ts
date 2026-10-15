@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { parseEntry, serializeEntry, parseScene, serializeScene, factApplies, parseFact } from './bible'
-import { buildContext, buildMatcher, findMentions, outlineLines, ownShare, proseSamples, sceneWords } from './context'
+import { buildContext, buildMatcher, findMentions, outlineLines, ownShare, proseSamples, sceneWords, systemPrompt } from './context'
 import { autoCapitalRule, fixTypography, loneI, typingRule } from './typography'
 import { pasteText, wrapMarks } from './paste'
 import { matterPages, FRONT, BACK } from './matter'
@@ -972,6 +972,11 @@ describe('story foundation, turning points and outline versions', () => {
     expect(f).toContain('<premise>\nA seer hunts her own future.')
     expect(f).toContain('Logline : Alice must stop a vision.')
     expect(f).not.toContain('Theme')
+    book.meta.foundation.tone = 'Grim, morally gray.'
+    book.meta.foundation.comps = 'Abercrombie.'
+    const sys = systemPrompt(book, 'continue', 0)
+    expect(sys).toContain('<tone>\nGrim, morally gray.\n</tone>')
+    expect(sys).not.toContain('Abercrombie')
     expect(turningPointsText(book)).toContain('- Midpoint (50 %): She sees her death. → The diner')
   })
   it('keeps earlier versions (never empty ones) and brings one back as a proposal', () => {

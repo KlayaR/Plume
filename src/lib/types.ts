@@ -261,10 +261,16 @@ export interface Foundation {
   antagonist: string
   stakes: string
   theme: string
-  /** What magic (or the world's great rule) can do, its limits and its cost. */
+  /** The magic system (or the world's great rule): source, rules, limits, cost, who, how it shows, what it can't do. */
   magic: string
+  /** Subgenre and shape: points of view, kind of ending, standalone or series. */
+  shape: string
+  /** Tone and limits: how dark, how mature, how much violence, sex and swearing. */
+  tone: string
+  /** Comparable books, and what to take from each (planning only, never the prose). */
+  comps: string
 }
-export const FOUNDATION_KEYS: (keyof Foundation)[] = ['logline', 'want', 'need', 'antagonist', 'stakes', 'theme', 'magic']
+export const FOUNDATION_KEYS: (keyof Foundation)[] = ['logline', 'shape', 'tone', 'comps', 'want', 'need', 'antagonist', 'stakes', 'theme', 'magic']
 export interface LooseCard { id: string; title: string; note: string }
 
 export interface BookMeta {

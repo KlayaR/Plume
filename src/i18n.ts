@@ -1138,7 +1138,7 @@ const FR: Record<string, string> = {
   'Propose': 'Proposer',
   'Premise': 'Pitch',
   '+ Your premise': '+ Votre pitch',
-  '+ The foundation: logline, what the protagonist wants and needs, antagonist, stakes, theme, magic': '+ Les fondations : pitch en une phrase, ce que veut et ce dont a besoin le protagoniste, antagoniste, enjeux, thème, magie',
+  '+ The foundation: logline, subgenre and shape, tone, comparable books, what the protagonist wants and needs, antagonist, stakes, theme, magic system': '+ Les fondations : pitch en une phrase, sous-genre et forme, ton, livres comparables, ce que veut et ce dont a besoin le protagoniste, antagoniste, enjeux, thème, système de magie',
   'Claude’s foundation': 'Les fondations de Claude',
   'Turning points': 'Tournants',
   'Claude writes what happens at each turning point, from the foundation (three acts if none is chosen)': 'Claude écrit ce qui se passe à chaque tournant, d’après les fondations (trois actes si rien n’est choisi)',

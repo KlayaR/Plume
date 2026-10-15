@@ -56,7 +56,18 @@ export const FOUNDATION_LABELS: Record<keyof Foundation, { en: string; fr: strin
   antagonist: { en: 'Antagonist and their plan', fr: 'Antagoniste et son plan' },
   stakes: { en: 'Stakes', fr: 'Enjeux' },
   theme: { en: 'Theme', fr: 'Thème' },
-  magic: { en: 'Magic: limits and cost', fr: 'Magie : limites et prix' },
+  magic: { en: 'Magic system', fr: 'Système de magie' },
+  shape: { en: 'Subgenre and shape', fr: 'Sous-genre et forme' },
+  tone: { en: 'Tone and limits', fr: 'Ton et limites' },
+  comps: { en: 'Comparable books', fr: 'Livres comparables' },
+}
+
+/** What each foundation field asks for, shown in the empty field. */
+export const FOUNDATION_HINTS: Partial<Record<keyof Foundation, { en: string; fr: string }>> = {
+  magic: { en: 'Source, rules, limits, cost, who can use it, how it shows, what it can’t do', fr: 'Source, règles, limites, prix, qui peut s’en servir, comment elle se voit, ce qu’elle ne peut pas faire' },
+  shape: { en: 'Grimdark, epic, low fantasy…; one point of view or several; triumphant, bittersweet or tragic ending; standalone or series', fr: 'Grimdark, épique, low fantasy… ; un point de vue ou plusieurs ; fin triomphante, douce-amère ou tragique ; tome unique ou série' },
+  tone: { en: 'Mature, morally gray, dark humour…; how much violence, sex and swearing', fr: 'Adulte, personnages gris, humour noir… ; combien de violence, de sexe et de jurons' },
+  comps: { en: 'Characters like Abercrombie, magic like Sanderson… (for planning; the prose stays yours)', fr: 'Des personnages à la Abercrombie, une magie à la Sanderson… (pour le plan ; la prose reste la vôtre)' },
 }
 
 /** The premise and the foundation, as Claude reads them. */

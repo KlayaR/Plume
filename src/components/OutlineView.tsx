@@ -12,7 +12,7 @@ import { FOUNDATION_KEYS, type Book, type Chapter, type Foundation, type Scene }
 import { TEMPLATES, templateBeats } from '../lib/structures'
 import { chapterLabels } from '../lib/chapters'
 import { countWords, foldText } from '../lib/text'
-import { FOUNDATION_LABELS, chapterBeats, mergeCards, outlineMarkdown, type CardDraft } from '../lib/outline'
+import { FOUNDATION_HINTS, FOUNDATION_LABELS, chapterBeats, mergeCards, outlineMarkdown, type CardDraft } from '../lib/outline'
 import { acceptAll, acceptFoundation, createEntriesFromOutline, stopEntries, acceptOutline, acceptTurningPoints, checkOutline, cleanOutline, detailAll, fixIssue, interviewFoundation, issueChapter, loadVersions, planChapter, planScene, proposeFoundation, proposeTurningPoints, rejectOutline, restoreVersion, useOutline } from '../outline'
 import { writeChapter, writeFromPlan } from '../editor/actions'
 import { askText, showMenu } from '../contextMenu'
@@ -403,7 +403,7 @@ function StorySection({ book }: { book: Book }) {
           <div className="pl-ol-storyform" data-editing="true">
             <label className="sk-field"><span className="sk-label">{t('Premise')}</span><Grow autoFocus value={book.meta.summary ?? ''} placeholder={t('Your premise: who, what they want, what stands in the way, how it might end…')} onChange={v => st().updateMeta({ summary: v })} /></label>
             {FOUNDATION_KEYS.map(k => (
-              <label key={k} className="sk-field"><span className="sk-label">{FOUNDATION_LABELS[k][lang]}</span><Grow value={f[k] ?? ''} onChange={v => setF(k, v)} /></label>
+              <label key={k} className="sk-field"><span className="sk-label">{FOUNDATION_LABELS[k][lang]}</span><Grow value={f[k] ?? ''} placeholder={FOUNDATION_HINTS[k]?.[lang]} onChange={v => setF(k, v)} /></label>
             ))}
             <button type="button" className="sk-btn sk-btn-sm sk-btn-primary pl-ol-done" onClick={() => edit(null)}><Check size={13} /> {t('Done')}</button>
           </div>
@@ -411,7 +411,7 @@ function StorySection({ book }: { book: Book }) {
           <button type="button" className="pl-ol-storyread" onClick={() => edit('story')}>
             {book.meta.summary?.trim() ? <p>{book.meta.summary}</p> : <p className="pl-ol-ghost">{t('+ Your premise')}</p>}
             {FOUNDATION_KEYS.filter(k => f[k]?.trim()).map(k => <span key={k} className="pl-ol-small"><b>{FOUNDATION_LABELS[k][lang]}</b> {f[k]}</span>)}
-            {filled === 0 && <span className="pl-ol-ghost">{t('+ The foundation: logline, what the protagonist wants and needs, antagonist, stakes, theme, magic')}</span>}
+            {filled === 0 && <span className="pl-ol-ghost">{t('+ The foundation: logline, subgenre and shape, tone, comparable books, what the protagonist wants and needs, antagonist, stakes, theme, magic system')}</span>}
           </button>
         )}
         {proposed && (

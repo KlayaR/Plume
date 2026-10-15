@@ -7,6 +7,15 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.31.0
+**A richer story foundation: tone, shape, comparable books, a real magic system**
+- Three new foundation fields (Plan → Outline → The story): **Subgenre and shape** (grimdark, epic…; one point of view or several; kind of ending; standalone or series), **Tone and limits** (mature, morally gray, dark humour; how much violence, sex and swearing) and **Comparable books** ("characters like Abercrombie, magic like Sanderson").
+- **Magic system** replaces "Magic: limits and cost": source, rules, limits, cost, who can use it, how it shows, what it can't do. Propose writes it in full, with limits and costs that create conflict.
+- Every outline request, the outline check and Missing entries read all of it. The **tone** also goes with every writing request; the comparable books never do, so the prose stays yours.
+- **Check the outline** now also flags magic that solves a problem it was never set up to solve, limits that never cost anyone anything, and scenes or characters that break the tone.
+- Characters drafted by **Missing entries** say what they are right and wrong about, and an antagonist gets a point the reader half agrees with.
+- **Ask me questions** covers the new fields too. Each new field shows what it asks for when empty.
+
 ## 0.30.0
 **Spelling and grammar everywhere you write**
 - LanguageTool now checks every text box, not only the manuscript: bible entries (blocks, short version, voice card, facts, notes), the outline and its scene cards, Outline from a premise, chapter and scene titles, beats, notes, the chat, voice and style settings, front matter.
