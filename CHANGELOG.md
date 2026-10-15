@@ -7,6 +7,11 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.23.0
+**Scenes stay in their lane, and outlines that breathe**
+- **Claude writes only the scene you're in.** Continue, Beats to prose, Describe and Fill now see the scenes on either side: how the previous one ends (or its plan note), and what the next one is about. Continuity comes from them, but Claude is told that the next scene's events, characters and revelations don't happen yet, and to stop once the scene reaches what its note says. Beats to prose writes only the beats given and stops after the last one.
+- **Outline from a premise:** Claude now gets the rules of a scene (one place, one stretch of time, one point of view; something changes; action then reaction; usual lengths) and the number of scenes per chapter follows what each chapter needs, instead of three everywhere. You can still set a range ("between 1 and 4"). New: **Book length** (your book goal by default), and each card comes with its **point of view and place**, set on the card when the bible knows them.
+
 ## 0.22.2
 **Fix: drafted entries land in the right fields**
 - Entries drafted with **Turn into entries** now come in **blocks** (Appearance, Personality, History… the headings of their type), not one long text. For characters, the **voice card** and **Knows / Doesn't know** are filled too, and shown in To review before you accept.

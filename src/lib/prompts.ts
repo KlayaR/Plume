@@ -96,8 +96,8 @@ export function taskMessage(lang: Lang, action: ActionId, instruction: string, s
       storyBlock,
       `<beats>\n${dir}\n</beats>`,
       fr
-        ? `<task>\nÉcris la suite de la scène en suivant ces étapes dans l'ordre, en reprenant exactement là où le texte s'arrête. ${Words(ai.beatsWords)}.\n</task>`
-        : `<task>\nWrite the next part of the scene, following these beats in order, picking up exactly where the story stops. ${Words(ai.beatsWords)}.\n</task>`,
+        ? `<task>\nÉcris la suite de la scène en suivant ces étapes dans l'ordre, en reprenant exactement là où le texte s'arrête. N'écris que ce que disent ces étapes, sans ajouter d'événement, et arrête-toi une fois la dernière accomplie. ${Words(ai.beatsWords)}.\n</task>`
+        : `<task>\nWrite the next part of the scene, following these beats in order, picking up exactly where the story stops. Write only what these beats say, add no other event, and stop once the last one is done. ${Words(ai.beatsWords)}.\n</task>`,
     ].join('\n\n')
   }
   return [

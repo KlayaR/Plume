@@ -860,3 +860,19 @@ describe('drafts in blocks', () => {
     expect(checkBible(bookOf([], [e])).issues.some(i => i.kind === 'one-block' && i.slug === 'alice')).toBe(true)
   })
 })
+
+describe('scene boundaries', () => {
+  it('shows the scenes around this one for continuity and keeps the reply inside it', () => {
+    const s1 = scene('s1', 'Jasper watched the rain.', { note: 'Jasper wants a calm morning.' })
+    const s2 = scene('s2', '', { note: 'Alice tells him a new girl will change everything.' })
+    const book = bookOf([s1, s2], [])
+    const b = buildContext({ book, chapter: 1, pov: null, action: 'continue', instruction: '', before: s1.text, selection: '', after: '', overrides: {}, scene: s1 })
+    expect(b.message).toContain('<next_scene title="s2">\nAlice tells him')
+    expect(b.message).toContain('<scope>')
+    expect(b.message).not.toContain('<previous_scene title')
+    const c = buildContext({ book, chapter: 1, pov: null, action: 'continue', instruction: '', before: '', selection: '', after: '', overrides: {}, scene: s2 })
+    expect(c.message).toContain('<previous_scene title="s1">\nJasper watched the rain.')
+    const r = buildContext({ book, chapter: 1, pov: null, action: 'rewrite', instruction: '', before: '', selection: 'x', after: '', overrides: {}, scene: s1 })
+    expect(r.message).not.toContain('<scope>')
+  })
+})

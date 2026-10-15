@@ -1026,6 +1026,12 @@ const FR: Record<string, string> = {
   '{name}: the full version is one block holding {n} topics. As blocks, each can be sent or kept back on its own.': '{name} : la version complète est un seul bloc qui contient {n} sujets. En blocs, chacun peut être envoyé ou retenu séparément.',
   'Split into blocks': 'Découper en blocs',
   'Split the {n} entries into blocks': 'Découper les {n} fiches en blocs',
+  'Book length': 'Longueur du livre',
+  'Scenes per chapter': 'Scènes par chapitre',
+  'As each chapter needs': 'Selon chaque chapitre',
+  'Between…': 'Entre…',
+  'At least': 'Au moins',
+  'At most': 'Au plus',
 }
 
 const SHELL = {

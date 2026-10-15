@@ -206,6 +206,37 @@ export function storySoFar(book: Book, sceneId: string, maxTokens = 700): string
   return out.join('\n')
 }
 
+/** Keeps the reply inside the scene being written: the scenes around it are for continuity only. */
+const SCOPE: Record<Lang, string> = {
+  fr: `<scope>\nN'écris que cette scène : ce que demandent la consigne, les étapes ou la note de <scene>, et rien au-delà. <previous_scene> a déjà eu lieu : ne le répète pas. <next_scene> n'est là que pour la continuité : ses événements, ses personnages qui n'ont pas encore paru et ses révélations n'arrivent pas ici, ne les amorce pas et n'y fais pas allusion. Si la scène atteint ce que dit sa note, arrête-toi.\n</scope>`,
+  en: `<scope>\nWrite only this scene: what the direction, the beats or the <scene> note ask for, and nothing beyond. <previous_scene> has already happened: don't repeat it. <next_scene> is there for continuity only: its events, its characters who haven't appeared yet and its revelations don't happen here; don't set them up or allude to them. Once the scene reaches what its note says, stop.\n</scope>`,
+}
+
+/**
+ * The scenes on either side of this one, for continuity: how the previous one
+ * ends (its last lines, or its plan note if unwritten) when this scene has
+ * barely started, and what the next one is about (its note, or its opening).
+ */
+export function sceneEdges(book: Book, sceneId: string, before: string, lang: Lang): string {
+  const all = book.chapters.flatMap(c => c.scenes)
+  const i = all.findIndex(s => s.id === sceneId)
+  if (i < 0) return ''
+  const prev = all[i - 1]
+  const next = all[i + 1]
+  const fr = lang === 'fr'
+  const out: string[] = []
+  // Once this scene has a few hundred words of its own, they carry the continuity.
+  if (prev && (before.match(/\S+/g) ?? []).length < 200) {
+    const body = prev.text.trim() ? lastWords(prev.text, 150) : prev.note?.trim() ? `${fr ? 'Prévu' : 'Planned'} : ${prev.note.trim()}` : ''
+    if (body) out.push(`<previous_scene title="${prev.title}">\n${body}\n</previous_scene>`)
+  }
+  if (next) {
+    const body = next.note?.trim() ? next.note.trim() : next.text.trim() ? `${fr ? 'Commence par' : 'Opens with'} : ${firstWords(next.text, 60)}` : ''
+    if (body) out.push(`<next_scene title="${next.title}">\n${body}\n</next_scene>`)
+  }
+  return out.join('\n\n')
+}
+
 export function storyParts(input: Pick<ContextInput, 'action' | 'before' | 'selection' | 'after'>, windowWords: number) {
   if (isRewrite(input.action)) {
     return { before: lastWords(input.before, Math.min(400, windowWords)), selection: input.selection, after: firstWords(input.after, 150) }
@@ -305,11 +336,14 @@ export function buildContext(input: ContextInput): Built {
     ] : []),
   ].filter(Boolean).join('\n')
   const bibleBlock = bible ? `<bible>\n${bible}\n</bible>` : ''
+  const edges = !isRewrite(input.action) && sc ? sceneEdges(book, sc.id, story.before, lang) : ''
   const message = [
     bibleBlock,
     so ? `<story_so_far>\n${so}\n</story_so_far>` : '',
+    edges,
     info ? `<scene>\n${info}\n</scene>` : '',
     taskMessage(lang, input.action, input.instruction, story, ai),
+    !isRewrite(input.action) && (edges || sc?.note?.trim()) ? SCOPE[lang] : '',
   ].filter(Boolean).join('\n\n')
   const parts = {
     rules: estimateTokens(rules) + 830, // + the CLI's own minimum, measured
