@@ -7,6 +7,13 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.24.0
+**Write from the plan**
+- **Write a scene from its plan card:** right-click a card (Plan) or a scene (Manuscript) → **Write it from the plan**, or **From the plan** in the Assistant, or Ctrl+K. Claude writes the scene (or the rest of it) from the card's note, POV, time and place, with the scenes around it for continuity; it arrives as a proposal to accept or discard.
+- **Write a whole chapter:** right-click a chapter → **Write the chapter from the plan**. Every empty scene that has a note is written in order, straight into the chapter, each one reading the end of the one before. Scenes with text are left alone, a snapshot is taken first, and Stop works between scenes.
+- **Usual chapter length** (Settings → This book), 3,000 to 4,500 words by default: a guide, not a rule. A one-scene chapter gets the whole range; with several scenes it is shared between them, and Claude may write shorter or longer when the scene needs it.
+- Text written this way counts as Claude's, so it is never used as a sample of your voice.
+
 ## 0.23.0
 **Scenes stay in their lane, and outlines that breathe**
 - **Claude writes only the scene you're in.** Continue, Beats to prose, Describe and Fill now see the scenes on either side: how the previous one ends (or its plan note), and what the next one is about. Continuity comes from them, but Claude is told that the next scene's events, characters and revelations don't happen yet, and to stop once the scene reaches what its note says. Beats to prose writes only the beats given and stops after the last one.

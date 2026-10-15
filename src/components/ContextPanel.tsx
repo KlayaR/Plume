@@ -38,6 +38,7 @@ const QUICK: [ActionId, string, string][] = [
   ['show', 'Show it', 'Select a passage: turns telling into action and sensation'],
   ['dialogue', 'Sharpen dialogue', 'Select a passage: more subtext, a distinct voice for each speaker'],
   ['describe', 'Describe', 'Writes a description at the cursor'],
+  ['scene', 'From the plan', 'Writes the scene (or the rest of it) from its plan card note'],
 ]
 
 const n = (x: number) => x.toLocaleString(numLocale())

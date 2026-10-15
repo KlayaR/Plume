@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { parseEntry, serializeEntry, parseScene, serializeScene, factApplies, parseFact } from './bible'
-import { buildContext, buildMatcher, findMentions, ownShare, proseSamples } from './context'
+import { buildContext, buildMatcher, findMentions, ownShare, proseSamples, sceneWords } from './context'
 import { autoCapitalRule, fixTypography, loneI, typingRule } from './typography'
 import { pasteText, wrapMarks } from './paste'
 import { matterPages, FRONT, BACK } from './matter'
@@ -874,5 +874,18 @@ describe('scene boundaries', () => {
     expect(c.message).toContain('<previous_scene title="s1">\nJasper watched the rain.')
     const r = buildContext({ book, chapter: 1, pov: null, action: 'rewrite', instruction: '', before: '', selection: 'x', after: '', overrides: {}, scene: s1 })
     expect(r.message).not.toContain('<scope>')
+  })
+})
+
+describe('writing from the plan', () => {
+  it('shares the chapter length between its scenes, as a guide', () => {
+    const one = bookOf([scene('a', '', { note: 'Jasper wants a calm morning.' })], [])
+    expect(sceneWords(one, 'a')).toEqual([3000, 4500])
+    const three = bookOf([scene('a', ''), scene('b', ''), scene('c', '')], [])
+    expect(sceneWords(three, 'b')).toEqual([1000, 1500])
+    const b = buildContext({ book: one, chapter: 1, pov: null, action: 'scene', instruction: '', before: '', selection: '', after: '', overrides: {}, scene: one.chapters[0].scenes[0] })
+    expect(b.message).toContain('about 3000 to 4500 words')
+    expect(b.message).toContain('Jasper wants a calm morning.')
+    expect(b.message).toContain('<scope>')
   })
 })

@@ -1032,6 +1032,22 @@ const FR: Record<string, string> = {
   'Between…': 'Entre…',
   'At least': 'Au moins',
   'At most': 'Au plus',
+  'Write this scene from the plan (Claude)': 'Écrire cette scène d’après le plan (Claude)',
+  'Write this chapter from the plan (Claude)': 'Écrire ce chapitre d’après le plan (Claude)',
+  'Usual chapter length': 'Longueur habituelle d’un chapitre',
+  'A guide for Claude when it writes from the plan, shared between the chapter’s scenes. It may write shorter or longer when the scene needs it.': 'Un repère pour Claude quand il écrit d’après le plan, partagé entre les scènes du chapitre. Il peut écrire plus court ou plus long si la scène le demande.',
+  'Give this scene a note in the Plan first: Claude writes it from that note.': 'Donnez d’abord une note à cette scène dans le Plan : Claude l’écrit à partir de cette note.',
+  'No empty scene with a plan note in this chapter.': 'Aucune scène vide avec une note de plan dans ce chapitre.',
+  'Claude will write {n} scene(s) of this chapter from their plan notes, about {a} to {b} words in all. Scenes that already have text are left alone, and a snapshot is taken first.': 'Claude va écrire {n} scène(s) de ce chapitre d’après leurs notes de plan, environ {a} à {b} mots en tout. Les scènes qui ont déjà du texte ne sont pas touchées, et un instantané est pris avant.',
+  'Write the chapter': 'Écrire le chapitre',
+  'Before Claude wrote “{title}”': 'Avant que Claude écrive « {title} »',
+  'Writing “{title}”… ({i} of {n})': 'Écriture de « {title} »… ({i} sur {n})',
+  '{n} scene(s) written. Snapshots can put the chapter back as it was.': '{n} scène(s) écrite(s). Les instantanés peuvent remettre le chapitre comme avant.',
+  'Read it': 'Le lire',
+  'Write it from the plan (Claude)': 'L’écrire d’après le plan (Claude)',
+  'Write the chapter from the plan (Claude)': 'Écrire le chapitre d’après le plan (Claude)',
+  'From the plan': 'D’après le plan',
+  'Writes the scene (or the rest of it) from its plan card note': 'Écrit la scène (ou sa suite) d’après la note de sa carte du plan',
 }
 
 const SHELL = {

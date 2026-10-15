@@ -48,7 +48,7 @@ Rules:
 
 interface Story { before: string; selection: string; after: string }
 
-export function taskMessage(lang: Lang, action: ActionId, instruction: string, story: Story, ai: BookMeta['ai']): string {
+export function taskMessage(lang: Lang, action: ActionId, instruction: string, story: Story, ai: BookMeta['ai'], sceneRange?: [number, number]): string {
   const fr = lang === 'fr'
   const dir = instruction.trim()
   const words = (n: number) => fr ? `environ ${n} mots` : `about ${n} words`
@@ -89,6 +89,16 @@ export function taskMessage(lang: Lang, action: ActionId, instruction: string, s
       fr
         ? `<task>\nÉcris une description (lieu, personnage ou objet) qui s'insère ici, en reprenant exactement là où le texte s'arrête. Détails concrets, plusieurs sens, vus par le personnage du point de vue ; pas de liste. Environ 120 mots.${dir ? `\nCe qu'il faut décrire : ${dir}` : '\nDécris ce que le personnage remarque en premier.'}\nRéponds uniquement avec la description.\n</task>`
         : `<task>\nWrite a description (place, character or object) that fits in here, picking up exactly where the story stops. Concrete detail, more than one sense, seen through the point-of-view character; no lists. About 120 words.${dir ? `\nWhat to describe: ${dir}` : '\nDescribe what the character notices first.'}\nReply with the description only.\n</task>`,
+    ].join('\n\n')
+  }
+  if (action === 'scene') {
+    const [a, b] = sceneRange ?? ai.chapterWords
+    const range = fr ? `environ ${a} à ${b} mots` : `about ${a} to ${b} words`
+    return [
+      storyBlock,
+      fr
+        ? `<task>\nÉcris cette scène en entier d'après son plan (<scene>)${story.before.trim() ? ", en reprenant exactement là où le texte s'arrête" : ''} : entre dans le moment, mène-la jusqu'à ce que sa note dit qui change, et termine là. Longueur indicative : ${range} ; plus courte ou plus longue si la scène le demande.${dir ? `\nConsigne de l'auteur : ${dir}` : ''}\n</task>`
+        : `<task>\nWrite this scene in full from its plan (<scene>)${story.before.trim() ? ', picking up exactly where the story stops' : ''}: go into the moment, carry it to what its note says changes, and end there. Length as a guide: ${range}; shorter or longer if the scene needs it.${dir ? `\nAuthor's direction: ${dir}` : ''}\n</task>`,
     ].join('\n\n')
   }
   if (action === 'beats') {

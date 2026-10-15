@@ -3,6 +3,7 @@
 import { useStore } from './store'
 import { t } from './i18n'
 import { newThingsMenu } from './menus'
+import { writeChapter, writeFromPlan } from './editor/actions'
 
 export interface Command { id: string; label: string; keys?: string; run: () => void }
 
@@ -16,6 +17,8 @@ export function commands(): Command[] {
     { id: 'write', label: t('Write mode'), run: () => { st.setView('manuscript'); st.setPrefs({ mode: 'write' }) } },
     { id: 'review', label: t('Review mode'), run: () => { st.setView('manuscript'); st.setPrefs({ mode: 'review' }) } },
     { id: 'chapter', label: t('New chapter'), run: () => newThingsMenu()[0]?.onClick?.() },
+    { id: 'write-scene', label: t('Write this scene from the plan (Claude)'), run: () => { const id = useStore.getState().sceneId; if (id) writeFromPlan(id) } },
+    { id: 'write-chapter', label: t('Write this chapter from the plan (Claude)'), run: () => { const s = useStore.getState(); const c = s.book?.chapters.find(x => x.scenes.some(y => y.id === s.sceneId)); if (c) writeChapter(c.id) } },
     { id: 'export', label: t('Export…'), run: () => set({ dialog: 'export' }) },
     { id: 'snapshots', label: t('Snapshots'), run: () => set({ dialog: 'snapshots' }) },
     { id: 'find', label: t('Find and replace'), keys: 'Ctrl+Shift+F', run: () => set({ dialog: 'find' }) },

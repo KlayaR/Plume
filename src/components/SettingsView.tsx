@@ -226,6 +226,14 @@ function BookTab() {
       <SettingRow label={t('Words for the whole book')}>
         <input className="sk-input pl-num" type="number" min={0} step={5000} value={goal.book} onChange={e => setGoal({ book: Math.max(0, Number(e.target.value) || 0) })} />
       </SettingRow>
+      <SettingRow label={t('Usual chapter length')} description={t('A guide for Claude when it writes from the plan, shared between the chapter’s scenes. It may write shorter or longer when the scene needs it.')}>
+        <span className="pl-row">
+          <input className="sk-input pl-num" type="number" min={500} step={250} value={ai.chapterWords[0]} onChange={e => setAi({ chapterWords: [num(e.target.value, 500, 20000), Math.max(num(e.target.value, 500, 20000), ai.chapterWords[1])] })} aria-label={t('At least')} />
+          <span>–</span>
+          <input className="sk-input pl-num" type="number" min={500} step={250} value={ai.chapterWords[1]} onChange={e => setAi({ chapterWords: [Math.min(ai.chapterWords[0], num(e.target.value, 500, 20000)), num(e.target.value, 500, 20000)] })} aria-label={t('At most')} />
+          <span>{t('words')}</span>
+        </span>
+      </SettingRow>
       <SettingRow label={t('Words a day')}>
         <input className="sk-input pl-num" type="number" min={0} step={100} value={goal.daily} onChange={e => setGoal({ daily: Math.max(0, Number(e.target.value) || 0) })} />
       </SettingRow>

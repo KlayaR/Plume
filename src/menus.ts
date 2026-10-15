@@ -12,7 +12,7 @@ import { stripInline } from './lib/inline'
 import { pasteText } from './lib/paste'
 import { countWords, foldText, locateQuote } from './lib/text'
 import { ENTRY_TYPES, typeInfo, type ActionId, type Entry, type EntryType, type Include, type Scene, type SceneStatus } from './lib/types'
-import { accept, discard, getEditorView, retry, runAction } from './editor/actions'
+import { accept, discard, getEditorView, retry, runAction, writeChapter, writeFromPlan } from './editor/actions'
 import { proposalField } from './editor/cm'
 import { insertPlaceholder, toggleInline, unknownNames } from './editor/marks'
 import { cutToDarlings, removeComment } from './writing'
@@ -168,6 +168,7 @@ export function sceneMenu(sceneId: string, opts: { card?: boolean } = {}): MenuI
   const lines = book.entries.filter(e => e.type === 'storyline')
   return [
     { label: t('Write it'), onClick: () => st.selectScene(sceneId) },
+    { label: t('Write it from the plan (Claude)'), disabled: !scene.note?.trim(), onClick: () => writeFromPlan(sceneId) },
     opts.card && st.view !== 'manuscript' && { label: t('Open in the second pane'), onClick: () => { st.setPrefs({ dual: 'manuscript' }); st.selectScene(sceneId) } },
     { label: t('Rename…'), onClick: async () => { const v = await askText(t('Scene title'), scene.title); if (v?.trim()) st.updateScene(sceneId, { title: v.trim() }) } },
     { separator: true },
@@ -196,6 +197,7 @@ export function chapterMenu(chapterId: string): MenuItem[] {
   const words = c.scenes.reduce((n, s) => n + countWords(s.text), 0)
   return [
     { label: t('New scene'), onClick: () => st.addScene(chapterId, `${t('Scene')} ${c.scenes.length + 1}`) },
+    { label: t('Write the chapter from the plan (Claude)'), disabled: !c.scenes.some(s => !s.text.trim() && s.note?.trim()), onClick: () => writeChapter(chapterId) },
     { label: t('Rename…'), onClick: async () => { const v = await askText(t('Chapter title'), c.title); if (v !== null) st.updateChapter(chapterId, { title: v.trim() }) } },
     kinds.length > 1 && { label: t('Kind'), sub: kinds.map(k => ({ label: t(kindNames[k]), checked: c.kind === k, onClick: () => st.updateChapter(chapterId, { kind: k }) })) },
     { label: c.part ? t('Part: {title}…', { title: c.part }) : t('Start a part here…'), onClick: async () => { const v = await askText(t('Title of the part that starts here (empty: none)'), c.part ?? ''); if (v !== null) st.updateChapter(chapterId, { part: v.trim() }) } },

@@ -182,7 +182,7 @@ export interface Chapter {
   scenes: Scene[]
 }
 
-export type ActionId = 'continue' | 'rewrite' | 'beats' | 'fill' | 'expand' | 'shorten' | 'show' | 'dialogue' | 'describe'
+export type ActionId = 'continue' | 'rewrite' | 'beats' | 'fill' | 'expand' | 'shorten' | 'show' | 'dialogue' | 'describe' | 'scene'
 /** Actions that replace the selected passage (the others write at the cursor). */
 export const REWRITE_ACTIONS: ActionId[] = ['rewrite', 'expand', 'shorten', 'show', 'dialogue']
 export const isRewrite = (a: ActionId) => REWRITE_ACTIONS.includes(a)
@@ -248,6 +248,8 @@ export interface BookMeta {
     storyWindow: number
     continueWords: number
     beatsWords: number
+    /** A chapter's usual length, a guide shared between its scenes when Claude writes them from the plan. */
+    chapterWords: [number, number]
   }
   voice: Voice
   structure: { template: string; beats: Beat[] }
@@ -289,9 +291,11 @@ export const DEFAULT_AI: BookMeta['ai'] = {
     show: { model: 'sonnet', effort: 'low' },
     dialogue: { model: 'sonnet', effort: 'low' },
     describe: { model: 'sonnet', effort: 'low' },
+    scene: { model: 'sonnet', effort: 'medium' },
   },
   bibleBudget: 3000,
   storyWindow: 1500,
   continueWords: 300,
   beatsWords: 600,
+  chapterWords: [3000, 4500],
 }

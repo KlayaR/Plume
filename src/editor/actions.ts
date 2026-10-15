@@ -5,12 +5,15 @@ import type { EditorView } from '@codemirror/view'
 import { isRewrite, type ActionId } from '../lib/types'
 import { buildContext, systemPrompt, type Built, type Override } from '../lib/context'
 import { checkRules, fixDirection, type Check } from '../lib/voice'
-import { ask, effective, isCheap } from '../ai'
+import { ask, effective, isCheap, stopAsk } from '../ai'
 import { noteTaste } from '../writing'
 import { canRun, cancelLLM, runLLM } from '../llm'
 import type { Effort, Model } from '../lib/types'
 import { findScene, useStore } from '../store'
 import { t } from '../i18n'
+import { ask as askDialog } from '@tauri-apps/plugin-dialog'
+import { makeSnap, saveSnap } from '../lib/snapshots'
+import { fixTypography } from '../lib/typography'
 import { acceptProposal, appendProposal, discardProposal, endStream, proposalField, setProposal } from './cm'
 
 let view: EditorView | null = null
@@ -75,6 +78,7 @@ export async function runAction(action: ActionId, instruction: string, overrides
   if (view.state.field(proposalField)) return st.notify('warn', t('Accept or discard the current proposal first.'))
   if (isRewrite(action) && view.state.selection.main.empty) return st.notify('warn', t('Select the passage to rewrite first.'))
   if (action === 'beats' && !instruction.trim()) return st.notify('warn', t('Write the beats first, one per line.'))
+  if (action === 'scene' && !findScene(st.book, st.sceneId)?.scene.note?.trim()) return st.notify('warn', t('Give this scene a note in the Plan first: Claude writes it from that note.'))
   const ctx = currentContext(action, instruction, overrides)
   if (!ctx) return
   useAI.setState({ last: { action, instruction, overrides } })
@@ -109,6 +113,67 @@ async function stream(action: ActionId, from: number, to: number, system: string
   if (useAI.getState().running === 'starting') useAI.setState({ running: id })
 }
 
+// A timer, not requestAnimationFrame: frames don't come while the window is hidden or minimised.
+const frame = () => new Promise(r => setTimeout(r, 30))
+
+/**
+ * Write a scene from its plan card: opens it, puts the cursor at the end of what
+ * is written, and Claude writes the rest as a proposal (Accept / Discard as usual).
+ */
+export async function writeFromPlan(sceneId: string) {
+  const st = useStore.getState()
+  const found = findScene(st.book, sceneId)
+  if (!found) return
+  if (!found.scene.note?.trim()) return st.notify('warn', t('Give this scene a note in the Plan first: Claude writes it from that note.'))
+  st.selectScene(sceneId)
+  // The scene's editor becomes the active one a frame or two after it opens.
+  for (let i = 0; i < 40 && !(view?.dom.isConnected && useStore.getState().sceneId === sceneId); i++) await frame()
+  await frame()
+  if (!view) return
+  view.dispatch({ selection: { anchor: view.state.doc.length } })
+  await runAction('scene', '', {})
+}
+
+/**
+ * Write a whole chapter from the plan: every scene with a note and no text yet,
+ * in order, straight into the scene (each one reads the end of the one before).
+ * A snapshot is taken first, so the chapter can be put back as it was.
+ */
+export async function writeChapter(chapterId: string) {
+  const st = useStore.getState()
+  const book = st.book
+  const chapter = book?.chapters.find(c => c.id === chapterId)
+  if (!book || !chapter || useAI.getState().running) return
+  if (!canRun()) return st.notify('error', t('The claude command line was not found. Set its path in Settings.'))
+  const todo = chapter.scenes.filter(s => !s.text.trim() && s.note?.trim())
+  if (!todo.length) return st.notify('warn', t('No empty scene with a plan note in this chapter.'))
+  const [a, b] = book.meta.ai.chapterWords
+  if (!(await askDialog(t('Claude will write {n} scene(s) of this chapter from their plan notes, about {a} to {b} words in all. Scenes that already have text are left alone, and a snapshot is taken first.', { n: todo.length, a, b }), { title: t('Write the chapter'), kind: 'info' }))) return
+  await saveSnap(book.root, makeSnap(book, t('Before Claude wrote “{title}”', { title: chapter.title || t('Chapter') })))
+  useAI.setState({ running: 'chapter' })
+  let done = 0
+  try {
+    for (const s of todo) {
+      const b2 = useStore.getState().book!
+      const f = findScene(b2, s.id)
+      if (!f) continue
+      const built = buildContext({ book: b2, chapter: f.number, pov: f.scene.pov, action: 'scene', instruction: '', before: '', selection: '', after: '', overrides: {}, scene: f.scene })
+      const c = assistantChoice('scene')
+      const e = effective(c.model, c.effort)
+      st.notify('ok', t('Writing “{title}”… ({i} of {n})', { title: s.title, i: done + 1, n: todo.length }))
+      const text = fixTypography((await ask({ model: e.model, effort: e.effort, orModel: c.orModel, system: built.system, message: built.message })).trim(), b2.meta.language)
+      if (!text || useAI.getState().running !== 'chapter') break
+      useStore.getState().updateScene(s.id, { text, extra: { ...f.scene.extra, aiWords: (text.match(/\S+/g) ?? []).length } })
+      done++
+    }
+  } catch (err) {
+    st.notify('error', (err as Error).message)
+  } finally {
+    useAI.setState({ running: null })
+  }
+  if (done) useStore.getState().notify('ok', t('{n} scene(s) written. Snapshots can put the chapter back as it was.', { n: done }), { label: t('Read it'), run: () => useStore.getState().selectScene(todo[0].id) })
+}
+
 /** Fill with AI: the placeholder ⟦note⟧ is replaced by a proposal written from its note. */
 export function fillPlaceholder(v: EditorView, from: number, to: number, note: string) {
   if (useAI.getState().running) return
@@ -119,6 +184,8 @@ export function fillPlaceholder(v: EditorView, from: number, to: number, note: s
 
 export function stopAction() {
   const id = useAI.getState().running
+  // Writing a chapter: stop after the scene being written is abandoned.
+  if (id === 'chapter') { useAI.setState({ running: null }); stopAsk(); return }
   if (id && id !== 'starting') cancelLLM(id)
 }
 

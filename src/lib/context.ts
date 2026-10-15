@@ -237,6 +237,14 @@ export function sceneEdges(book: Book, sceneId: string, before: string, lang: La
   return out.join('\n\n')
 }
 
+/** The length to aim for in one scene: the chapter's usual length, shared between its scenes, rounded to 50 words. */
+export function sceneWords(book: Book, sceneId: string): [number, number] {
+  const [a, b] = book.meta.ai.chapterWords ?? [3000, 4500]
+  const n = Math.max(1, book.chapters.find(c => c.scenes.some(s => s.id === sceneId))?.scenes.length ?? 1)
+  const r = (x: number) => Math.max(300, Math.round(x / n / 50) * 50)
+  return [r(a), r(b)]
+}
+
 export function storyParts(input: Pick<ContextInput, 'action' | 'before' | 'selection' | 'after'>, windowWords: number) {
   if (isRewrite(input.action)) {
     return { before: lastWords(input.before, Math.min(400, windowWords)), selection: input.selection, after: firstWords(input.after, 150) }
@@ -342,7 +350,7 @@ export function buildContext(input: ContextInput): Built {
     so ? `<story_so_far>\n${so}\n</story_so_far>` : '',
     edges,
     info ? `<scene>\n${info}\n</scene>` : '',
-    taskMessage(lang, input.action, input.instruction, story, ai),
+    taskMessage(lang, input.action, input.instruction, story, ai, sc ? sceneWords(book, sc.id) : undefined),
     !isRewrite(input.action) && (edges || sc?.note?.trim()) ? SCOPE[lang] : '',
   ].filter(Boolean).join('\n\n')
   const parts = {
