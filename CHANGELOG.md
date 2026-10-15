@@ -7,6 +7,12 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.29.0
+**Bible entries from the outline**
+- **Missing entries** (Plan → Outline bar): Claude reads the whole outline, the foundation, the turning points and the bible, lists every character, place, object, faction, creature, magic or past event the story uses but the bible lacks, then writes full entries for them: main characters one at a time, the rest three at a time, each knowing the whole story and the other new entries.
+- A character comes with their part in the story, telling details, a personality with a contradiction and a flaw that matter to the plot, what they want and need, secrets, an arc tied to the turning points and chapters, relationships by name, a full voice card distinct from the others, what they know and don't at the start, and dated facts. Places, magic, objects and factions get what matters for writing them.
+- Everything lands in **Bible → To review** to accept, edit or reject; nothing enters the bible on its own. **Stop** ends it after the entry being written.
+
 ## 0.28.0
 **From an idea to a full outline**
 - **The story** (top of Plan → Outline): your premise, the **foundation** (logline, what the protagonist wants and needs, antagonist and their plan, stakes, theme, the limits and cost of magic) and the book's **turning points** (three acts, hero's journey…). Fill them by hand, or **Ask me questions** (Claude interviews you in the chat) then **Propose**; both come back as proposals. Every outline request (from a premise, Detail, Regenerate, Check) now reads them, and *Outline from a premise* places each turning point in its chapter (shown as a badge).

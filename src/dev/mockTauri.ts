@@ -61,7 +61,8 @@ async function invoke(cmd: string, args: any = {}): Promise<unknown> {
       }
       let i = 0
       // window.__mockReply: what the fake claude answers next (an outline's JSON, say); otherwise the canned prose.
-      const reply = (window as any).__mockReply ?? REPLY
+      // window.__mockReplies: several answers in order, one per request.
+      const reply = (window as any).__mockReplies?.shift() ?? (window as any).__mockReply ?? REPLY
       const words = reply.split(/(?<= )/)
       const timer = setInterval(() => {
         if (i < words.length) {

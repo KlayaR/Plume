@@ -4,13 +4,14 @@
 import { create } from 'zustand'
 import { invoke } from '@tauri-apps/api/core'
 import { ask, parseJSON } from './ai'
+import { addDrafts, entryFormat, readDrafts } from './chat'
 import { useStore } from './store'
 import { t } from './i18n'
-import { FOUNDATION_KEYS, WORLD_TYPES, type Book, type Foundation, type Scene } from './lib/types'
+import { ENTRY_TYPES, FOUNDATION_KEYS, WORLD_TYPES, type Book, type EntryType, type Foundation, type Scene } from './lib/types'
 import { templateBeats } from './lib/structures'
 import { foldText } from './lib/text'
 import {
-  CHAPTER_JSON, SCENE_JSON, addVersion, cardOf, cardPatch, cardSpec, chapterText, foundationText, outlineRules, outlineText,
+  CHAPTER_JSON, SCENE_JSON, addVersion, findEntrySlug, cardOf, cardPatch, cardSpec, chapterText, foundationText, outlineRules, outlineText,
   readCard, readChapterProposal, turningPointsText, versionOf, versionProposal, type OutlineProposal, type OutlineVersion,
 } from './lib/outline'
 
@@ -336,3 +337,90 @@ export async function cleanOutline() {
   useOutline.setState({ proposals: {}, issues: null })
   useStore.getState().notify('ok', t('Outline cleaned. Empty chapters and scenes are in the book’s trash; written scenes kept their text.'))
 }
+
+// --- Bible entries from the outline ---------------------------------------------------
+
+interface Missing { type: EntryType; name: string; role: string; major: boolean }
+const NAMED: EntryType[] = ENTRY_TYPES.map(x => x.type).filter(x => !['style', 'wordlist', 'excerpt'].includes(x))
+
+/** What makes an entry worth having, said to Claude when it writes them from the outline. */
+const ENTRY_CRAFT = {
+  en: `Write these entries as a great novelist's story bible, for THIS story: everything specific to it, nothing generic or interchangeable.
+- A character: their part in the story; a few telling details of appearance; a personality with a contradiction and a flaw that matters to the plot; what they want and what they need; their secrets; their arc across the book, tied to the turning points and the chapters where it turns; their relationships with the other characters, by name. A full voice card, distinct from every other character's (register, rhythm, tics, what they never say, sample lines that could only be theirs). "knows" and "unaware": at the start of the book.
+- A place: what it looks, sounds and smells like; who lives there; what happens there in the story; its danger or its secret.
+- Magic or lore: the rule, its limits, its cost, who can use it, how it shows; exactly as the foundation says.
+- An object, faction, creature or event: what it is, its part in the plot, when it matters.
+- Facts that change during the book as dated facts ([ch 3+]).
+Everything consistent with the foundation, the turning points, the outline and the existing entries.`,
+  fr: `Écris ces fiches comme la bible d’un grand romancier, pour CETTE histoire : tout lui est propre, rien de générique ou d’interchangeable.
+- Un personnage : son rôle dans l’histoire ; quelques détails d’apparence qui le disent ; une personnalité avec une contradiction et un défaut qui comptent pour l’intrigue ; ce qu’il veut et ce dont il a besoin ; ses secrets ; son arc sur tout le livre, lié aux tournants et aux chapitres où il bascule ; ses relations avec les autres personnages, nommés. Une fiche de voix complète, distincte de celle de chaque autre personnage (registre, rythme, tics, ce qu’il ne dit jamais, répliques qui ne pourraient être que les siennes). "knows" et "unaware" : au début du livre.
+- Un lieu : ce qu’on y voit, entend, sent ; qui y vit ; ce qui s’y passe dans l’histoire ; son danger ou son secret.
+- Magie ou univers : la règle, ses limites, son prix, qui peut s’en servir, comment elle se manifeste ; exactement comme le disent les fondations.
+- Un objet, une faction, une créature, un événement : ce que c’est, son rôle dans l’intrigue, quand il compte.
+- Ce qui change au fil du livre en faits datés ([ch 3+]).
+Tout cohérent avec les fondations, les tournants, le plan et les fiches existantes.`,
+}
+
+/**
+ * Creates the bible entries the outline needs and the bible lacks: Claude first
+ * lists them (with their role), then writes them in small batches (a main
+ * character alone), each knowing the whole story and the other new entries.
+ * The drafts go to Bible → To review.
+ */
+export async function createEntriesFromOutline() {
+  const book = useStore.getState().book
+  if (!book || useOutline.getState().busy) return
+  if (!book.chapters.some(c => c.scenes.some(s => s.note?.trim() || s.beats?.length))) return useStore.getState().notify('warn', t('Outline the book first: Claude creates the entries its outline needs.'))
+  const F = fr(book)
+  const lang = book.meta.language
+  const existing = book.entries.filter(e => NAMED.includes(e.type)).map(e => `- ${e.name}${e.aliases.length ? ` (${e.aliases.join(', ')})` : ''} [${e.type}]${e.short.trim() ? `: ${e.short.trim().slice(0, 140)}` : ''}`).join('\n')
+  // Names in the cards' "who is there" that the bible doesn't know, as hints.
+  const hints = [...new Set(book.chapters.flatMap(c => c.scenes.flatMap(s => s.cast ?? [])))].filter(n => !findEntrySlug(book, n, NAMED))
+  const story = [grounding(book), `<outline>\n${outlineText(book)}\n</outline>`, `<existing_entries>\n${existing || '-'}\n</existing_entries>`].join('\n\n')
+  const ask_ = (message: string) => ask({ model: 'sonnet', effort: 'medium', system: F ? 'Tu construis la bible d’un roman de fantasy à partir de son plan. Réponds uniquement en JSON valide, en français.' : 'You build the story bible of a fantasy novel from its outline. Reply with valid JSON only.', message })
+  useOutline.setState({ busy: 'entries' })
+  try {
+    useStore.getState().notify('ok', t('Claude is reading the outline for missing entries…'))
+    const listRaw = parseJSON<Missing[]>(await ask_([
+      story,
+      hints.length ? `<names_without_entry>\n${hints.join(', ')}\n</names_without_entry>` : '',
+      F ? `Liste ce que cette histoire utilise et que la bible n’a pas encore : chaque personnage nommé ou important, lieu, objet, faction, créature, magie, événement passé qui compte. Pas ce qui existe déjà (noms et alias de <existing_entries>). "major" = protagoniste, antagoniste, personnage de point de vue ou récurrent, lieu ou règle centrale. "role" : une phrase sur sa place dans l’histoire.`
+        : `List what this story uses that the bible doesn't have yet: every named or important character, place, object, faction, creature, magic, past event that matters. Not what already exists (names and aliases in <existing_entries>). "major" = protagonist, antagonist, point-of-view or recurring character, central place or rule. "role": one sentence on its place in the story.`,
+      `JSON: [{"type": "${NAMED.join('|')}", "name": "…", "role": "…", "major": true}]`,
+    ].filter(Boolean).join('\n\n')))
+    const missing = (Array.isArray(listRaw) ? listRaw : []).filter(m => m && m.name && !findEntrySlug(book, m.name, NAMED))
+      .map(m => ({ ...m, type: NAMED.includes(m.type) ? m.type : 'lore' as EntryType, major: !!m.major }))
+    if (!missing.length) return useStore.getState().notify('ok', t('The bible already has everything the outline uses.'))
+    // Main entries one by one, the rest three at a time; characters first, they shape the rest.
+    const order = [...missing].sort((a, b) => Number(b.major) - Number(a.major) || Number(b.type === 'character') - Number(a.type === 'character'))
+    const batches: Missing[][] = []
+    for (const m of order) {
+      const last = batches[batches.length - 1]
+      if (m.major || !last || last.length >= 3 || last[0].major) batches.push([m]); else last.push(m)
+    }
+    const all = missing.map(m => `- ${m.name} [${m.type}]: ${m.role}`).join('\n')
+    let made = 0
+    for (const [i, batch] of batches.entries()) {
+      if (useOutline.getState().busy !== 'entries') break
+      useStore.getState().notify('ok', t('Writing {names}… ({i} of {n})', { names: batch.map(m => m.name).join(', '), i: i + 1, n: batches.length }))
+      const raw = parseJSON<Record<string, unknown>[]>(await ask_([
+        story,
+        `<new_entries>\n${all}\n</new_entries>`,
+        ENTRY_CRAFT[lang],
+        `<task>\n${F ? 'Écris maintenant ces fiches, et seulement elles' : 'Now write these entries, and only these'} : ${batch.map(m => `${m.name} [${m.type}]`).join(', ')}.\n</task>`,
+        entryFormat(book, true),
+      ].join('\n\n')))
+      // A draft with nothing in it (a reply that only named the entries) never reaches the review list.
+      const drafts = readDrafts(useStore.getState().book!, Array.isArray(raw) ? raw : raw ? [raw] : []).map(d => ({ ...d, target: null })).filter(d => d.short.trim() || d.full.trim())
+      if (drafts.length) { addDrafts(drafts); made += drafts.length }
+    }
+    if (made) useStore.getState().notify('ok', t('{n} entries drafted from the outline, in Bible → To review.', { n: made }), { label: t('Review'), run: () => useStore.setState({ view: 'bible', entrySlug: null, bibleTab: 'review' }) })
+  } catch (e) {
+    useStore.getState().notify('error', (e as Error).message)
+  } finally {
+    useOutline.setState({ busy: null })
+  }
+}
+
+/** Stops creating entries after the one being written. */
+export const stopEntries = () => { if (useOutline.getState().busy === 'entries') useOutline.setState({ busy: null }) }

@@ -1155,6 +1155,14 @@ const FR: Record<string, string> = {
   'Outline cleaned. Empty chapters and scenes are in the book’s trash; written scenes kept their text.': 'Plan effacé. Les chapitres et scènes vides sont dans la corbeille du livre ; les scènes écrites ont gardé leur texte.',
   'Before an earlier version came back': 'Avant le retour d’une version précédente',
   'Earlier version of this chapter’s outline': 'Version précédente du plan de ce chapitre',
+  'Stop creating entries': 'Arrêter la création des fiches',
+  'Claude finds the characters, places, objects and rules the outline uses but the bible lacks, and writes full entries for them (personality, arc, voice…), in Bible → To review.': 'Claude trouve les personnages, lieux, objets et règles que le plan utilise mais que la bible n’a pas, et leur écrit des fiches complètes (personnalité, arc, voix…), dans Bible → À relire.',
+  'Missing entries': 'Fiches manquantes',
+  'Outline the book first: Claude creates the entries its outline needs.': 'Faites d’abord le plan : Claude crée les fiches dont il a besoin.',
+  'Claude is reading the outline for missing entries…': 'Claude cherche dans le plan les fiches qui manquent…',
+  'The bible already has everything the outline uses.': 'La bible a déjà tout ce que le plan utilise.',
+  'Writing {names}… ({i} of {n})': 'Écriture de {names}… ({i} sur {n})',
+  '{n} entries drafted from the outline, in Bible → To review.': '{n} fiches rédigées d’après le plan, dans Bible → À relire.',
 }
 
 const SHELL = {

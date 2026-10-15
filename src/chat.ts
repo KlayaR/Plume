@@ -242,6 +242,40 @@ export function deleteMessage(index: number) {
   commit(chatId, messages.filter((_, i) => i !== index))
 }
 
+/**
+ * The JSON an entry draft comes back in: blocks under the type's headings, and
+ * for a character the voice card and what they know. full = every field filled
+ * (writing entries from the outline); otherwise only what the conversation says.
+ */
+export function entryFormat(book: Book, full: boolean): string {
+  const fr = book.meta.language === 'fr'
+  return `JSON: [{"target": null, "type": "${TYPES.join('|')}", "name": "...", "aliases": ["..."], "short": "one or two lines", "full": {"Heading": "the text of that block"}, "facts": ["a fact; start it with [ch 3+] only if you know from which chapter it holds, otherwise no brackets"], "why": "${full ? (fr ? 'son rôle dans l’histoire' : 'its part in the story') : 'what in the conversation this comes from'}"}]
+${fr ? 'Pour "full", un bloc par sujet, en texte simple (pas de Markdown). Titres à utiliser selon le type, dans cet ordre, puis d’autres si besoin :' : 'For "full", one block per subject, in plain text (no Markdown). Headings to use for each type, in this order, then others if needed:'}
+${TYPES.map(ty => `${ty}: ${typeInfo(ty).headings[book.meta.language].join(', ')}`).join('\n')}
+${fr ? 'Pour un personnage, ajoute aussi' : 'For a character, also add'} "voice": {"register": "${fr ? 'registre' : 'formal, slangy…'}", "sentences": "${fr ? 'longueur des phrases' : 'sentence length'}", "tic": "${fr ? 'tic de langage' : 'verbal tic'}", "gesture": "${fr ? 'geste signature' : 'signature gesture'}", "never": "${fr ? 'ce qu’il ne dit jamais' : 'what they never say'}", "inner": "${fr ? 'voix intérieure' : 'inner voice'}", "lines": "${fr ? '3 à 5 répliques types, une par ligne' : '3 to 5 sample lines, one per line'}"}, "knows": "${fr ? 'ce qu’il sait' : 'what they know'}", "unaware": "${fr ? 'ce qu’il ignore' : 'what they don’t know'}" ${full
+    ? (fr ? '(remplis tout ; ne mets pas la voix dans "full").' : '(fill in everything; don’t put the voice in "full").')
+    : (fr ? '(laisse vide ce que la conversation ne dit pas ; ne mets pas la voix dans "full").' : '(leave empty what the conversation doesn’t say; don’t put the voice in "full").')}`
+}
+
+/** Claude's entry drafts as review proposals. */
+export function readDrafts(book: Book, list: Partial<Proposal>[]): Proposal[] {
+  return list.filter(p => p && p.name).map(p => ({
+    id: newId(),
+    target: p.target && book.entries.some(e => e.slug === p.target) ? p.target : null,
+    type: TYPES.includes(p.type as EntryType) ? p.type as EntryType : 'lore',
+    name: String(p.name), aliases: Array.isArray(p.aliases) ? p.aliases.map(String) : [],
+    short: String(p.short ?? ''), full: toBlocks(p.full as unknown as string | Record<string, unknown>), facts: Array.isArray(p.facts) ? p.facts.map(String) : [], why: String(p.why ?? ''),
+    ...(p.type === 'character' ? readCharacter(p) : {}),
+  }))
+}
+
+/** Puts drafts in the review list (Bible → To review) and says so. */
+export function addDrafts(proposals: Proposal[]) {
+  useChat.setState(s => ({ proposals: [...s.proposals, ...proposals] }))
+  saveReview()
+  useStore.getState().notify('ok', t('{n} drafts in the review list.', { n: proposals.length }), { label: t('Review'), run: () => useStore.setState({ view: 'bible', entrySlug: null, bibleTab: 'review' }) })
+}
+
 export async function turnIntoEntries() {
   const book = useStore.getState().book
   const { messages, interview } = useChat.getState()
@@ -259,25 +293,13 @@ export async function turnIntoEntries() {
       message: `<existing_entries>\n${existing || '-'}\n</existing_entries>\n\n<conversation>\n${transcript(messages.slice(-30))}\n</conversation>\n\n${fr
         ? `Extrais ce que l’auteur a décidé ou accepté, et les fiches que Claude a écrites à sa demande (pas les idées qu’il a rejetées). Reprends tout le détail de ces fiches, ne les résume pas. ${interview ? `Tout concerne la fiche « ${interview} » : utilise target = "${interview}".` : 'Pour un élément nouveau, target = null ; pour un ajout à une fiche existante, target = son identifiant, et seulement si l’ajout apporte un fait ou un détail qui n’y est pas déjà.'} S’il n’y a rien de tel, réponds []. Écris le texte des fiches en français.`
         : `Extract what the author decided or accepted, and the entries Claude wrote at their request (not ideas they rejected). Keep all the detail of those entries; don't summarise them. ${interview ? `Everything is about the "${interview}" entry: use target = "${interview}".` : 'For something new, target = null; for an addition to an existing entry, target = its id, and only if it adds a fact or detail the entry doesn\'t already have.'} If there is nothing of the kind, reply []. Write the entries in English.`}
-JSON: [{"target": null, "type": "${TYPES.join('|')}", "name": "...", "aliases": ["..."], "short": "one or two lines", "full": {"Heading": "the text of that block"}, "facts": ["a fact; start it with [ch 3+] only if you know from which chapter it holds, otherwise no brackets"], "why": "what in the conversation this comes from"}]
-${fr ? 'Pour "full", un bloc par sujet, en texte simple (pas de Markdown). Titres à utiliser selon le type, dans cet ordre, puis d’autres si besoin :' : 'For "full", one block per subject, in plain text (no Markdown). Headings to use for each type, in this order, then others if needed:'}
-${TYPES.map(ty => `${ty}: ${typeInfo(ty).headings[book.meta.language].join(', ')}`).join('\n')}
-${fr ? 'Pour un personnage, ajoute aussi' : 'For a character, also add'} "voice": {"register": "${fr ? 'registre' : 'formal, slangy…'}", "sentences": "${fr ? 'longueur des phrases' : 'sentence length'}", "tic": "${fr ? 'tic de langage' : 'verbal tic'}", "gesture": "${fr ? 'geste signature' : 'signature gesture'}", "never": "${fr ? 'ce qu’il ne dit jamais' : 'what they never say'}", "inner": "${fr ? 'voix intérieure' : 'inner voice'}", "lines": "${fr ? '3 à 5 répliques types, une par ligne' : '3 to 5 sample lines, one per line'}"}, "knows": "${fr ? 'ce qu’il sait' : 'what they know'}", "unaware": "${fr ? 'ce qu’il ignore' : 'what they don’t know'}" ${fr ? '(laisse vide ce que la conversation ne dit pas ; ne mets pas la voix dans "full").' : '(leave empty what the conversation doesn’t say; don’t put the voice in "full").'}`,
+${entryFormat(book, false)}`,
     })
     const list = parseJSON<Partial<Proposal>[]>(reply)
     if (!list || !Array.isArray(list)) throw new Error(t('Claude’s reply could not be read. Try again.'))
-    const proposals: Proposal[] = list.filter(p => p && p.name).map(p => ({
-      id: newId(),
-      target: p.target && book.entries.some(e => e.slug === p.target) ? p.target : null,
-      type: TYPES.includes(p.type as EntryType) ? p.type as EntryType : 'lore',
-      name: String(p.name), aliases: Array.isArray(p.aliases) ? p.aliases.map(String) : [],
-      short: String(p.short ?? ''), full: toBlocks(p.full as unknown as string | Record<string, unknown>), facts: Array.isArray(p.facts) ? p.facts.map(String) : [], why: String(p.why ?? ''),
-      ...(p.type === 'character' ? readCharacter(p) : {}),
-    }))
+    const proposals = readDrafts(book, list)
     if (!proposals.length) { useStore.getState().notify('warn', t('Nothing new to draft from this conversation. Ask Claude to write the entries out first.')); useChat.setState({ busy: null }); return }
-    useChat.setState(s => ({ proposals: [...s.proposals, ...proposals] }))
-    saveReview()
-    useStore.getState().notify('ok', t('{n} drafts in the review list.', { n: proposals.length }), { label: t('Review'), run: () => useStore.setState({ view: 'bible', entrySlug: null, bibleTab: 'review' }) })
+    addDrafts(proposals)
   } catch (e) { useStore.getState().notify('error', (e as Error).message) }
   useChat.setState({ busy: null })
 }
