@@ -52,6 +52,9 @@ export function ReviewList() {
             <textarea className="sk-input" rows={2} value={p.short} placeholder={t('Short version')} onChange={e => updateProposal(p.id, { short: e.target.value })} />
             <textarea className="sk-input" rows={5} value={p.full} placeholder={t('Full version')} onChange={e => updateProposal(p.id, { full: e.target.value })} />
             <textarea className="sk-input" rows={2} value={p.facts.join('\n')} placeholder={t('Facts')} onChange={e => updateProposal(p.id, { facts: e.target.value.split('\n').filter(s => s.trim()) })} />
+            {p.voice && <span className="sk-hint"><b>{t('Voice')}</b> · {Object.values(p.voice).filter(Boolean).join(' · ')}</span>}
+            {p.knows && <span className="sk-hint"><b>{t('Knows')}</b> · {p.knows}</span>}
+            {p.unaware && <span className="sk-hint"><b>{t('Doesn’t know')}</b> · {p.unaware}</span>}
           </div>
         )
       })}

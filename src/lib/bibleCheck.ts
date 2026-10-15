@@ -7,10 +7,11 @@ import { buildMatcher, findMentions } from './context'
 import { estimateTokens, foldText } from './text'
 import { unknownNames } from '../editor/marks'
 import type { Book, Entry } from './types'
+import { blockCount, toBlocks } from './blocks'
 
 export type IssueKind =
   | 'no-short' | 'short-long' | 'full-huge' | 'no-voice' | 'no-knows' | 'always-heavy'
-  | 'duplicate' | 'common-alias' | 'unlinked' | 'unknown-name' | 'unused'
+  | 'duplicate' | 'common-alias' | 'unlinked' | 'unknown-name' | 'unused' | 'one-block'
 
 export interface Issue {
   kind: IssueKind
@@ -58,6 +59,8 @@ export function checkBible(book: Book): { issues: Issue[]; stats: BibleStats } {
     if (!e.short.trim() && e.full.trim() && used) issues.push({ kind: 'no-short', severity: 'warn', slug: e.slug })
     if (estimateTokens(e.short) > SHORT_MAX) issues.push({ kind: 'short-long', severity: 'warn', slug: e.slug, n: estimateTokens(e.short) })
     if (estimateTokens(e.full) > FULL_MAX) issues.push({ kind: 'full-huge', severity: 'warn', slug: e.slug, n: estimateTokens(e.full) })
+    // A list of "**Label:** text" in one block: as blocks, each can be sent or not, and the short version can borrow one.
+    if (blockCount(toBlocks(e.full)) > blockCount(e.full) + 1) issues.push({ kind: 'one-block', severity: 'warn', slug: e.slug, n: blockCount(toBlocks(e.full)) })
     if (e.type === 'character') {
       const hasVoice = !!e.voice && Object.values(e.voice).some(v => v.trim())
       if (!hasVoice && count(e) >= 3) issues.push({ kind: 'no-voice', severity: 'warn', slug: e.slug, n: count(e) })

@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { useStore } from '../store'
 import { typeInfo, type EntryType } from '../lib/types'
 import { checkBible, type Issue } from '../lib/bibleCheck'
+import { toBlocks } from '../lib/blocks'
 import { writeShort } from '../bibleAI'
 import { numLocale, useT } from '../i18n'
 
@@ -32,6 +33,7 @@ export default function AICheck() {
       case 'unlinked': return t('{a} and {b} appear together in {n} scenes but aren’t linked: linking sends one along with the other.', { a: name(i.slug), b: name(i.other), n: i.n ?? 0 })
       case 'unknown-name': return t('“{name}” appears {n} times in the text but isn’t in the bible.', { name: i.name ?? '', n: i.n ?? 0 })
       case 'unused': return t('{name} is never mentioned in the text.', { name: name(i.slug) })
+      case 'one-block': return t('{name}: the full version is one block holding {n} topics. As blocks, each can be sent or kept back on its own.', { name: name(i.slug), n: i.n ?? 0 })
     }
   }
 
@@ -57,12 +59,15 @@ export default function AICheck() {
     st.updateEntry(a, { links: [...(st.book!.entries.find(e => e.slug === a)?.links ?? []), b] })
   }
 
+  const split = (slug: string) => { const e = useStore.getState().book!.entries.find(x => x.slug === slug); if (e) useStore.getState().updateEntry(slug, { full: toBlocks(e.full) }) }
+  const oneBlock = issues.filter(i => i.kind === 'one-block')
   const warns = issues.filter(i => i.severity === 'warn')
   const infos = issues.filter(i => i.severity === 'info')
   const row = (i: Issue, k: number) => (
     <div key={`${i.kind}${k}`} className={`pl-aicheck-row ${i.severity === 'warn' ? 'pl-warn' : ''}`}>
       <span className="pl-grow">{text(i)}</span>
       {(i.kind === 'no-short' || i.kind === 'short-long') && i.slug && <button type="button" className="sk-btn sk-btn-sm" disabled={!!busy} onClick={() => rewrite(i.slug!)}>{busy === i.slug ? t('Thinking…') : t('Write it')}</button>}
+      {i.kind === 'one-block' && i.slug && <button type="button" className="sk-btn sk-btn-sm" onClick={() => split(i.slug!)}>{t('Split into blocks')}</button>}
       {i.kind === 'unlinked' && <button type="button" className="sk-btn sk-btn-sm" onClick={() => { link(i.slug, i.other); link(i.other, i.slug) }}>{t('Link them')}</button>}
       {i.kind === 'unknown-name' && i.name && <button type="button" className="sk-btn sk-btn-sm" onClick={() => { const e = useStore.getState().addEntry(type, i.name!); open(e.slug) }}>{t('Add to the bible')}</button>}
       {i.slug && i.kind !== 'unknown-name' && <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm" onClick={() => open(i.slug)}>{t('Open')}</button>}
@@ -86,6 +91,7 @@ export default function AICheck() {
         <select className="sk-select sk-btn-sm" value={type} onChange={e => setType(e.target.value as EntryType)} aria-label={t('Type for new entries')}>
           {NAMED.map(ty => <option key={ty} value={ty}>{t(typeInfo(ty).label)}</option>)}
         </select>
+        {oneBlock.length > 1 && <button type="button" className="sk-btn sk-btn-sm" onClick={() => oneBlock.forEach(i => split(i.slug!))}>{t('Split the {n} entries into blocks', { n: oneBlock.length })}</button>}
         {missing.length > 1 && <button type="button" className="sk-btn sk-btn-primary sk-btn-sm" disabled={!!busy} onClick={fillAll} title={t('One quick Haiku call per entry')}>{t('Write the {n} missing short versions', { n: missing.length })}</button>}
       </div>
       {warns.map(row)}

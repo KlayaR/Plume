@@ -1023,6 +1023,9 @@ const FR: Record<string, string> = {
   'Sample of my voice': 'Échantillon de ma voix',
   'AI tells': 'Tics d’IA',
   'Nothing new to draft from this conversation. Ask Claude to write the entries out first.': 'Rien de nouveau à mettre en fiches dans cette conversation. Demandez d’abord à Claude d’écrire les fiches.',
+  '{name}: the full version is one block holding {n} topics. As blocks, each can be sent or kept back on its own.': '{name} : la version complète est un seul bloc qui contient {n} sujets. En blocs, chacun peut être envoyé ou retenu séparément.',
+  'Split into blocks': 'Découper en blocs',
+  'Split the {n} entries into blocks': 'Découper les {n} fiches en blocs',
 }
 
 const SHELL = {

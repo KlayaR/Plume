@@ -6,7 +6,7 @@ import { pasteText, wrapMarks } from './paste'
 import { matterPages, FRONT, BACK } from './matter'
 import { checkBible } from './bibleCheck'
 import { jumpItems, rankJump } from './quickjump'
-import { aiBlocks, joinBlocks, parseBlocks } from './blocks'
+import { aiBlocks, joinBlocks, parseBlocks, toBlocks } from './blocks'
 import { tidy } from '../contextMenu'
 import { sessionOf, worthShowing } from './session'
 import { addDirection, ordered, togglePin, type Direction } from './directions'
@@ -843,5 +843,20 @@ describe('quality per token', () => {
     const body = chatBody('anthropic/claude-sonnet-5.5', 'Rules', 'Hi')
     expect(body.messages[0].content).toEqual([{ type: 'text', text: 'Rules', cache_control: { type: 'ephemeral' } }])
     expect(chatBody('openai/gpt-x', 'Rules', 'Hi').messages[0].content).toBe('Rules')
+  })
+})
+
+describe('drafts in blocks', () => {
+  it('cuts Claude\'s labelled lists and objects into blocks, and leaves blocks alone', () => {
+    const list = 'Jasper\'s mate.\n\n- **Appearance:** Tiny, black hair.\n- **Gift:** Visions\nthat shift.'
+    expect(toBlocks(list)).toBe('Jasper\'s mate.\n\n### Appearance\nTiny, black hair.\n\n### Gift\nVisions\nthat shift.')
+    expect(toBlocks({ Role: 'Seer', Secrets: '', History: 'Asylum.' })).toBe('### Role\nSeer\n\n### History\nAsylum.')
+    const done = '### Role\nSeer\n\n### History\nAsylum.'
+    expect(toBlocks(done)).toBe(done)
+    expect(toBlocks('**Never** say never.')).toBe('**Never** say never.')
+  })
+  it('flags an entry whose full version is a list in one block', () => {
+    const e = entry({ slug: 'alice', name: 'Alice', full: '- **Appearance:** Tiny.\n- **Gift:** Visions.\n- **Personality:** Warm.' })
+    expect(checkBible(bookOf([], [e])).issues.some(i => i.kind === 'one-block' && i.slug === 'alice')).toBe(true)
   })
 })

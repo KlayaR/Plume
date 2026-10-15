@@ -7,6 +7,12 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.22.2
+**Fix: drafted entries land in the right fields**
+- Entries drafted with **Turn into entries** now come in **blocks** (Appearance, Personality, History… the headings of their type), not one long text. For characters, the **voice card** and **Knows / Doesn't know** are filled too, and shown in To review before you accept.
+- The chat writes characters' voice (register, tics, sample lines…) when it creates them.
+- **Bible → AI check** spots entries whose full version is a "**Label:** text" list in one block, with **Split into blocks** (one entry or all at once) to repair those already accepted.
+
 ## 0.22.1
 **Fix: the bible chat makes entries again**
 - Asked to create entries, the brainstorming chat answered that it couldn't. It now writes them out in full (and draws on the published canon when your book continues or is set in an existing work), then points you to **Turn into entries**.

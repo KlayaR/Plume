@@ -24,6 +24,31 @@ const render = (b: Block) => b.title ? `### ${b.title}${b.text ? `\n${b.text}` :
 
 export const joinBlocks = (blocks: Block[]): string => blocks.map(render).join('\n\n')
 
+const BOLD_LABEL = /^\s*(?:[-*]\s+)?(?:\*\*|__)([^*_\n:]{2,40}):(?:\*\*|__)\s*(.*)$|^\s*(?:[-*]\s+)?(?:\*\*|__)([^*_\n:]{2,40})(?:\*\*|__)\s*:\s*(.*)$/
+
+/**
+ * A full version cut into blocks: Claude's "- **Appearance:** …" lists and
+ * "## Heading" lines become "### Heading" blocks, and a {Heading: text} object
+ * one block per key. Text that is already in blocks comes back the same.
+ */
+export function toBlocks(full: string | Record<string, unknown> | null | undefined): string {
+  if (full && typeof full === 'object') {
+    return Object.entries(full).filter(([, v]) => String(v ?? '').trim()).map(([h, v]) => `### ${h.trim()}\n${String(v).trim()}`).join('\n\n')
+  }
+  let out = ''
+  for (const line of String(full ?? '').split('\n')) {
+    const bold = line.match(BOLD_LABEL)
+    const head = line.match(/^#{1,3}\s+(.+)$/)
+    if (bold) out += `\n\n### ${(bold[1] ?? bold[3]).trim()}${(bold[2] ?? bold[4]).trim() ? `\n${(bold[2] ?? bold[4]).trim()}` : ''}`
+    else if (head) out += `\n\n### ${head[1].trim()}`
+    else out += `\n${line}`
+  }
+  return out.replace(/\n{3,}/g, '\n\n').trim()
+}
+
+/** How many blocks a full version has. */
+export const blockCount = (full: string) => (full.match(/^###\s/gm) ?? []).length
+
 export interface HasBlocks { full: string; sends?: Record<string, Send> }
 
 export const sendOf = (e: HasBlocks, title: string): Send => e.sends?.[title] ?? 'full'
