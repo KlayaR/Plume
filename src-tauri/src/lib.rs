@@ -95,6 +95,10 @@ fn list_files(root: String, rel: String) -> Result<Vec<String>, String> {
 #[tauri::command]
 fn move_to_trash(root: String, rel: String) -> Result<(), String> {
     let from = safe_join(&root, &rel)?;
+    // Already gone (never saved, or removed outside Plume): nothing to keep, nothing to block.
+    if !from.exists() {
+        return Ok(());
+    }
     let stamp = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
     let name = rel.replace('/', "__");
     let to = safe_join(&root, &format!(".plume/trash/{stamp}-{name}"))?;

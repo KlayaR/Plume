@@ -612,7 +612,7 @@ export const useStore = create<State>((set, get) => {
       if (!found) return
       const b = get().book!
       cancelLater(found.scene.path)
-      await trash(b.root, found.scene.path)
+      try { await trash(b.root, found.scene.path) } catch (err) { get().notify('error', t('Could not move the scene to the trash: {e}', { e: String(err) })); return }
       const chapters = b.chapters.map(c => ({ ...c, scenes: c.scenes.filter(s => s.id !== id) }))
       set({ book: { ...b, chapters }, sceneId: get().sceneId === id ? chapters.flatMap(c => c.scenes)[0]?.id ?? null : get().sceneId })
       await saveMeta(get().book!)
@@ -655,8 +655,13 @@ export const useStore = create<State>((set, get) => {
       const e = b.entries.find(x => x.slug === slug)
       if (!e) return
       cancelLater(e.path)
-      await trash(e.shared ? seriesRootOf(b.root, b.meta.series) ?? b.root : b.root, e.path)
-      set({ book: { ...b, entries: b.entries.filter(x => x.slug !== slug) }, entrySlug: null })
+      try {
+        await trash(e.shared ? seriesRootOf(b.root, b.meta.series) ?? b.root : b.root, e.path)
+      } catch (err) {
+        get().notify('error', t('Could not move the entry to the trash: {e}', { e: String(err) }))
+        return
+      }
+      set({ book: { ...get().book!, entries: get().book!.entries.filter(x => x.slug !== slug) }, entrySlug: null })
       get().notify('ok', t('Entry moved to the trash.'), { label: t('Undo'), run: async () => {
         const bk = get().book!
         if (bk.entries.some(x => x.slug === slug)) return

@@ -1050,6 +1050,8 @@ const FR: Record<string, string> = {
   'Writes the scene (or the rest of it) from its plan card note': 'Écrit la scène (ou sa suite) d’après la note de sa carte du plan',
   'Goal': 'But',
   'Ending': 'Fin',
+  'Could not move the entry to the trash: {e}': 'Impossible de mettre la fiche à la corbeille : {e}',
+  'Could not move the scene to the trash: {e}': 'Impossible de mettre la scène à la corbeille : {e}',
 }
 
 const SHELL = {

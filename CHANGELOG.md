@@ -7,6 +7,11 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.25.1
+**Fix: removing entries and scenes**
+- Removing an entry or a scene whose file was missing on disk (never saved, or moved outside Plume) silently did nothing. It now removes it from the book; there's simply nothing to put in the trash.
+- When moving to the trash really fails, Plume now says why instead of doing nothing.
+
 ## 0.25.0
 **How a chapter is built**
 - **Writing from the plan follows the craft of a chapter:** a concrete, immediate goal for the point-of-view character (not the big quest); every attempt complicates things ("yes, but…" / "no, and what's more…"); the world shown through action, never in a pause to explain it. The scene that opens a chapter is anchored at once in the now (no waking up, no recap); the one that ends it lands on a turn or a question for the next chapter, not a mid-action cliffhanger or a summary. Scenes in between end where they turn.
