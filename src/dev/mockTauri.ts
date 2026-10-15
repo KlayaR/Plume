@@ -2,25 +2,14 @@
 // side so the UI can be tried in a plain browser. An in-memory sample book and
 // a fake `claude` that streams a canned reply. Never part of a release build.
 
+import { exampleFiles } from '../lib/example'
+
 const ROOT = 'C:\\Livres\\Le Bal des Cendres'
 const files = new Map<string, string>()
 const put = (rel: string, text: string) => files.set(rel, text)
 
-put('plume.json', JSON.stringify({
-  format: 1, title: 'Le Bal des Cendres', author: 'Test', language: 'fr',
-  order: [{ folder: 'ch-le-bal', scenes: ['sc-l-arrivee.md', 'sc-la-danse.md'] }, { folder: 'ch-la-fuite', scenes: ['sc-la-nuit.md'] }],
-}))
-put('bible/style.md', '---\ntype: style\nname: Guide de style\ninclude: always\n---\n\n## Short\n\n## Full\n### Temps\nPassé simple, troisième personne.\n\n### Voix\nPhrases sobres, images sensorielles, peu d’adverbes.\n\n## Facts\n')
-put('bible/characters/elise.md', '---\ntype: character\nname: Élise Varenne\naliases: [Élise, Lise, la Duchesse]\ninclude: auto\nlinks: [aube]\n---\n\n## Short\nJeune duchesse fière et imprudente, qui cache sa peur du feu.\n\n## Full\n### Apparence\nCheveux noirs, robe grise, une cicatrice au poignet.\n\n### Secrets\nElle a allumé l’incendie de Valombre, enfant.\n\n## Facts\n- [ch 1–2] Porte l’épée Aube sous sa cape.\n- [ch 5+] Aveugle de l’œil gauche.\n')
-put('bible/objects/aube.md', '---\ntype: object\nname: Aube\ninclude: auto\n---\n\n## Short\nÉpée d’argent qui chauffe à l’approche de la magie.\n\n## Full\n\n## Facts\n')
-put('bible/characters/marc.md', '---\ntype: character\nname: Marc Delorme\naliases: [Marc, le capitaine]\ninclude: auto\n---\n\n## Short\nCapitaine de la garde, loyal, amoureux d’Élise sans le dire.\n\n## Full\n\n## Facts\n')
-put('bible/places/valombre.md', '---\ntype: place\nname: Valombre\ninclude: auto\n---\n\n## Short\nVille brûlée il y a quinze ans, encore en ruines au nord.\n\n## Full\n\n## Facts\n')
-put('bible/lore/magie-du-feu.md', '---\ntype: lore\nname: La magie du feu\ninclude: always\n---\n\n## Short\nToute flamme magique coûte un souvenir à celui qui l’allume.\n\n## Full\n\n## Facts\n')
-put('manuscript/ch-le-bal/chapter.md', '---\nid: c1\ntitle: Le bal\n---\n')
-put('manuscript/ch-le-bal/sc-l-arrivee.md', '---\nid: s1\ntitle: L’arrivée\npov: elise\nstatus: revised\n---\n\nLa calèche s’arrêta devant les grilles. Élise resta un instant immobile, la main posée sur la garde d’Aube, cachée sous sa cape.\n\nMarc ouvrit la portière.\u00A0— Duchesse, on vous attend.\n\nElle descendit sans répondre. Au loin, vers le nord, les ruines de Valombre découpaient le ciel comme des dents noires.')
-put('manuscript/ch-le-bal/sc-la-danse.md', '---\nid: s2\ntitle: La danse\npov: elise\nstatus: draft\n---\n\nLa musique commença quand Lise entra dans la salle.')
-put('manuscript/ch-la-fuite/chapter.md', '---\nid: c2\ntitle: La fuite\n---\n')
-put('manuscript/ch-la-fuite/sc-la-nuit.md', '---\nid: s3\ntitle: La nuit\nstatus: draft\n---\n\n')
+// The sample book is the example book offered in New book.
+for (const [rel, text] of Object.entries(exampleFiles('fr'))) put(rel, text)
 
 const REPLY = 'Les lustres tremblaient au rythme des violons. Elle sentit la chaleur d\'Aube contre sa hanche, comme un avertissement... "Pas ce soir", murmura-t-elle. Marc, de l\'autre côté de la salle, ne la quittait pas des yeux !'
 

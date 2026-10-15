@@ -5,7 +5,7 @@ import { DEFAULT_PREFS, useStore, type FontId, type PageSize, type Paper } from 
 import { FONTS, PAGE_SIZES } from '../lib/fonts'
 import { useT } from '../i18n'
 
-const PAPERS: [Paper, string][] = [['auto', 'Auto'], ['ivory', 'Ivory'], ['sepia', 'Sepia'], ['night', 'Night']]
+const PAPERS: [Paper, string][] = [['auto', 'Auto'], ['ivory', 'Ivory'], ['sepia', 'Sepia'], ['candle', 'Candle'], ['night', 'Night']]
 
 function Slider({ value, min, max, step, onChange }: { value: number; min: number; max: number; step: number; onChange: (v: number) => void }) {
   return (

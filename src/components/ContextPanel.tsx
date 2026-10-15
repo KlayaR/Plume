@@ -1,7 +1,7 @@
 // Right panel: the three AI actions, the size meter, and the bible entries
 // that will be sent, each droppable or switchable between short and full.
 import { useMemo, useState } from 'react'
-import { Check, CircleCheck, CircleX, Copy, Eye, GraduationCap, RotateCcw, Send, Square, Wand2, X } from 'lucide-react'
+import { Check, CircleCheck, CircleX, Copy, Eye, GraduationCap, Pin, RotateCcw, Send, Square, Wand2, X } from 'lucide-react'
 import { Dialog } from '../studio-kit/shell.js'
 import { useStore } from '../store'
 import type { ActionId, Effort, Model } from '../lib/types'
@@ -13,6 +13,8 @@ import { allPrompts } from '../lib/voice'
 import { BackendModelSelect } from './ModelPresets'
 import { isCheap } from '../ai'
 import { numLocale, useT } from '../i18n'
+import { addDirection, ordered, togglePin, type Direction } from '../lib/directions'
+import { showMenu } from '../contextMenu'
 
 /** Reasons come from the context engine in English; shown in the interface language. */
 function reasonText(r: string, t: ReturnType<typeof useT>) {
@@ -59,6 +61,16 @@ export default function ContextPanel() {
   const t = useT()
   const prompts = allPrompts()
   const voice = book.meta.voice
+  const directions = useStore(s => s.prefs.directions)
+  // Runs the action and keeps what you asked as a chip for next time.
+  const go = () => {
+    if (text[action].trim()) useStore.getState().setPrefs({ directions: addDirection(directions, text[action]) })
+    runAction(action, instruction, overrides)
+  }
+  const dirMenu = (e: React.MouseEvent, d: Direction) => showMenu(e, [
+    { label: t(d.pinned ? 'Unpin' : 'Pin'), onClick: () => useStore.getState().setPrefs({ directions: togglePin(directions, d.text) }) },
+    { label: t('Remove'), onClick: () => useStore.getState().setPrefs({ directions: directions.filter(x => x.text !== d.text) }) },
+  ])
   const setActionPrompt = (id: string) => useStore.getState().updateMeta({ voice: { ...voice, actionPrompts: { ...voice.actionPrompts, [action]: id || undefined } } })
 
   const ctx = useMemo(
@@ -85,13 +97,24 @@ export default function ContextPanel() {
         ))}
       </div>
 
+      {directions.length > 0 && (
+        <div className="pl-chips pl-directions" aria-label={t('Saved directions')}>
+          {ordered(directions).map(d => (
+            <button key={d.text} type="button" className={`pl-chip ${d.pinned ? 'pl-chip-on' : ''}`} title={d.text + ' · ' + t('Right-click to pin or remove')}
+              onClick={() => setText(x => ({ ...x, [action]: d.text }))} onContextMenu={e => dirMenu(e, d)}>
+              {d.pinned && <Pin size={11} />}{d.text.length > 38 ? d.text.slice(0, 36) + '…' : d.text}
+            </button>
+          ))}
+        </div>
+      )}
+
       <textarea
         className="sk-input pl-instruction"
         rows={action === 'beats' ? 6 : 3}
         placeholder={action === 'beats' && sceneNote ? sceneNote : t(LABELS[action].hint) + ' · ' + t('@Name sends the full entry')}
         value={text[action]}
         onChange={e => setText(t => ({ ...t, [action]: e.target.value }))}
-        onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); runAction(action, instruction, overrides) } }}
+        onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); go() } }}
       />
 
       <div className="pl-row">
@@ -113,7 +136,7 @@ export default function ContextPanel() {
         {running ? (
           <button type="button" className="sk-btn sk-btn-danger" onClick={stopAction}><Square size={14} /> {t('Stop')}</button>
         ) : (
-          <button type="button" className="sk-btn sk-btn-primary" disabled={hasProposal} onClick={() => runAction(action, instruction, overrides)}>
+          <button type="button" className="sk-btn sk-btn-primary" disabled={hasProposal} onClick={go}>
             <Send size={14} /> {t(LABELS[action].button)}
           </button>
         )}

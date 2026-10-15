@@ -172,6 +172,7 @@ html[data-theme="light"] .pl-sheet { box-shadow: 0 2px 18px rgba(0, 0, 0, 0.12);
 .pl-manuscript, .pl-paper-auto, .pl-paper-white { --pl-paper: #fbfaf7; --pl-ink: #1c1c1c; --pl-ink-soft: #6f6a5e; --pl-rule: rgba(0, 0, 0, 0.1); --pl-edge: transparent; }
 .pl-paper-ivory { --pl-paper: #f6f0e1; --pl-ink: #2b2620; --pl-ink-soft: #85796a; --pl-rule: rgba(80, 60, 30, 0.16); --pl-edge: transparent; }
 .pl-paper-sepia { --pl-paper: #efe1c3; --pl-ink: #4a3a28; --pl-ink-soft: #8c7656; --pl-rule: rgba(90, 60, 20, 0.2); --pl-edge: transparent; }
+.pl-paper-candle { --pl-paper: #2b2219; --pl-ink: #e8d9bc; --pl-ink-soft: #a8957a; --pl-rule: rgba(255, 220, 160, 0.1); --pl-edge: #3a2e22; }
 .pl-paper-night { --pl-paper: #232221; --pl-ink: #d6d2c6; --pl-ink-soft: #918b7d; --pl-rule: rgba(255, 255, 255, 0.08); --pl-edge: #2e2d2b; }
 
 /* The whole chapter on the sheet: scenes one after the other. */
@@ -820,3 +821,20 @@ body.pl-typing .pl-toolbar { opacity: 0.08; }
 .pl-showall:hover { color: var(--text); }
 .pl-allreports { display: flex; align-items: center; gap: 4px; margin-top: 6px; font-size: var(--fs-sm); color: var(--text-dim); }
 .pl-voiceadv, .pl-advconn { margin-top: 8px; }
+.pl-today { display: flex; align-items: center; gap: 16px; max-width: 46rem; margin: 0 0 28px; padding: 14px 18px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-1, transparent); }
+.pl-today-text { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.pl-today-text b { font-size: 1.05rem; }
+/* Distraction-free (F11): only the page. */
+body.pl-zen .pl-toolbar, body.pl-zen .pl-pane, body.pl-zen .pl-bar, body.pl-zen .pl-tipcard { display: none; }
+body.pl-zen .pl-manuscript .pl-scroll { inset: 0; }
+.pl-zenbar { position: fixed; top: 8px; right: 12px; z-index: 90; display: flex; gap: 12px; opacity: 0.25; transition: opacity 0.2s; font-size: var(--fs-xs); }
+.pl-zenbar:hover { opacity: 1; }
+.pl-zenbar [aria-pressed="true"] { color: var(--accent); }
+.cm-editor .cm-activeLine { background: transparent; }
+body.pl-dimpara .cm-line { opacity: 0.32; transition: opacity 0.25s; }
+body.pl-dimpara .cm-focused .cm-line.cm-activeLine { opacity: 1; }
+/* Just accepted from Claude: a soft highlight that fades. */
+.cm-accepted { background: color-mix(in srgb, var(--accent) 22%, transparent); animation: pl-accepted 4s ease-out forwards; border-radius: 2px; }
+@keyframes pl-accepted { 0%, 40% { background: color-mix(in srgb, var(--accent) 22%, transparent); } 100% { background: transparent; } }
+@media (prefers-reduced-motion: reduce) { .cm-accepted { animation: none; } }
+.pl-grow-right { margin-right: auto; }

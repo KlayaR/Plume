@@ -1,11 +1,11 @@
-// Ctrl+K: type a few letters, open any scene or bible entry. The items and
-// their ranking, without any screen.
+// Ctrl+K: type a few letters, open any scene or bible entry, or run an action.
+// The items and their ranking, without any screen.
 import { chapterLabels } from './chapters'
 import { foldText } from './text'
 import { typeInfo, type Book } from './types'
 
 export interface JumpItem {
-  kind: 'scene' | 'entry'
+  kind: 'scene' | 'entry' | 'action'
   id: string
   /** What is shown. */
   label: string
@@ -30,6 +30,10 @@ export function jumpItems(book: Book): JumpItem[] {
   }
   return items
 }
+
+/** App actions as items; an action's hint is its shortcut. */
+export const actionItems = (list: { id: string; label: string; keys?: string }[]): JumpItem[] =>
+  list.map(a => ({ kind: 'action', id: a.id, label: a.label, hint: a.keys ?? '', haystack: foldText(`${a.label} ${a.id}`), names: foldText(a.label) }))
 
 /** Items containing every word of the query, best first: names that start with it, then names that contain it, then the rest. */
 export function rankJump(items: JumpItem[], query: string, limit = 30): JumpItem[] {

@@ -4,7 +4,7 @@ import { useEffect } from 'react'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { CircleAlert, CircleCheck, TriangleAlert, X } from 'lucide-react'
 import { setShellStrings } from './studio-kit/shell.js'
-import { useStore } from './store'
+import { DEFAULT_PREFS, keepSession, useStore } from './store'
 import { useAppVersion } from './lib/useAppVersion'
 import { applyPrefs } from './lib/fonts'
 import { setClaudeTranslator } from './lib/claude'
@@ -26,6 +26,9 @@ import ContextMenuHost from './components/ContextMenuHost'
 import HelpDialog from './components/HelpDialog'
 import SnapshotsDialog from './components/SnapshotsDialog'
 
+/** Scroll positions per space and scrolling element, for this run of the app. */
+const scrolls = new Map<string, number>()
+
 export default function App() {
   const book = useStore(s => s.book)
   const view = useStore(s => s.view)
@@ -33,6 +36,7 @@ export default function App() {
   const dialog = useStore(s => s.dialog)
   const printing = useStore(s => s.printing)
   const prefs = useStore(s => s.prefs)
+  const t = useT()
   const version = useAppVersion()
   const lang = book?.meta.language ?? 'fr'
   // The shell's own labels and the CLI's messages follow the interface language.
@@ -75,6 +79,13 @@ export default function App() {
         if (e.key === 'ArrowLeft') useStore.getState().goBack(); else useStore.getState().goForward()
       }
       if (e.key === 'F1') { e.preventDefault(); useStore.setState({ dialog: 'help' }) }
+      // Text size of the manuscript: Ctrl + / Ctrl - / Ctrl 0.
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && ['=', '+', '-', '0'].includes(e.key) && useStore.getState().book) {
+        e.preventDefault()
+        const size = useStore.getState().prefs.size
+        useStore.getState().setPrefs({ size: e.key === '0' ? DEFAULT_PREFS.size : Math.max(14, Math.min(26, size + (e.key === '-' ? -1 : 1))) })
+      }
+      if (e.key === 'F11' && useStore.getState().book) { e.preventDefault(); const p = useStore.getState().prefs; useStore.getState().setPrefs({ zen: !p.zen }) }
       if ((e.ctrlKey || e.metaKey) && e.key === '/' && useStore.getState().book) { e.preventDefault(); useStore.setState({ dialog: 'shortcuts' }) }
       // Ctrl+Z in the Plan, outside any text field: take back the last card or chapter move.
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z' && useStore.getState().view === 'plan' && !(e.target as HTMLElement | null)?.closest?.('input, textarea, select, [contenteditable]')) {
@@ -92,11 +103,36 @@ export default function App() {
   useEffect(() => {
     let unlisten = () => {}
     try {
-      getCurrentWindow().onCloseRequested(async () => { await useStore.getState().flush() })
+      getCurrentWindow().onCloseRequested(async () => { keepSession(); await useStore.getState().flush() })
         .then(u => { unlisten = u }).catch(() => {})
     } catch { /* browser preview */ }
     return () => unlisten()
   }, [])
+
+  // Each space (Plan, Bible…) comes back scrolled where you left it.
+  useEffect(() => {
+    const onScroll = (e: Event) => {
+      const el = e.target as HTMLElement
+      if (el instanceof HTMLElement && el.closest('.pl-stage') && el.className) scrolls.set(`${useStore.getState().view}|${el.className}`, el.scrollTop)
+    }
+    window.addEventListener('scroll', onScroll, true)
+    return () => window.removeEventListener('scroll', onScroll, true)
+  }, [])
+  useEffect(() => {
+    if (view === 'manuscript') return
+    const id = requestAnimationFrame(() => document.querySelectorAll<HTMLElement>('.pl-stage *').forEach(el => {
+      const top = el.className && typeof el.className === 'string' ? scrolls.get(`${view}|${el.className}`) : undefined
+      if (top) el.scrollTop = top
+    }))
+    return () => cancelAnimationFrame(id)
+  }, [view, book?.root])
+
+  // Distraction-free: only the page, in the Manuscript.
+  const zen = !!book && view === 'manuscript' && prefs.zen
+  useEffect(() => {
+    document.body.classList.toggle('pl-zen', zen)
+    document.body.classList.toggle('pl-dimpara', zen && prefs.dimPara)
+  }, [zen, prefs.dimPara])
 
   return (
     <div className="pl-room">
@@ -104,6 +140,12 @@ export default function App() {
         {!book ? <StartScreen version={version} /> : prefs.dual && prefs.dual !== view ? <DualView view={view} other={prefs.dual} /> : <ViewBody view={view} />}
       </main>
       {book && <BottomBar />}
+      {zen && (
+        <div className="pl-zenbar" onMouseDown={e => e.preventDefault()}>
+          <button type="button" className="pl-quiet" aria-pressed={prefs.dimPara} onClick={() => useStore.getState().setPrefs({ dimPara: !prefs.dimPara })}>{t('Dim the rest')}</button>
+          <button type="button" className="pl-quiet" onClick={() => useStore.getState().setPrefs({ zen: false })}>{t('Leave (F11)')}</button>
+        </div>
+      )}
       {showSettings && <SettingsView version={version} />}
       {book && dialog === 'export' && <ExportDialog onClose={() => useStore.setState({ dialog: null })} />}
       {book && dialog === 'find' && <FindDialog onClose={() => useStore.setState({ dialog: null })} />}

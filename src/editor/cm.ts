@@ -1,5 +1,6 @@
 // CodeMirror pieces for the scene editor: bible names underlined (with a hover
 // card), typography as you type, and AI proposals shown inline until accepted.
+import { isolateHistory } from '@codemirror/commands'
 import { Annotation, EditorState, Prec, RangeSetBuilder, StateEffect, StateField, type Extension } from '@codemirror/state'
 import { Decoration, EditorView, ViewPlugin, WidgetType, hoverTooltip, keymap, type DecorationSet, type ViewUpdate } from '@codemirror/view'
 import type { Entry, Lang } from '../lib/types'
@@ -213,6 +214,18 @@ const lockWhileProposing = EditorState.transactionFilter.of(tr => {
   return tr
 })
 
+/** Text just accepted from Claude, softly highlighted for a few seconds. */
+const setAccepted = StateEffect.define<{ from: number; to: number } | null>()
+const acceptedField = StateField.define<DecorationSet>({
+  create: () => Decoration.none,
+  update(deco, tr) {
+    deco = deco.map(tr.changes)
+    for (const e of tr.effects) if (e.is(setAccepted)) deco = e.value && e.value.to > e.value.from ? Decoration.set([Decoration.mark({ class: 'cm-accepted' }).range(e.value.from, e.value.to)]) : Decoration.none
+    return deco
+  },
+  provide: f => EditorView.decorations.from(f),
+})
+
 export function acceptProposal(view: EditorView, lang: Lang): boolean {
   const p = view.state.field(proposalField)
   if (!p || p.streaming || !p.text.trim()) return false
@@ -225,13 +238,15 @@ export function acceptProposal(view: EditorView, lang: Lang): boolean {
   }
   view.dispatch({
     changes: { from: p.from, to: p.to, insert: text },
-    effects: setProposal.of(null),
-    annotations: accepting.of(true),
+    effects: [setProposal.of(null), setAccepted.of({ from: p.from, to: p.from + text.length })],
+    // Its own undo step: one Ctrl+Z takes the whole proposal back.
+    annotations: [accepting.of(true), isolateHistory.of('full')],
     selection: { anchor: p.from + text.length },
     scrollIntoView: true,
     userEvent: 'input.ai',
   })
   view.focus()
+  setTimeout(() => { if (view.dom.isConnected) view.dispatch({ effects: setAccepted.of(null) }) }, 4000)
   return true
 }
 
@@ -249,6 +264,7 @@ export function sceneExtensions(lang: Lang, keys: { accept: () => boolean; escap
     mentionsPlugin,
     nameCard,
     proposalField,
+    acceptedField,
     lockWhileProposing,
     typography(lang),
     keymap.of([

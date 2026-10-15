@@ -14,6 +14,7 @@ import { referenceTargets, useRefs } from '../lib/references'
 import { speakerStats } from '../lib/speakers'
 import { numLocale, useT } from '../i18n'
 import { ShowEverything } from './BibleView'
+import { costText } from '../cost'
 
 const n = (x: number, d = 0) => x.toLocaleString(numLocale(), { maximumFractionDigits: d, minimumFractionDigits: d })
 
@@ -228,7 +229,7 @@ function AIChecks({ sceneId, chapterId, chapterText }: { sceneId: string; chapte
   const [persona, setPersona] = useState('editor')
   const [custom, setCustom] = useState('')
   const t = useT()
-  const cost = (x: number) => t('about {n} tokens', { n: n(x) })
+  const cost = (x: number) => costText(x)
   const jump = (quote: string) => {
     const v = getEditorView()
     const at = v ? v.state.doc.toString().indexOf(quote) : -1

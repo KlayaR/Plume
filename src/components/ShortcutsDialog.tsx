@@ -19,7 +19,9 @@ const GROUPS: [string, [string, string][]][] = [
     ['Ctrl+Shift+Y', 'Synonyms for the selected word'],
   ]],
   ['Book', [
-    ['Ctrl+K', 'Go to any scene or bible entry'],
+    ['Ctrl+K', 'Go to any scene or bible entry, or run an action'],
+    ['F11', 'Distraction-free: only the page'],
+    ['Ctrl + / Ctrl − / Ctrl 0', 'Larger / smaller / default text'],
     ['Ctrl+PageUp / PageDown', 'Previous / next scene'],
     ['Alt+Left / Right', 'Back / forward through what you opened'],
     ['Ctrl+Shift+F', 'Find and replace in the whole book'],

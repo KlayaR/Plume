@@ -2,7 +2,7 @@
 // the "active" one: the AI panel, Accept/Discard and the counters follow it.
 import { useEffect, useRef } from 'react'
 import { Compartment, EditorState, StateField } from '@codemirror/state'
-import { EditorView, keymap, placeholder, showTooltip, type Tooltip } from '@codemirror/view'
+import { EditorView, highlightActiveLine, keymap, placeholder, showTooltip, type Tooltip } from '@codemirror/view'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { findScene, useStore } from '../store'
 import { locateQuote } from '../lib/text'
@@ -176,6 +176,8 @@ function makeState(s: Scene, lang: Lang) {
       marksExt,
       inlineExt,
       selectionBarField,
+      // Marks the paragraph being written; only visible when "dim the rest" is on (styles.css).
+      highlightActiveLine(),
       trackedChangesExt,
       unknown,
       placeholderExt((view, from, to, note) => fillPlaceholder(view, from, to, note)),
@@ -212,6 +214,7 @@ function makeState(s: Scene, lang: Lang) {
           clearTimeout(tick)
           tick = setTimeout(() => useStore.getState().bumpEditor(), 250)
         }
+        if (u.selectionSet) useStore.getState().noteSpot(s.id, u.state.selection.main.head)
         if (u.transactions.some(tr => tr.effects.length)) syncProposalState()
         // Typewriter scrolling: typing keeps the line in the middle of the screen.
         if ((u.docChanged || u.selectionSet) && u.view.hasFocus && useStore.getState().prefs.typewriter && !u.transactions.some(tr => tr.scrollIntoView)) {

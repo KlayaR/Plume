@@ -7,6 +7,18 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.21.0
+**Daily comfort** (UX plan, phase 5, the last one)
+- **Open where you stopped:** a book reopens on the scene and at the cursor where you left it. The start screen has a **Today** strip with your last book, its progress, your last session, and **Continue writing**.
+- **After a session**, one line: "640 words in 52 minutes".
+- **Ctrl+K runs actions too:** Export, New chapter, Snapshots, Find and replace, Review mode, Settings → Voice, Help, and more.
+- **Distraction-free mode (F11):** only the page. "Dim the rest" greys every paragraph but the one you are writing.
+- **Saved directions:** what you ask the Assistant comes back as chips above its box; right-click a chip to pin or remove it.
+- **After Accept**, the new text glows softly for a few seconds, and one Ctrl+Z takes the whole proposal back.
+- **Cost as a share of your 5-hour window** (experimental): Review's Claude checks say "about 3 % of your 5-hour window" once Plume has seen enough of your calls to estimate it; until then they show tokens.
+- **Comfort:** Ctrl + / Ctrl − / Ctrl 0 change the text size; a new **Candle** paper (dark and warm); in a narrow window the panes slide over the page instead of squeezing it; the Plan and the Bible come back scrolled where you left them.
+- **Example book:** New book → "Open an example book" makes a short book (bible, plan, three scenes) in French or English to try Plume on.
+
 ## 0.20.0
 **Voice, Review, Settings and a simpler start** (UX plan, phase 4)
 - **Settings → Voice in three steps:** 1. Your voice (tense, adult fiction, fantasy defaults, then your voice materials), 2. Your rules, 3. Your prompt. Scene rules, the style profile and reference books are under Advanced.

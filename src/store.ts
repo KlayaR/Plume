@@ -8,6 +8,10 @@ import { chapterLabels } from './lib/chapters'
 import { Conflict, loadBook, makeChapter, makeEntry, makeScene, reread, saveChapter, saveEntry, saveMeta, saveScene, seriesRootOf, trash } from './lib/project'
 import { parseEntry, parseScene } from './lib/bible'
 import { t } from './i18n'
+import { bookCounts } from './lib/stats'
+import { sessionOf, worthShowing, type Session } from './lib/session'
+import type { Direction } from './lib/directions'
+import { EMPTY_RATE, learnCall, learnWindow, weigh, type Rate } from './lib/windowCost'
 
 const undos: (() => void)[] = []
 
@@ -23,6 +27,28 @@ const SETTINGS_KEY = 'plume.settings'
 const RECENT_KEY = 'plume.recent'
 const DAY_KEY = 'plume.usage-day'
 const PREFS_KEY = 'plume.prefs'
+const SPOTS_KEY = 'plume.spots'
+const RATE_KEY = 'plume.rate'
+/** How much of the 5-hour window a token costs, learned from your calls (experimental). */
+export const loadRate = (): Rate => load<Rate>(RATE_KEY, EMPTY_RATE)
+
+/** Where you stopped in each book (scene and cursor), and your last session there. */
+export interface Spot { sceneId: string; pos: number; session?: Session }
+export const loadSpots = (): Record<string, Spot> => { try { return JSON.parse(localStorage.getItem(SPOTS_KEY) ?? '{}') ?? {} } catch { return {} } }
+let session: { root: string; words: number; start: number } | null = null
+let spotTimer: ReturnType<typeof setTimeout> | undefined
+function saveSpot(root: string, patch: Partial<Spot>) {
+  const all = loadSpots()
+  all[root] = { ...(all[root] ?? { sceneId: '', pos: 0 }), ...patch }
+  try { localStorage.setItem(SPOTS_KEY, JSON.stringify(all)) } catch { /* private mode */ }
+}
+/** Called when the window closes: the session so far is kept for the start screen. */
+export function keepSession() {
+  const b = useStore.getState().book
+  const done = b ? sessionNow(b) : undefined
+  if (b && done) saveSpot(b.root, { session: done })
+}
+const sessionNow = (book: Book) => session?.root === book.root ? sessionOf(session.words, bookCounts(book.chapters).words, session.start, Date.now()) : undefined
 
 interface Settings { claudePath: string }
 
@@ -104,6 +130,11 @@ export interface Prefs {
   famClosed: string[]
   /** Beginner mode: the less used tabs and reports stay hidden until "Show everything". */
   simple: boolean
+  /** Distraction-free: only the page (F11); dimPara greys every paragraph but the current one. */
+  zen: boolean
+  /** Instructions given to the Assistant, offered again as chips (pinned ones stay). */
+  directions: Direction[]
+  dimPara: boolean
   advOpen: string[]
   /** A second view shown beside the main one (Bible, Plan or Manuscript), and its width in px. */
   dual: View | null
@@ -112,7 +143,7 @@ export interface Prefs {
   v?: number
 }
 
-export type Paper = 'auto' | 'ivory' | 'white' | 'sepia' | 'night'
+export type Paper = 'auto' | 'ivory' | 'white' | 'sepia' | 'candle' | 'night'
 export type Scope = 'scene' | 'chapter' | 'book'
 
 export const DEFAULT_PREFS: Prefs = {
@@ -155,6 +186,9 @@ export const DEFAULT_PREFS: Prefs = {
   selBar: true,
   famClosed: [],
   simple: true,
+  zen: false,
+  directions: [],
+  dimPara: false,
   advOpen: [],
   dual: null,
   dualW: 520,
@@ -227,6 +261,8 @@ interface State {
   open: (root: string) => Promise<void>
   setBook: (b: Book) => void
   close: () => void
+  /** The cursor moved in a scene: remembered (after a pause) to reopen the book there. */
+  noteSpot: (sceneId: string, pos: number) => void
   setView: (v: View) => void
   selectScene: (id: string) => void
   selectEntry: (slug: string | null) => void
@@ -377,7 +413,12 @@ export const useStore = create<State>((set, get) => {
     setBook: book => {
       const recent = [book.root, ...get().recent.filter(r => r !== book.root)].slice(0, 8)
       store(RECENT_KEY, recent)
-      set({ book, recent, view: 'manuscript', sceneId: book.chapters[0]?.scenes[0]?.id ?? null, entrySlug: null, freshSceneId: null, bibleTab: 'entry', planTab: 'board' })
+      // Open where you stopped: the scene and the cursor of last time.
+      const spot = loadSpots()[book.root]
+      const back = spot && book.chapters.some(c => c.scenes.some(x => x.id === spot.sceneId)) ? spot : null
+      const sceneId = back?.sceneId ?? book.chapters[0]?.scenes[0]?.id ?? null
+      session = { root: book.root, words: bookCounts(book.chapters).words, start: Date.now() }
+      set({ book, recent, view: 'manuscript', sceneId, jump: back ? { sceneId: back.sceneId, from: back.pos, to: back.pos } : null, entrySlug: null, freshSceneId: null, bibleTab: 'entry', planTab: 'board' })
       import('./chat').then(m => m.loadChat(book))
       import('./writing').then(m => m.loadNotes(book))
       import('./agents').then(m => m.loadAgents())
@@ -388,7 +429,15 @@ export const useStore = create<State>((set, get) => {
       const b = get().book
       get().flush()
       if (b) import('./library').then(m => { m.noteOnShelf(b); m.releaseLock(b) })
+      const done = b ? sessionNow(b) : undefined
+      if (b && done) saveSpot(b.root, { session: done })
+      session = null
       set({ book: null, sceneId: null, entrySlug: null })
+      if (worthShowing(done)) get().notify('ok', t('{w} words in {m} minutes.', { w: done.words.toLocaleString(), m: done.minutes }))
+    },
+    noteSpot: (sceneId, pos) => {
+      clearTimeout(spotTimer)
+      spotTimer = setTimeout(() => { const b = get().book; if (b) saveSpot(b.root, { sceneId, pos, session: sessionNow(b) }) }, 800)
     },
     setView: view => set({ view }),
     selectScene: id => { if (id !== get().sceneId || get().view !== 'manuscript') rememberPlace(here()); set({ sceneId: id, ...(get().prefs.dual === 'manuscript' ? {} : { view: 'manuscript' as View }), freshSceneId: get().freshSceneId === id ? id : null }) },
@@ -647,6 +696,7 @@ export const useStore = create<State>((set, get) => {
       const d = get().day.day === today() ? get().day : emptyDay()
       const day = { ...d, calls: d.calls + 1, input: d.input + u.input + u.cacheWrite, cached: d.cached + u.cacheRead, output: d.output + u.output }
       store(DAY_KEY, day)
+      store(RATE_KEY, learnCall(loadRate(), weigh(u)))
       set({ usage: u, day })
     },
     notify: (kind, msg, action) => set({ toast: { kind, msg, action } }),
@@ -659,4 +709,7 @@ export const useStore = create<State>((set, get) => {
   }
 })
 
-setLimitsListener(limits => useStore.setState({ limits }))
+setLimitsListener(limits => {
+  if (limits.fiveHour) store(RATE_KEY, learnWindow(loadRate(), limits.fiveHour))
+  useStore.setState({ limits })
+})

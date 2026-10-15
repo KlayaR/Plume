@@ -8,6 +8,10 @@ import { checkBible } from './bibleCheck'
 import { jumpItems, rankJump } from './quickjump'
 import { aiBlocks, joinBlocks, parseBlocks } from './blocks'
 import { tidy } from '../contextMenu'
+import { sessionOf, worthShowing } from './session'
+import { addDirection, ordered, togglePin, type Direction } from './directions'
+import { EMPTY_RATE, learnCall, learnWindow, shareOf } from './windowCost'
+import { exampleFiles } from './example'
 import { HELP, searchHelp } from './help'
 import { chatBody, DEFAULT_PRESETS, httpMessage, isLimitError, presetFor, readEvent, readModels, searchModels, splitSSE } from './presets'
 import { attention } from './attention'
@@ -765,5 +769,42 @@ describe('review top problems', () => {
     const r = (id: string, rate: number, target: number, status: 'good' | 'ok' | 'bad') => ({ def: { id } as never, findings: [], count: 1, rate, target, fromRef: false, status })
     const top = topProblems([r('a', 1, 2, 'good'), r('b', 3, 2, 'ok'), r('c', 10, 2, 'bad'), r('d', 5, 2, 'bad'), r('e', 2.5, 2, 'ok')])
     expect(top.map(x => x.def.id)).toEqual(['c', 'd', 'b'])
+  })
+})
+
+describe('daily comfort', () => {
+  it('measures a session and ignores a glance', () => {
+    const s = sessionOf(1000, 1640, 0, 52 * 60000)
+    expect(s.words).toBe(640)
+    expect(s.minutes).toBe(52)
+    expect(worthShowing(s)).toBe(true)
+    expect(worthShowing(sessionOf(1000, 1000, 0, 60000))).toBe(false)
+  })
+  it('keeps pinned directions and the last few others', () => {
+    let list: Direction[] = []
+    for (let i = 0; i < 9; i++) list = addDirection(list, `dir ${i}`)
+    expect(list).toHaveLength(6)
+    expect(list[0].text).toBe('dir 8')
+    list = togglePin(list, 'dir 3')
+    for (let i = 10; i < 20; i++) list = addDirection(list, `dir ${i}`)
+    expect(list.some(d => d.text === 'dir 3' && d.pinned)).toBe(true)
+    expect(ordered(list)[0].text).toBe('dir 3')
+    expect(addDirection(list, '  dir   19 ')[0].text).toBe('dir 19')
+  })
+  it('learns what a token costs of the window, and stays quiet until sure', () => {
+    let r = EMPTY_RATE
+    r = learnWindow(r, { used: 0.1, resetsAt: 1 })
+    expect(shareOf(r, 1000)).toBeNull()
+    for (let i = 0; i < 3; i++) { r = learnCall(r, 10000); r = learnWindow(r, { used: 0.1 + 0.02 * (i + 1), resetsAt: 1 }) }
+    expect(shareOf(r, 10000)).toBeCloseTo(0.02)
+    expect(learnWindow(r, { used: 0, resetsAt: 2 }).pending).toBe(0)
+  })
+  it('ships an example book whose files parse', () => {
+    for (const lang of ['fr', 'en'] as const) {
+      const files = exampleFiles(lang)
+      const order = JSON.parse(files['plume.json']).order as { folder: string; scenes: string[] }[]
+      for (const c of order) for (const sc of c.scenes) expect(files[`manuscript/${c.folder}/${sc}`], sc).toBeDefined()
+      for (const [rel, text] of Object.entries(files)) if (rel.startsWith('bible/')) expect(parseEntry(rel, text).name, rel).toBeTruthy()
+    }
   })
 })

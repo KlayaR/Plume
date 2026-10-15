@@ -22,6 +22,17 @@ import { useT } from '../i18n'
 import { showMenu } from '../contextMenu'
 import { chapterMenu, newThingsMenu, sceneMenu } from '../menus'
 
+/** True while the window leaves too little room for the page between pinned panes. */
+function useNarrow(panes: number) {
+  const [width, setWidth] = useState(() => window.innerWidth)
+  useEffect(() => {
+    const on = () => setWidth(window.innerWidth)
+    window.addEventListener('resize', on)
+    return () => window.removeEventListener('resize', on)
+  }, [])
+  return width - panes < 520
+}
+
 export default function WritingView() {
   const book = useStore(s => s.book)!
   const sceneId = useStore(s => s.sceneId)
@@ -35,15 +46,18 @@ export default function WritingView() {
   const [hoverR, setHoverR] = useState(false)
   const t = useT()
   const found = findScene(book, sceneId)
-  const openL = prefs.pinLeft || hoverL
+  // In a narrow window the panes slide over the page instead of squeezing it.
+  const narrow = useNarrow((prefs.pinLeft ? prefs.paneL : 0) + (prefs.pinRight ? prefs.paneR : 0))
+  const pinL = prefs.pinLeft && !narrow, pinR = prefs.pinRight && !narrow
+  const openL = pinL || hoverL
   // The AI panel also comes out on its own while a reply streams or waits for a decision.
-  const openR = prefs.pinRight || hoverR || hasProposal || !!running || chatting
+  const openR = pinR || hoverR || hasProposal || !!running || chatting
   const setPrefs = useStore.getState().setPrefs
   // A new view only when what's shown changes: in the whole book, moving between chapters keeps it.
   const viewKey = !found ? '' : prefs.scope === 'book' ? 'book' : prefs.scope === 'scene' ? found.scene.id : found.chapter.id
 
   return (
-    <div className="pl-manuscript" data-pin-left={prefs.pinLeft} data-pin-right={prefs.pinRight}>
+    <div className="pl-manuscript" data-pin-left={pinL} data-pin-right={pinR}>
       <ManuscriptToolbar />
       {hasProposal && (
         <div className="pl-propbar" role="group" aria-label={t('Proposal')}>
@@ -57,8 +71,8 @@ export default function WritingView() {
         {found ? (prefs.page ? <BookView key={viewKey} /> : <Sheet key={viewKey} />) :<div className="sk-empty" style={{ paddingTop: 80 }}>{t('Pick or add a scene on the left.')}</div>}
       </div>
 
-      {!prefs.pinLeft && <div className="pl-hotzone pl-hotzone-left" onMouseEnter={() => setHoverL(true)} />}
-      <aside className="pl-pane pl-pane-left" data-open={openL} data-pinned={prefs.pinLeft} onMouseLeave={() => setHoverL(false)} aria-label={t('Chapters and scenes')}>
+      {!pinL && <div className="pl-hotzone pl-hotzone-left" onMouseEnter={() => setHoverL(true)} />}
+      <aside className="pl-pane pl-pane-left" data-open={openL} data-pinned={pinL} onMouseLeave={() => setHoverL(false)} aria-label={t('Chapters and scenes')}>
         <ResizeHandle side="left" />
         <div className="pl-pane-head pl-pane-book">
           <button type="button" className="pl-quiet pl-backshelf" onClick={() => useStore.getState().close()} title={t('Switch book')}>
@@ -73,8 +87,8 @@ export default function WritingView() {
 
       {found && (
         <>
-          {!prefs.pinRight && <div className="pl-hotzone pl-hotzone-right" onMouseEnter={() => setHoverR(true)} />}
-          <aside className="pl-pane pl-pane-right" data-open={openR} data-pinned={prefs.pinRight} onMouseLeave={() => setHoverR(false)}>
+          {!pinR && <div className="pl-hotzone pl-hotzone-right" onMouseEnter={() => setHoverR(true)} />}
+          <aside className="pl-pane pl-pane-right" data-open={openR} data-pinned={pinR} onMouseLeave={() => setHoverR(false)}>
             <ResizeHandle side="right" />
             <PaneHead title={prefs.mode === 'review' ? t('Review') : (
               <span className="pl-switch pl-panetabs" role="group" aria-label="Claude">

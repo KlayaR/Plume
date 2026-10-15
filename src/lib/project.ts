@@ -6,6 +6,7 @@ import { DEFAULT_AI, DEFAULT_RULES, DEFAULT_VOICE, typeInfo } from './types'
 import { FANTASY_LISTS, FANTASY_STYLE, fantasyVoice } from './defaults'
 import { joinFrontmatter, parseEntry, parseScene, serializeEntry, serializeScene, splitFrontmatter } from './bible'
 import { newId, slugify } from './text'
+import { exampleFiles } from './example'
 
 const rawRead = (root: string, rel: string) => invoke<string>('read_text', { root, rel })
 const write = (root: string, rel: string, content: string) => invoke<void>('write_text', { root, rel, content })
@@ -186,6 +187,13 @@ export function makeScene(chapter: Chapter, title: string): Scene {
 export const STOCK_STYLE: Record<Lang, string> = {
   fr: '### Voix\n\n### Temps\nPassé simple.\n\n### Point de vue\n\n### Mots à éviter\n',
   en: '### Voice\n\n### Tense\nPast tense.\n\n### POV rules\n\n### Words to avoid\n',
+}
+
+/** Writes the example book into an empty folder and opens it. */
+export async function createExample(root: string, language: Lang): Promise<Book> {
+  if (await isBook(root)) throw new Error('This folder already holds a book.')
+  for (const [rel, text] of Object.entries(exampleFiles(language))) await write(root, rel, text)
+  return loadBook(root)
 }
 
 export async function createBook(root: string, title: string, author: string, language: Lang): Promise<Book> {

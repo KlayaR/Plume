@@ -4,10 +4,12 @@
 import { useEffect, useState } from 'react'
 import { open } from '@tauri-apps/plugin-dialog'
 import { documentDir, join } from '@tauri-apps/api/path'
-import { BookPlus, FileUp, Settings } from 'lucide-react'
+import { BookPlus, FileUp, PenLine, Settings } from 'lucide-react'
 import { Dialog } from '../studio-kit/shell.js'
-import { useStore } from '../store'
-import { createBook, isBook } from '../lib/project'
+import { loadSpots, useStore } from '../store'
+import { worthShowing } from '../lib/session'
+import { createBook, createExample, isBook } from '../lib/project'
+import { exampleTitle } from '../lib/example'
 import type { Lang } from '../lib/types'
 import { importManuscript, loadShelf, type ShelfBook } from '../library'
 import { numLocale, useT } from '../i18n'
@@ -89,6 +91,8 @@ export default function StartScreen({ version }: { version: string }) {
         </div>
       </header>
 
+      {books[0] && <Today book={books.find(b => b.root === recent[0]) ?? books[0]} onOpen={openRoot} />}
+
       {series.map(s => (
         <section key={s} className="pl-shelf">
           <div className="pl-label" style={{ marginBottom: 14 }}>{t('Series')} · {s}</div>
@@ -108,6 +112,26 @@ export default function StartScreen({ version }: { version: string }) {
       {creating && <NewBook onClose={() => setCreating(false)} />}
       {importing && <ImportBook onClose={() => setImporting(false)} />}
     </div>
+  )
+}
+
+/** The book you were last in, how your last session went, and a button to carry on. */
+function Today({ book, onOpen }: { book: ShelfBook; onOpen: (root: string) => void }) {
+  const t = useT()
+  const last = loadSpots()[book.root]?.session
+  const nf = (x: number) => x.toLocaleString(numLocale())
+  return (
+    <section className="pl-today">
+      <div className="pl-today-text">
+        <span className="pl-label">{t('Today')}</span>
+        <b>{book.title}</b>
+        <span className="sk-hint">
+          {book.goal > 0 ? t('{n} of {goal} words', { n: nf(book.words), goal: nf(book.goal) }) : t('{n} words', { n: nf(book.words) })}
+          {worthShowing(last) && <> · {t('Last time: {w} words in {m} minutes', { w: nf(last.words), m: last.minutes })}</>}
+        </span>
+      </div>
+      <button type="button" className="sk-btn sk-btn-primary" onClick={() => onOpen(book.root)} autoFocus><PenLine size={14} /> {t('Continue writing')}</button>
+    </section>
   )
 }
 
@@ -149,9 +173,17 @@ function NewBook({ onClose }: { onClose: () => void }) {
     setBusy(false)
   }
 
+  const example = async () => {
+    if (!parent) return
+    setBusy(true)
+    try { useStore.getState().setBook(await createExample(await join(parent, exampleTitle(lang)), lang)) } catch (e) { notify('error', t('Could not create the book: {e}', { e: String(e) })) }
+    setBusy(false)
+  }
+
   return (
     <Dialog title={t('New book')} icon={BookPlus} onClose={onClose}
       footer={<>
+        <button type="button" className="sk-btn sk-btn-ghost pl-grow-right" disabled={busy || !parent} onClick={example} title={t('A short book with a bible, a plan and three scenes, to try Plume before starting your own. It goes in the folder below, in the language chosen above.')}>{t('Open an example book')}</button>
         <button type="button" className="sk-btn sk-btn-ghost" onClick={onClose}>{t('Cancel')}</button>
         <button type="button" className="sk-btn sk-btn-primary" disabled={!title.trim() || busy} onClick={create}>{t('Create book')}</button>
       </>}>
