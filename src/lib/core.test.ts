@@ -951,6 +951,8 @@ describe('outline', () => {
   })
   it('says one scene is the norm by default, and sends the detailed card when writing', () => {
     expect(outlineRules('en', { kind: 'one' })).toContain('Most chapters are a single scene')
+    expect(outlineRules('en', { kind: 'one' })).toContain('A change of place is not enough')
+    expect(outlineRules('en', { kind: 'one' })).not.toContain('one place,')
     const s = { ...scene('a', '', { note: 'N' }), beats: ['He waits.'], reveals: 'The letter.' }
     const book = bookOf([s], [])
     book.chapters[0] = { ...book.chapters[0], goal: 'Get in.', ending: 'The door was open all along.' }

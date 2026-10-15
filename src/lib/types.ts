@@ -270,6 +270,8 @@ export interface Foundation {
   /** Comparable books, and what to take from each (planning only, never the prose). */
   comps: string
 }
+/** Scenes per chapter: mostly one, as each chapter needs, or within a range. */
+export type SceneMode = { kind: 'one' } | { kind: 'auto' } | { kind: 'range'; min: number; max: number }
 export const FOUNDATION_KEYS: (keyof Foundation)[] = ['logline', 'shape', 'tone', 'comps', 'want', 'need', 'antagonist', 'stakes', 'theme', 'magic']
 export interface LooseCard { id: string; title: string; note: string }
 
@@ -309,6 +311,8 @@ export interface BookMeta {
   ltIgnored?: string[]
   summary?: string
   foundation?: Partial<Foundation>
+  /** Scenes per chapter, as chosen in Outline from a premise; every outline request follows it. */
+  sceneMode?: SceneMode
 }
 
 export interface Book {

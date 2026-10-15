@@ -7,6 +7,12 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.31.1
+**"Mostly one scene" now means it**
+- Claude split chapters into two scenes whenever the character changed place. A scene is now one unbroken stretch of time with one point of view: the character can walk from the ballroom to the garden inside it.
+- With **Mostly one**, at least three chapters in four get exactly one scene; a second scene only for a jump in time or a change of point of view, never more than two.
+- Your choice of scenes per chapter is kept with the book: Detail, Regenerate, scene cards and the outline check follow it too (they always assumed "mostly one" before).
+
 ## 0.31.0
 **A richer story foundation: tone, shape, comparable books, a real magic system**
 - Three new foundation fields (Plan → Outline → The story): **Subgenre and shape** (grimdark, epic…; one point of view or several; kind of ending; standalone or series), **Tone and limits** (mature, morally gray, dark humour; how much violence, sex and swearing) and **Comparable books** ("characters like Abercrombie, magic like Sanderson").

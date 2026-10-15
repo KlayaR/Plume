@@ -21,7 +21,7 @@ export default function OutlineDialog({ onClose }: { onClose: () => void }) {
   const [premise, setPremise] = useState(book.meta.summary ?? '')
   const [chapters, setChapters] = useState(12)
   // Scenes per chapter: mostly one (the default), as each chapter needs, or within a range you set.
-  const [mode, setMode] = useState<SceneMode>({ kind: 'one' })
+  const [mode, setMode] = useState<SceneMode>(book.meta.sceneMode ?? { kind: 'one' })
   const [words, setWords] = useState(book.meta.goal.book || 90000)
   const [busy, setBusy] = useState(false)
   const [outline, setOutline] = useState<Outline[]>([])
@@ -35,6 +35,7 @@ export default function OutlineDialog({ onClose }: { onClose: () => void }) {
     try {
       // The premise is kept with the book; the foundation and turning points come with it.
       if (premise.trim() !== (book.meta.summary ?? '').trim()) useStore.getState().updateMeta({ summary: premise.trim() })
+      useStore.getState().updateMeta({ sceneMode: mode })
       const fresh = useStore.getState().book!
       const points = fresh.meta.structure.beats.length > 0
       const reply = await ask({

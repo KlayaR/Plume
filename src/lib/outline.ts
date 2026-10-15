@@ -2,21 +2,21 @@
 // book's outline as compact text, and Claude's JSON turned into a proposal
 // that the Outline tab shows before anything changes. No screen, no calls.
 import { foldText } from './text'
-import { FOUNDATION_KEYS, type Book, type Chapter, type EntryType, type Foundation, type Lang, type Scene } from './types'
+import { FOUNDATION_KEYS, type Book, type Chapter, type EntryType, type Foundation, type Lang, type Scene, type SceneMode } from './types'
 
 /** How many scenes a chapter gets: mostly one (the default), as each chapter needs, or within a range. */
-export type SceneMode = { kind: 'one' } | { kind: 'auto' } | { kind: 'range'; min: number; max: number }
+export type { SceneMode } from './types'
 
 /** What a scene and a chapter are, said once to Claude. */
 export function outlineRules(lang: Lang, mode: SceneMode): string {
   const fr = lang === 'fr'
   const count = mode.kind === 'one'
-    ? (fr ? '- La plupart des chapitres sont une seule scène. N’ajoute une scène que si le lieu, le moment ou le point de vue change vraiment.' : '- Most chapters are a single scene. Add a scene only when the place, the time or the point of view really changes.')
+    ? (fr ? '- La plupart des chapitres sont une seule scène : au moins trois chapitres sur quatre en ont exactement une. Une deuxième scène seulement pour un saut dans le temps ou un changement de point de vue ; jamais plus de deux. Un changement de lieu ne suffit pas.' : '- Most chapters are a single scene: at least three chapters in four have exactly one. A second scene only for a jump in time or a change of point of view; never more than two. A change of place is not enough.')
     : mode.kind === 'range'
       ? (fr ? `- De ${mode.min} à ${mode.max} scènes par chapitre, selon ce que chacun demande.` : `- ${mode.min} to ${mode.max} scenes per chapter, as each one needs.`)
-      : (fr ? '- Le nombre de scènes suit ce dont le chapitre a besoin : une seule scène est normal et souvent le mieux ; plusieurs seulement quand le lieu, le moment ou le point de vue change.' : '- The number of scenes follows what the chapter needs: a single scene is normal and often best; several only when the place, the time or the point of view changes.')
+      : (fr ? '- Le nombre de scènes suit ce dont le chapitre a besoin : une seule scène est normal et souvent le mieux ; plusieurs seulement pour un saut dans le temps ou un changement de point de vue.' : '- The number of scenes follows what the chapter needs: a single scene is normal and often best; several only for a jump in time or a change of point of view.')
   return fr ? `Ce qu’est une scène :
-- Un seul moment continu : un lieu, un temps sans coupure, un personnage de point de vue.
+- Un seul moment continu : un temps sans coupure, un personnage de point de vue. Le personnage peut changer de lieu pendant la scène (de la salle de bal au jardin) sans qu’elle s’arrête.
 - Quelque chose change : quelqu’un veut quelque chose, rencontre un obstacle, et la scène finit sur une situation différente. Si rien ne change, ce n’est pas une scène.
 ${count}
 - Un moment de réaction plus calme (émotion, dilemme, décision) peut clore un chapitre ou ouvrir le suivant ; il n’a pas besoin de sa propre scène.
@@ -25,7 +25,7 @@ Ce qu’est un chapitre (environ 3 000 à 4 500 mots) :
 - Un but concret et immédiat pour le personnage du point de vue, pas la grande quête.
 - Il monte en tension : chaque tentative donne « oui, mais… » ou « non, et en plus… ».
 - Il finit sur un tournant : un problème pire, une révélation qui change le plan, une image ou une prise de conscience pour un chapitre calme, ou une question pour le suivant.` : `What a scene is:
-- One continuous moment: one place, unbroken time, one point-of-view character.
+- One continuous moment: unbroken time, one point-of-view character. The character can move from place to place within it (from the ballroom to the garden) without it ending.
 - Something changes: someone wants something, meets an obstacle, and the scene ends with the situation different. If nothing changes, it is not a scene.
 ${count}
 - A quieter reaction moment (feeling, dilemma, decision) can close a chapter or open the next; it doesn’t need its own scene.
