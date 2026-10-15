@@ -55,9 +55,14 @@ export function readEvent(event: string): Delta {
 }
 
 /** The request body for a streamed chat completion. */
+// Claude models on OpenRouter cache only what is marked: the system prompt (the
+// stable part of every request) gets the mark. Other providers cache on their own.
 export const chatBody = (model: string, system: string, message: string) => ({
   model, stream: true,
-  messages: [...(system.trim() ? [{ role: 'system', content: system }] : []), { role: 'user', content: message }],
+  messages: [
+    ...(system.trim() ? [{ role: 'system', content: model.startsWith('anthropic/') ? [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }] : system }] : []),
+    { role: 'user', content: message },
+  ],
 })
 
 /** A human message for an OpenRouter HTTP failure. */

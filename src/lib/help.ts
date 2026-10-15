@@ -57,7 +57,8 @@ export const HELP: HelpTopic[] = [
       en: [
         '**Continue** (Ctrl+Enter) writes on from the cursor. **Rewrite** works on the text you selected. **Beats to prose** turns a list of beats into a passage. Quick actions: **Expand, Shorten, Show it, Sharpen dialogue** (on a selection) and **Describe** (at the cursor).',
         'The answer is a **proposal** in the text: the old text is struck through, the new text highlighted. The text is locked until you decide: **Tab** accepts, **Esc** discards. The Assistant tab also has Accept, **Retry**, Discard, and **x3** (three versions side by side).',
-        'Below the proposal, a **scorecard** checks it against your own rules (passive voice, adverbs, banned words…). "Retry fixing" asks again with the failed rules as direction.',
+        'Below the proposal, a **scorecard** checks it against your own rules (passive voice, adverbs, banned words, **AI tells** like "not X, but Y" used as a habit…). "Retry fixing" sends back only the proposal and what failed, and changes only those sentences.',
+        'Claude matches **your voice** from samples of your own prose: your excerpts (Settings → Voice) and passages of your revised or done scenes that Claude wrote little of. Right-click a scene → **Sample of my voice** to include or leave out one.',
         'The box above the buttons is your **direction** ("tighter, more tension"). Write **@Name** to send that bible entry in full.',
         'Right-click selected text for the same actions without leaving the page. Choose the model (a **preset**) next to the buttons; presets are made in Settings → Claude.',
         'Claude only sees what it needs: your rules, the bible entries named in the passage, and the text around it. The size meter shows it before you send.',
@@ -65,7 +66,8 @@ export const HELP: HelpTopic[] = [
       fr: [
         '**Continuer** (Ctrl+Entrée) écrit la suite à partir du curseur. **Réécrire** travaille sur le texte sélectionné. **Étapes en prose** transforme une liste d\'étapes en passage. Actions rapides : **Développer, Raccourcir, Le montrer, Aiguiser les dialogues** (sur une sélection) et **Décrire** (au curseur).',
         'La réponse est une **proposition** dans le texte : l\'ancien texte est barré, le nouveau surligné. Le texte est verrouillé tant que vous n\'avez pas décidé : **Tab** accepte, **Échap** rejette. L\'onglet Assistant a aussi Accepter, **Réessayer**, Rejeter, et **×3** (trois versions côte à côte).',
-        'Sous la proposition, une **fiche de contrôle** la vérifie selon vos propres règles (voix passive, adverbes, mots interdits…). « Réessayer en corrigeant » redemande avec les règles échouées comme consigne.',
+        'Sous la proposition, une **fiche de contrôle** la vérifie selon vos propres règles (voix passive, adverbes, mots interdits, **tics d’IA** comme « ce n’est pas X, c’est Y » à répétition…). « Réessayer en corrigeant » ne renvoie que la proposition et ce qui a échoué, et ne change que ces phrases.',
+        'Claude reprend **votre voix** à partir d’échantillons de votre propre prose : vos extraits (Réglages → Voix) et des passages de vos scènes relues ou terminées que Claude a peu écrites. Clic droit sur une scène → **Échantillon de ma voix** pour en inclure ou en écarter une.',
         'La zone au-dessus des boutons est votre **consigne** (« plus serré, plus de tension »). Écrivez **@Nom** pour envoyer cette fiche de la bible en entier.',
         'Clic droit sur un texte sélectionné pour les mêmes actions sans quitter la page. Choisissez le modèle (un **préréglage**) à côté des boutons ; les préréglages se créent dans Paramètres → Claude.',
         'Claude ne voit que ce qu\'il lui faut : vos règles, les fiches de la bible citées dans le passage, et le texte autour. Le compteur de taille le montre avant l\'envoi.',

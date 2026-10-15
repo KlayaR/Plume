@@ -7,6 +7,14 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.22.0
+**Better prose for fewer tokens**
+- **The prompt cache now works across requests.** Your rules, your prompt, your style guide and samples of your voice form a system prompt that stays the same in every scene, so it is served from the cache (about a tenth of the price) instead of being written again. The bible entries, which change with the passage, now travel with the story and the task. Scene details (POV, title, chapter) in your prompts are said with the task, not in the cached part.
+- **Samples of your own prose with every request:** your excerpts, then passages of your revised or done scenes that Claude wrote little of (up to about 1,100 words, from other chapters than the one you're writing). Plume now counts the words you accept from Claude in each scene; right-click a scene → **Sample of my voice** to include or leave one out. The excerpt "kind" setting is gone: every excerpt is sent.
+- **"Retry fixing" fixes only what failed:** it sends back the proposal and the failed points (no bible, no story again) and changes only those sentences, keeping the rest word for word.
+- **AI tells in the scorecard:** "not X, but Y" contrasts used as a habit, em dashes in the middle of sentences, three sentences in a row starting with the same word, lists of three again and again. Checked on your computer, no tokens.
+- **OpenRouter:** Claude models there now cache the system prompt too.
+
 ## 0.21.0
 **Daily comfort** (UX plan, phase 5, the last one)
 - **Open where you stopped:** a book reopens on the scene and at the cursor where you left it. The start screen has a **Today** strip with your last book, its progress, your last session, and **Continue writing**.

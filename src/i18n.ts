@@ -45,8 +45,8 @@ const FR: Record<string, string> = {
   'Stop': 'Arrêter', 'Proposal': 'Proposition', 'Accept': 'Accepter', 'Retry': 'Réessayer', 'Discard': 'Rejeter',
   'Request size': 'Taille de la requête', 'Estimate: no tokenizer is available offline': 'Estimation : pas de compteur de jetons hors ligne',
   'tokens': 'jetons', 'Preview the prompt': 'Voir le prompt', 'Rules': 'Règles', 'Story': 'Texte', 'Task': 'Tâche',
-  'The rules and bible are cached by the CLI for an hour, so repeat calls in this scene cost much less.':
-    'Les règles et la bible restent en cache une heure : les appels suivants dans cette scène coûtent bien moins.',
+  'Your rules, prompt and voice samples are cached for an hour and reused by every call, in any scene: only the bible entries, the text and the task are paid in full.':
+    'Vos règles, votre prompt et vos échantillons de voix restent en cache une heure et servent à chaque appel, dans toutes les scènes : seuls les fiches, le texte et la tâche sont payés en entier.',
   'Bible entries sent': 'Fiches envoyées', 'No bible names in the text near the cursor yet.': 'Aucun nom de la bible près du curseur pour l’instant.',
   'cut by budget': 'coupée par le budget', 'Version': 'Version', 'Reset choices': 'Annuler mes choix',
   'Send {name}': 'Envoyer {name}', 'Prompt preview': 'Aperçu du prompt', 'System prompt (cached)': 'Prompt système (en cache)',
@@ -1019,6 +1019,9 @@ const FR: Record<string, string> = {
   'Go to any scene or bible entry, or run an action': 'Aller à une scène ou une fiche de la bible, ou lancer une action',
   'Distraction-free: only the page': 'Sans distraction : la page seule',
   'Larger / smaller / default text': 'Texte plus grand / plus petit / par défaut',
+  'Your excerpts are sent with every request as samples of your voice (about 1,100 words in all, with passages of your own revised scenes). Mix dialogue, action and description.': 'Vos extraits accompagnent chaque demande comme échantillons de votre voix (environ 1 100 mots en tout, avec des passages de vos propres scènes relues). Mélangez dialogue, action et description.',
+  'Sample of my voice': 'Échantillon de ma voix',
+  'AI tells': 'Tics d’IA',
 }
 
 const SHELL = {

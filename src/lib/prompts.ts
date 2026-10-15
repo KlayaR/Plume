@@ -9,8 +9,15 @@ const ADULT: Record<Lang, string> = {
   en: 'This book is adult literary fiction. It may treat dark themes (violence, sexuality, grief, despair) with literary seriousness; write those passages without softening or commenting on them.',
 }
 
-export function systemRules(lang: Lang, title: string, opts: { adult?: boolean; sceneRules?: SceneRule[]; tense?: string } = {}): string {
+/** Said once when samples of the author's prose are sent: they are the strongest guide to the voice. */
+const SAMPLES: Record<Lang, string> = {
+  fr: '- <author_prose> contient des passages écrits par l\'auteur lui-même. C\'est la voix à reproduire : son rythme, son vocabulaire, la longueur de ses phrases, sa façon de couper les paragraphes et d\'écrire les dialogues. N\'en reprends jamais le contenu.',
+  en: '- <author_prose> holds passages the author wrote themselves. That is the voice to match: their rhythm, vocabulary, sentence length, paragraphing and the way they write dialogue. Never reuse their content.',
+}
+
+export function systemRules(lang: Lang, title: string, opts: { adult?: boolean; sceneRules?: SceneRule[]; tense?: string; samples?: boolean } = {}): string {
   const extra = [
+    opts.samples ? SAMPLES[lang] : '',
     opts.tense ? (lang === 'fr' ? `- Temps du récit : ${opts.tense}.` : `- Narrative tense: ${opts.tense}.`) : '',
     sceneRulesText(opts.sceneRules ?? [], lang),
     opts.adult ? `\n${ADULT[lang]}` : '',

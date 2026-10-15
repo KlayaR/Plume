@@ -198,7 +198,7 @@ export default function ContextPanel() {
             <span><i className="pl-m-story" />{t('Story')} {n(ctx.parts.story)}</span>
             <span><i className="pl-m-task" />{t('Task')} {n(ctx.parts.task)}</span>
           </div>
-          <p className="sk-hint">{t('The rules and bible are cached by the CLI for an hour, so repeat calls in this scene cost much less.')}</p>
+          <p className="sk-hint">{t('Your rules, prompt and voice samples are cached for an hour and reused by every call, in any scene: only the bible entries, the text and the task are paid in full.')}</p>
         </section>
       )}
 

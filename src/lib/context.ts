@@ -1,12 +1,13 @@
 // The context engine: finds which bible entries a request needs and builds
-// the prompt. Runs locally, costs no tokens. Stable parts go in the system
-// prompt (cached by the CLI for an hour); story text and the task in the message.
+// the prompt. Runs locally, costs no tokens. The system prompt holds only what
+// stays the same from one request to the next (rules, your prompt, your voice,
+// samples of your prose), so the CLI's cache serves it again and again; the
+// bible entries, the story and the task change and go in the message.
 import { isRewrite, type ActionId, type Book, type Entry, type Lang, type Scene } from './types'
 import { factApplies } from './bible'
 import { estimateTokens, fold, lastWords, firstWords } from './text'
 import { taskMessage, systemRules } from './prompts'
 import { expandVariables, promptFor, promptText } from './voice'
-import { passageKind } from './analysis'
 import { aiBlocks } from './blocks'
 
 /** Entry types that are never looked for in the text. */
@@ -125,14 +126,65 @@ function renderEntry(e: Entry, mode: Mode, chapter: number, lang: Lang, bookInde
   return [head, body?.trim(), facts.length ? `${label}\n${facts.join('\n')}` : '', knows, unaware, voiceBlock(e, lang), '</entry>'].filter(Boolean).join('\n')
 }
 
-/** Up to two passages of the author's own prose, matching the kind of passage being written. */
-function pickExcerpts(book: Book, before: string): Entry[] {
-  const all = book.entries.filter(e => e.type === 'excerpt' && e.full.trim() && e.include !== 'never' && e.include !== 'secret')
-  if (!all.length) return []
-  const kind = passageKind(lastWords(before, 300), book.meta.language)
-  const match = all.filter(e => e.kind === kind)
-  const rest = all.filter(e => e.kind !== kind && (!e.kind || e.kind === 'any'))
-  return [...match, ...rest].sort((a, b) => a.slug.localeCompare(b.slug)).slice(0, 2)
+/** Samples of the author's prose, at most this many words in all (cached, so cheap after the first call). */
+export const SAMPLE_WORDS = 1100
+
+/** Share of a scene that may come from Claude for it to still count as the author's own prose. */
+const OWN_SHARE = 0.25
+
+const wordCount = (s: string) => (s.match(/\S+/g) ?? []).length
+
+/** Share of a scene's words that were accepted from Claude (counted when you press Accept). */
+export function ownShare(s: Scene): number {
+  const ai = Number(s.extra?.aiWords ?? 0)
+  const n = wordCount(s.text)
+  return n ? Math.min(1, ai / n) : 0
+}
+
+/**
+ * Samples of the author's own prose: their excerpts first, then passages of their
+ * revised or done scenes that Claude wrote little of, outside the chapter being
+ * written (so the samples, and the cache, hold while you work on it). Chosen the
+ * same way every time.
+ */
+export function proseSamples(book: Book, chapter: number): string[] {
+  const out: string[] = []
+  let left = SAMPLE_WORDS
+  const take = (text: string, max: number) => {
+    const t = firstWords(text.trim(), Math.min(max, left))
+    const n = wordCount(t)
+    if (n < 60) return
+    out.push(t)
+    left -= n
+  }
+  const excerpts = book.entries.filter(e => e.type === 'excerpt' && e.full.trim() && e.include !== 'never' && e.include !== 'secret').sort((a, b) => a.slug.localeCompare(b.slug))
+  for (const e of excerpts) if (left >= 60) take(e.full, 450)
+  const own = book.chapters.flatMap((c, i) => (i + 1 === chapter ? [] : c.scenes))
+    .filter(s => s.status !== 'draft' && ownShare(s) <= OWN_SHARE && wordCount(s.text) >= 150)
+    .sort((a, b) => (a.status === 'done' ? 0 : 1) - (b.status === 'done' ? 0 : 1))
+  for (const s of own) if (left >= 60) take(s.text.replace(/⟦[^⟧]*⟧/g, ''), 350)
+  return out
+}
+
+/** The stable part of every request: rules, your prompt, your voice, your style guide, samples of your prose. */
+export function systemPrompt(book: Book, action: ActionId, chapter: number): string {
+  const lang: Lang = book.meta.language
+  const voice = book.meta.voice
+  const prompt = promptFor(book, action)
+  const body = prompt ? promptText(prompt, lang) : ''
+  // Scene details (POV, title, chapter) stay out, so the prompt doesn't change from scene to scene; they go with the task.
+  const vars = { book, generic: true }
+  const style = book.entries.find(e => e.type === 'style')
+  const styleText = style ? [style.short, style.full].filter(s => s.trim()).join('\n\n').trim() : ''
+  const samples = proseSamples(book, chapter)
+  return [
+    systemRules(lang, book.meta.title, { adult: voice.adult, sceneRules: voice.sceneRules, tense: body.includes('{book.tense}') ? '' : voice.tense, samples: samples.length > 0 }),
+    body ? `<author_instructions>\n${expandVariables(body, vars)}\n</author_instructions>` : '',
+    voice.description.trim() ? `<author_voice>\n${voice.description.trim()}\n</author_voice>` : '',
+    voice.taste.trim() ? `<author_taste>\n${voice.taste.trim()}\n</author_taste>` : '',
+    styleText ? `<style_guide>\n${expandVariables(styleText, vars)}\n</style_guide>` : '',
+    samples.length ? `<author_prose>\n${samples.map(x => `<sample>\n${x}\n</sample>`).join('\n')}\n</author_prose>` : '',
+  ].filter(Boolean).join('\n\n')
 }
 
 /** Summaries of what came before this scene, for long books: earlier chapters, then earlier scenes of this one. */
@@ -233,44 +285,37 @@ export function buildContext(input: ContextInput): Built {
     p.tokens = size(p)
   }
 
-  const style = book.entries.find(e => e.type === 'style')
-  const styleText = style ? [style.short, style.full].filter(s => s.trim()).join('\n\n').trim() : ''
   const kept = list.filter(p => !p.dropped).sort((a, b) => a.slug.localeCompare(b.slug))
   const bible = kept.map(render).join('\n\n')
   const voice = book.meta.voice
-  const rules = systemRules(lang, book.meta.title, { adult: voice.adult, sceneRules: voice.sceneRules, tense: voice.tense })
-  const vars = { book, sceneTitle: input.scene?.title, pov: input.pov, chapter }
-  const prompt = promptFor(book, input.action)
-  const excerpts = isRewrite(input.action) ? [] : pickExcerpts(book, input.before)
-  const system = [
-    rules,
-    prompt ? `<author_instructions>\n${expandVariables(promptText(prompt, lang), vars)}\n</author_instructions>` : '',
-    voice.description.trim() ? `<author_voice>\n${voice.description.trim()}\n</author_voice>` : '',
-    voice.taste.trim() ? `<author_taste>\n${voice.taste.trim()}\n</author_taste>` : '',
-    styleText ? `<style_guide>\n${expandVariables(styleText, vars)}\n</style_guide>` : '',
-    excerpts.length ? `<author_excerpts>\n${excerpts.map(e => `<excerpt>\n${e.full.trim()}\n</excerpt>`).join('\n')}\n</author_excerpts>` : '',
-    bible ? `<bible>\n${bible}\n</bible>` : '',
-  ].filter(Boolean).join('\n\n')
+  const rules = systemRules(lang, book.meta.title, { adult: voice.adult, sceneRules: voice.sceneRules })
+  const system = systemPrompt(book, input.action, chapter)
 
-  // What happened before, and where and when the scene stands (not for rewrites: the passage is enough).
+  // Who tells the scene, and (not for rewrites: the passage is enough) what happened before, where and when.
   const sc = input.scene
   const placeName = sc?.place ? bySlug.get(sc.place)?.name ?? sc.place : ''
+  const povName = input.pov ? bySlug.get(input.pov)?.name ?? '' : ''
   const so = !isRewrite(input.action) && sc ? storySoFar(book, sc.id) : ''
-  const info = !isRewrite(input.action) && sc ? [
-    sc.time ? `${lang === 'fr' ? 'Moment' : 'Time'} : ${sc.time}` : '',
-    placeName ? `${lang === 'fr' ? 'Lieu' : 'Place'} : ${placeName}` : '',
-    sc.note?.trim() ? `${lang === 'fr' ? 'Ce qui se passe dans la scène' : 'What happens in the scene'} : ${sc.note.trim()}` : '',
-  ].filter(Boolean).join('\n') : ''
+  const info = [
+    povName ? `${lang === 'fr' ? 'Point de vue' : 'Point of view'} : ${povName}` : '',
+    ...(!isRewrite(input.action) && sc ? [
+      sc.time ? `${lang === 'fr' ? 'Moment' : 'Time'} : ${sc.time}` : '',
+      placeName ? `${lang === 'fr' ? 'Lieu' : 'Place'} : ${placeName}` : '',
+      sc.note?.trim() ? `${lang === 'fr' ? 'Ce qui se passe dans la scène' : 'What happens in the scene'} : ${sc.note.trim()}` : '',
+    ] : []),
+  ].filter(Boolean).join('\n')
+  const bibleBlock = bible ? `<bible>\n${bible}\n</bible>` : ''
   const message = [
+    bibleBlock,
     so ? `<story_so_far>\n${so}\n</story_so_far>` : '',
     info ? `<scene>\n${info}\n</scene>` : '',
     taskMessage(lang, input.action, input.instruction, story, ai),
   ].filter(Boolean).join('\n\n')
   const parts = {
     rules: estimateTokens(rules) + 830, // + the CLI's own minimum, measured
-    bible: estimateTokens(system) - estimateTokens(rules),
+    bible: estimateTokens(system) - estimateTokens(rules) + estimateTokens(bibleBlock),
     story: estimateTokens(story.before + story.selection + story.after),
-    task: estimateTokens(message) - estimateTokens(story.before + story.selection + story.after),
+    task: estimateTokens(message) - estimateTokens(bibleBlock) - estimateTokens(story.before + story.selection + story.after),
   }
   return {
     system,

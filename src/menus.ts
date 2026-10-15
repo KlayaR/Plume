@@ -1,5 +1,6 @@
 // The content of every right-click menu, one function per place. Screens call
 // these with what was clicked; the menu itself is drawn by ContextMenuHost.
+import { ownShare } from './lib/context'
 import type { EditorView } from '@codemirror/view'
 import { ask as askDialog } from '@tauri-apps/plugin-dialog'
 import { findScene, useStore } from './store'
@@ -172,6 +173,9 @@ export function sceneMenu(sceneId: string, opts: { card?: boolean } = {}): MenuI
     { separator: true },
     ...statusAndPov(scene),
     opts.card && lines.length > 0 && { label: t('Story lines'), sub: lines.map(l => ({ label: l.name, checked: !!scene.lines?.includes(l.slug), onClick: () => st.updateScene(sceneId, { lines: scene.lines?.includes(l.slug) ? scene.lines.filter(x => x !== l.slug) : [...(scene.lines ?? []), l.slug] }) })) },
+    // Revised or done scenes mostly written by you are sent as samples of your voice; this overrides the count.
+    { label: t('Sample of my voice'), checked: scene.status !== 'draft' && ownShare(scene) <= 0.25, disabled: scene.status === 'draft',
+      onClick: () => st.updateScene(sceneId, { extra: { ...scene.extra, aiWords: ownShare(scene) <= 0.25 ? (scene.text.match(/\S+/g) ?? []).length : 0 } }) },
     book.chapters.length > 1 && { label: t('Move to chapter'), sub: book.chapters.map((c, i) => ({ label: `${labels[i].label}${c.title && c.title !== labels[i].label ? ` · ${c.title}` : ''}`, checked: c.id === chapter.id, disabled: c.id === chapter.id, onClick: () => st.moveScene(sceneId, c.id, c.scenes.length) })) },
     { separator: true },
     { label: t('New scene after'), onClick: () => { const id = st.addScene(chapter.id, `${t('Scene')} ${chapter.scenes.length + 1}`, { stay: true }); st.moveScene(id, chapter.id, found.index + 1) } },

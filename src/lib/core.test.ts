@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { parseEntry, serializeEntry, parseScene, serializeScene, factApplies, parseFact } from './bible'
-import { buildContext, buildMatcher, findMentions } from './context'
+import { buildContext, buildMatcher, findMentions, ownShare, proseSamples } from './context'
 import { autoCapitalRule, fixTypography, loneI, typingRule } from './typography'
 import { pasteText, wrapMarks } from './paste'
 import { matterPages, FRONT, BACK } from './matter'
@@ -22,7 +22,7 @@ import { countSigns, textStats } from './stats'
 import type { Book, Entry, Scene } from './types'
 import { DEFAULT_AI, DEFAULT_VOICE, ENTRY_TYPES, FAMILIES, VOICE_TYPES, familyOf } from './types'
 import { adverbs, passives, echoes } from './analysis'
-import { checkRules, expandVariables } from './voice'
+import { aiTells, checkRules, expandVariables } from './voice'
 import { review, topProblems } from './review'
 import { parseStoryTime } from './structures'
 import { makeZip, readZip, utf8, fromUtf8 } from './zip'
@@ -116,8 +116,8 @@ describe('context', () => {
     expect(p.elise.mode).toBe('short')
     expect(p.aube.reasons[0]).toBe('linked from Élise Varenne')
     expect(b.system).toContain('Past tense.')
-    expect(b.system).toContain('Carries Aube.')
-    expect(b.system).not.toContain('Blind')
+    expect(b.message).toContain('Carries Aube.')
+    expect(b.message).not.toContain('Blind')
   })
   it('sends the full version for the POV and for @-mentions', () => {
     expect(buildContext({ ...base, pov: 'elise' }).picked.find(p => p.slug === 'elise')!.mode).toBe('full')
@@ -127,7 +127,7 @@ describe('context', () => {
   it('honours drop and short overrides', () => {
     const b = buildContext({ ...base, pov: 'elise', overrides: { elise: 'short', aube: 'drop' } })
     expect(b.picked.find(p => p.slug === 'elise')!.mode).toBe('short')
-    expect(b.system).not.toContain('silver sword')
+    expect(b.message).not.toContain('silver sword')
   })
   it('cuts linked entries first when over budget', () => {
     const tight = { ...book, meta: { ...book.meta, ai: { ...book.meta.ai, bibleBudget: 20 } } }
@@ -138,6 +138,13 @@ describe('context', () => {
     const a = buildContext({ ...base, before: 'Élise.' })
     const r = buildContext({ ...base, action: 'rewrite', before: 'Élise.', selection: 'She ran.' })
     expect(a.system).toBe(r.system)
+  })
+  it('keeps the system prompt identical across scenes, POVs and mentions, so the cache serves it', () => {
+    const a = buildContext({ ...base, before: 'Élise.', pov: 'elise' })
+    const b = buildContext({ ...base, before: 'Rose ran.', pov: null, chapter: 5 })
+    expect(a.system).toBe(b.system)
+    expect(a.system).not.toContain('<entry ')
+    expect(a.message).toContain('<bible>')
   })
 })
 
@@ -600,8 +607,8 @@ describe('private notes and new entry types', () => {
     expect(back.notes).toBe('secret plan')
     expect(back.type).toBe('magic')
     const b = buildContext({ book: bookOf([], [e]), chapter: 1, pov: null, action: 'continue', instruction: '', before: 'The Orb glowed.', selection: '', after: '', overrides: {} })
-    expect(b.system).toContain('Glows.')
-    expect(b.system).not.toContain('secret plan')
+    expect(b.message).toContain('Glows.')
+    expect(b.message).not.toContain('secret plan')
   })
 })
 
@@ -721,10 +728,10 @@ describe('entry blocks', () => {
     const e = entry({ slug: 'kara', name: 'Kara', short: 'A thief.', full, sends: { Secrets: 'never', Appearance: 'always' } })
     const book = bookOf([], [e])
     const base = { book, chapter: 1, pov: null, action: 'continue' as const, instruction: '', before: 'Kara ran.', selection: '', after: '', overrides: {} }
-    const short = buildContext(base).system
+    const short = buildContext(base).message
     expect(short).toContain('Tall, scarred.')
     expect(short).not.toContain('heir')
-    const withFull = buildContext({ ...base, pov: 'kara' }).system
+    const withFull = buildContext({ ...base, pov: 'kara' }).message
     expect(withFull).toContain('Overview line.')
     expect(withFull).not.toContain('heir')
   })
@@ -806,5 +813,35 @@ describe('daily comfort', () => {
       for (const c of order) for (const sc of c.scenes) expect(files[`manuscript/${c.folder}/${sc}`], sc).toBeDefined()
       for (const [rel, text] of Object.entries(files)) if (rel.startsWith('bible/')) expect(parseEntry(rel, text).name, rel).toBeTruthy()
     }
+  })
+})
+
+describe('quality per token', () => {
+  it('spots AI tells only when they become a habit', () => {
+    const one = 'It was not fear, but something colder. She walked on.'
+    expect(aiTells(one, 'en')).toEqual([])
+    const habit = 'It was not fear, but anger. He was not sad, but tired. She ran. She fell. She rose.'
+    expect(aiTells(habit, 'en').map(x => x.kind)).toEqual(['contrast', 'openers'])
+    expect(aiTells('Il avança — lentement — puis — enfin — s’arrêta.', 'fr').map(x => x.kind)).toEqual(['dashes'])
+    expect(aiTells('— Viens, dit-elle.\n— Non.', 'fr')).toEqual([])
+    expect(aiTells('Cold, wet and dark. Red, gold and black. Slow, sure and quiet.', 'en').map(x => x.kind)).toContain('triads')
+  })
+  it('takes samples of the author\'s own prose, never from drafts, Claude\'s text or the current chapter', () => {
+    const long = (w: string) => Array.from({ length: 200 }, () => w).join(' ')
+    const mine = { ...scene('a', long('mine')), status: 'done' as const }
+    const claude = { ...scene('b', long('claude')), status: 'done' as const, extra: { aiWords: 150 } }
+    const draft = scene('c', long('draft'))
+    const book = bookOf([mine, claude, draft], [])
+    expect(ownShare(claude)).toBe(0.75)
+    const s = proseSamples(book, 99).join(' ')
+    expect(s).toContain('mine')
+    expect(s).not.toContain('claude')
+    expect(s).not.toContain('draft')
+    expect(proseSamples(book, 1)).toEqual([])
+  })
+  it('marks the system prompt for caching on Claude models through OpenRouter', () => {
+    const body = chatBody('anthropic/claude-sonnet-5.5', 'Rules', 'Hi')
+    expect(body.messages[0].content).toEqual([{ type: 'text', text: 'Rules', cache_control: { type: 'ephemeral' } }])
+    expect(chatBody('openai/gpt-x', 'Rules', 'Hi').messages[0].content).toBe('Rules')
   })
 })

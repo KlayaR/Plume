@@ -63,19 +63,22 @@ export const wordLists = (book: Book) => book.entries.filter(e => e.type === 'wo
 export const listWords = (e: Entry) => e.full.split('\n').map(l => l.replace(/^\s*[-*]\s*/, '').trim()).filter(Boolean)
 
 /** Fills {book.tense}, {scene.pov}, {list.AI-isms}… Unknown variables are left as written. */
-export function expandVariables(text: string, ctx: { book: Book; sceneTitle?: string; pov?: string | null; chapter?: number }): string {
+export function expandVariables(text: string, ctx: { book: Book; sceneTitle?: string; pov?: string | null; chapter?: number; generic?: boolean }): string {
   const { book } = ctx
   const lang = book.meta.language
+  const fr = lang === 'fr'
   const povName = ctx.pov ? book.entries.find(e => e.slug === ctx.pov)?.name ?? ctx.pov : ''
   const lists = wordLists(book)
+  // generic: the same text for every scene (the system prompt, cached); the scene's details go with the task.
+  const g = ctx.generic
   const vars: Record<string, string> = {
     'book.title': book.meta.title,
     'book.author': book.meta.author,
-    'book.language': lang === 'fr' ? 'French' : 'English',
-    'book.tense': book.meta.voice.tense || (lang === 'fr' ? 'passé simple' : 'past tense'),
-    'scene.title': ctx.sceneTitle ?? '',
-    'scene.pov': povName || (lang === 'fr' ? 'le personnage principal' : 'the main character'),
-    'chapter.number': String(ctx.chapter ?? ''),
+    'book.language': fr ? 'French' : 'English',
+    'book.tense': book.meta.voice.tense || (fr ? 'passé simple' : 'past tense'),
+    'scene.title': g ? (fr ? 'la scène en cours' : 'the current scene') : ctx.sceneTitle ?? '',
+    'scene.pov': g ? (fr ? 'le personnage du point de vue' : 'the point-of-view character') : povName || (fr ? 'le personnage principal' : 'the main character'),
+    'chapter.number': g ? (fr ? 'le chapitre en cours' : 'the current chapter') : String(ctx.chapter ?? ''),
     'list.all': lists.flatMap(listWords).join(', ') || '-',
   }
   return text.replace(/\{([a-z]+)\.([^}]+)\}/gi, (m, scope: string, key: string) => {
@@ -141,12 +144,51 @@ export function checkRules(text: string, book: Book): Check[] {
   out.push({ id: 'sentence', label: 'Sentence length', ok: longS === 0, detail: `${longS} > ${r.sentenceMaxWords}`,
     fix: fr ? `${longS} phrase(s) de plus de ${r.sentenceMaxWords} mots. Coupe-les.` : `${longS} sentence(s) over ${r.sentenceMaxWords} words. Split them.` })
 
+  const tells = aiTells(text, lang)
+  out.push({ id: 'tells', label: 'AI tells', ok: tells.length === 0, detail: String(tells.length),
+    fix: (fr ? 'Tournures qui sonnent comme une IA, à réécrire simplement :\n' : 'Phrasings that sound machine-written, to rewrite plainly:\n') + tells.map(x => `  - ${TELL_FIX[x.kind][lang]}${x.quote ? (fr ? ` (« ${x.quote} »)` : ` (“${x.quote}”)`) : ''}`).join('\n') })
+
   if (r.dashDialogue) {
     // Dialogue opens with an em dash at the start of the line; quotes or a hyphen fail.
     const bad = text.split('\n').filter(l => /^\s*(?:[-–]|«|“|")/.test(l)).length
     out.push({ id: 'dash', label: 'Dialogue dashes', ok: bad === 0, detail: String(bad),
       fix: fr ? 'Les répliques commencent par un tiret cadratin suivi d’une espace insécable (— ), sans guillemets.' : 'Lines of dialogue open with an em dash (—), without quotation marks.' })
   }
+  return out
+}
+
+// --- AI tells ---------------------------------------------------------------------
+// Constructions that make prose read as machine-written. Each is fine once in a
+// while in a human text; it's the habit that gives it away, hence the thresholds.
+
+type Tell = 'contrast' | 'dashes' | 'openers' | 'triads'
+const TELL_FIX: Record<Tell, Record<Lang, string>> = {
+  contrast: { en: 'the "not X, but Y" / "It wasn\'t X. It was Y." contrast, used more than once: say the thing directly', fr: 'l\'opposition « ce n\'est pas X, c\'est Y » / « non pas X, mais Y », plus d\'une fois : dis la chose directement' },
+  dashes: { en: 'too many em dashes inside sentences: use commas, full stops or nothing', fr: 'trop de tirets au milieu des phrases : mets des virgules, des points, ou rien' },
+  openers: { en: 'three sentences in a row start with the same word: vary the openings', fr: 'trois phrases de suite commencent par le même mot : varie les débuts' },
+  triads: { en: 'lists of three ("X, Y and Z") again and again: keep one, cut or merge the others', fr: 'des énumérations par trois (« X, Y et Z ») à répétition : garde-en une, coupe ou fonds les autres' },
+}
+
+const CONTRAST: Record<Lang, RegExp[]> = {
+  en: [/\bnot\s+(?:just\s+|only\s+|merely\s+)?[^.,;!?\n]{1,40},\s*but\b/gi, /\b(?:wasn't|isn't|weren't|was not|is not)\s+[^.!?\n]{1,40}[.;]\s+(?:It|That|This|He|She|They)\s+(?:was|is|were)\b/g],
+  fr: [/\bce\s+n['’](?:est|était)\s+pas\s+[^.!?\n]{1,40}[.,;]\s*(?:c['’](?:est|était)|mais)\b/gi, /\b(?:non\s+pas|pas\s+seulement|pas\s+juste)\s+[^.,;!?\n]{1,40},?\s*mais\b/gi],
+}
+
+/** AI tells in a passage, at most one of each kind, with a short quote. Zero tokens. */
+export function aiTells(text: string, lang: Lang): { kind: Tell; quote: string }[] {
+  const out: { kind: Tell; quote: string }[] = []
+  const n = words(text).length
+  if (!n) return out
+  const contrast = CONTRAST[lang].flatMap(re => [...text.matchAll(re)].map(m => m[0]))
+  if (contrast.length >= 2) out.push({ kind: 'contrast', quote: contrast[0].slice(0, 60) })
+  // Dashes in the middle of a line (a dash opening a line is French dialogue).
+  const dashes = text.split('\n').reduce((k, l) => k + (l.replace(/^\s*—/, '').match(/—/g) ?? []).length, 0)
+  if (dashes > Math.max(1, n / 150)) out.push({ kind: 'dashes', quote: '' })
+  const firsts = sentences(text).map(s => s.s.replace(/^[—–\-«“"\s]+/, '').split(/\s+/)[0]?.toLowerCase() ?? '')
+  const at = firsts.findIndex((w, i) => i >= 2 && w.length > 0 && w === firsts[i - 1] && w === firsts[i - 2])
+  if (at >= 0) out.push({ kind: 'openers', quote: firsts[at] })
+  const triads = [...text.matchAll(/\b[\p{L}'’-]+,\s+[\p{L}'’-]+,?\s+(?:and|et|or|ou)\s+[\p{L}'’-]+/gu)].map(m => m[0])
+  if (triads.length >= 3) out.push({ kind: 'triads', quote: triads[0].slice(0, 60) })
   return out
 }
 

@@ -3,7 +3,7 @@
 import { create } from 'zustand'
 import type { EditorView } from '@codemirror/view'
 import { isRewrite, type ActionId } from '../lib/types'
-import { buildContext, type Built, type Override } from '../lib/context'
+import { buildContext, systemPrompt, type Built, type Override } from '../lib/context'
 import { checkRules, fixDirection, type Check } from '../lib/voice'
 import { ask, effective, isCheap } from '../ai'
 import { noteTaste } from '../writing'
@@ -77,13 +77,20 @@ export async function runAction(action: ActionId, instruction: string, overrides
   if (action === 'beats' && !instruction.trim()) return st.notify('warn', t('Write the beats first, one per line.'))
   const ctx = currentContext(action, instruction, overrides)
   if (!ctx) return
+  useAI.setState({ last: { action, instruction, overrides } })
+  await stream(action, ctx.from, ctx.to, ctx.system, ctx.message)
+}
+
+/** Streams a reply into a proposal between from and to, then scores it. */
+async function stream(action: ActionId, from: number, to: number, system: string, message: string) {
+  if (!view) return
   const chosen = assistantChoice(action)
   const settings = effective(chosen.model, chosen.effort)
   const v = view
-  v.dispatch({ effects: setProposal.of({ from: ctx.from, to: ctx.to, text: '', streaming: true }) })
-  useAI.setState({ last: { action, instruction, overrides }, hasProposal: true, running: 'starting', checks: [] })
+  v.dispatch({ effects: setProposal.of({ from, to, text: '', streaming: true }) })
+  useAI.setState({ hasProposal: true, running: 'starting', checks: [] })
   const id = await runLLM(
-    { model: settings.model, effort: settings.effort, orModel: chosen.orModel, system: ctx.system, message: ctx.message },
+    { model: settings.model, effort: settings.effort, orModel: chosen.orModel, system, message },
     // The reply goes to the scene it was asked for, even if another scene is active by now.
     text => { if (v.dom.isConnected) v.dispatch({ effects: appendProposal.of(text) }) },
     r => {
@@ -124,6 +131,10 @@ export function accept(): boolean {
   const text = proposalText()
   const ok = acceptProposal(view, book.meta.language)
   if (ok && last) noteTaste(last.action, true, text)
+  // Words that came from Claude, per scene: scenes mostly written by you become samples of your voice.
+  const st = useStore.getState()
+  const found = ok ? findScene(st.book, st.sceneId) : null
+  if (found) st.updateScene(found.scene.id, { extra: { ...found.scene.extra, aiWords: Number(found.scene.extra.aiWords ?? 0) + (text.match(/\S+/g) ?? []).length } })
   syncProposalState()
   return ok
 }
@@ -176,9 +187,24 @@ export function pickAlternative(text: string, from: number, to: number) {
   if (b) useAI.setState({ checks: checkRules(text, b) })
 }
 
-/** Retry with the failed rules of the scorecard as extra direction. */
-export function retryFixing() {
-  const book = useStore.getState().book
+/**
+ * Fixes only what the scorecard flags. Sends the proposal and the failed points,
+ * not the bible and the story again, and asks to change only the sentences
+ * concerned: cheaper than a retry, and it keeps what was good.
+ */
+export async function retryFixing() {
+  const st = useStore.getState()
+  const book = st.book
+  const last = useAI.getState().last
   const failed = useAI.getState().checks.filter(c => !c.ok)
-  if (book && failed.length) retry(fixDirection(failed, book.meta.language))
+  const p = view?.state.field(proposalField)
+  if (!view || !book || !last || !p || p.streaming || !failed.length || useAI.getState().running) return
+  const fr = book.meta.language === 'fr'
+  const message = `<passage>\n${p.text.trim()}\n</passage>\n\n<task>\n${fixDirection(failed, book.meta.language)}\n${fr
+    ? 'Corrige seulement les phrases concernées ; garde toutes les autres mot pour mot, avec la même longueur et le même sens. Réponds uniquement avec le passage complet corrigé.'
+    : 'Change only the sentences concerned; keep every other sentence word for word, with the same length and meaning. Reply with the whole corrected passage only.'}\n</task>`
+  // The same system prompt as the first request, so it comes from the cache.
+  const system = systemPrompt(book, last.action, findScene(book, st.sceneId)?.number ?? 1)
+  discardProposal(view)
+  await stream(last.action, p.from, p.to, system, message)
 }

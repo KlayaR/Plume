@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { ask } from '@tauri-apps/plugin-dialog'
 import { ChevronDown, ChevronRight, ImagePlus, MessagesSquare, Plus, Search, Sparkles, Trash2, X } from 'lucide-react'
 import { MORE_TABS, useStore, type BibleTab } from '../store'
-import { EMPTY_VOICE, FAMILIES, typeInfo, VOICE_TYPES, type Entry, type EntryType, type ExcerptKind, type Include, type VoiceCard } from '../lib/types'
+import { EMPTY_VOICE, FAMILIES, typeInfo, VOICE_TYPES, type Entry, type EntryType, type Include, type VoiceCard } from '../lib/types'
 import { formatFact, parseFact } from '../lib/bible'
 import { buildMatcher, findMentions } from '../lib/context'
 import { estimateTokens, foldText } from '../lib/text'
@@ -240,17 +240,7 @@ export function EntryEditor({ entry }: { entry: Entry }) {
       )}
 
       {entry.type === 'excerpt' && (
-        <div className="sk-field">
-          <label htmlFor="ee-kind">{t('Kind of passage')}</label>
-          <select id="ee-kind" className="sk-select" value={entry.kind ?? 'any'} onChange={e => update({ kind: e.target.value as ExcerptKind })}>
-            <option value="any">{t('Any')}</option>
-            <option value="dialogue">{t('Dialogue')}</option>
-            <option value="action">{t('Action')}</option>
-            <option value="description">{t('Description')}</option>
-            <option value="introspection">{t('Introspection')}</option>
-          </select>
-          <span className="sk-hint">{t('Up to two excerpts are sent with each request, those matching the kind of passage being written first.')}</span>
-        </div>
+        <span className="sk-hint">{t('Your excerpts are sent with every request as samples of your voice (about 1,100 words in all, with passages of your own revised scenes). Mix dialogue, action and description.')}</span>
       )}
 
       <div className="sk-field">
