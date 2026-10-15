@@ -1,6 +1,6 @@
 {
   "name": "plume",
-  "version": "0.27.1",
+  "version": "0.27.2",
   "description": "Novel writing app with a story bible, on the Claude command line",
   "license": "MIT",
   "type": "module",

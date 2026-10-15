@@ -7,6 +7,10 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.27.2
+**Merging scenes gives one scene, not two side by side**
+- After a merge, Claude rewrites the merged card as a single scene: one summary, the beats in order with no repeats, one arc. It comes back as a proposal (Accept / Reject); rejecting it keeps the plain merge. The written text is joined but never rewritten. A locked card isn't sent to Claude.
+
 ## 0.27.1
 **A calmer Outline tab**
 - Cards now read as text: title, one grey line (POV, place, time, words), the summary, the beats as a plain numbered list, and the other fields only when they're filled in. **Click a card to edit it** (one at a time; Done, Escape or a click elsewhere closes it).

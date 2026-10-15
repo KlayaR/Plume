@@ -1119,6 +1119,7 @@ const FR: Record<string, string> = {
   'Edit': 'Modifier',
   'Click to edit': 'Cliquez pour modifier',
   '+ What happens in this scene': '+ Ce qui se passe dans cette scène',
+  'Merge “{a}” with “{b}”? Their outlines and texts are joined into the first and Claude proposes one outline for the merged scene; the second goes to the trash.': 'Fusionner « {a} » avec « {b} » ? Leurs plans et leurs textes sont réunis dans la première et Claude propose un seul plan pour la scène fusionnée ; la seconde va à la corbeille.',
 }
 
 const SHELL = {

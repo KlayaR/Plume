@@ -155,14 +155,26 @@ function ChapterBlock({ book, c, n, label, open, onFold }: { book: Book; c: Chap
   )
 }
 
+/**
+ * Merges a scene with the next: the outlines and texts are joined at once, then
+ * Claude rewrites the merged card as one scene (beats in order, no repeats, one
+ * arc). That comes back as a proposal; rejecting it keeps the plain merge. The
+ * text is never rewritten.
+ */
+async function mergeScenes(a: Scene, b: Scene, t: (s: string, v?: Record<string, string | number>) => string) {
+  if (!(await askDialog(t('Merge “{a}” with “{b}”? Their outlines and texts are joined into the first and Claude proposes one outline for the merged scene; the second goes to the trash.', { a: a.title, b: b.title }), { title: t('Merge scenes'), kind: 'warning' }))) return
+  useStore.getState().updateScene(a.id, mergeCards(a, b))
+  await useStore.getState().removeScene(b.id)
+  const book = useStore.getState().book
+  if (!a.locked && book) planScene(a.id, book.meta.language === 'fr'
+    ? 'Cette fiche réunit deux scènes. Réécris-la comme une seule scène cohérente : un seul résumé, les étapes dans l’ordre sans répétition, un seul trajet intérieur. Garde tous ses événements.'
+    : 'This card merges two scenes. Rewrite it as one coherent scene: one summary, the beats in order with no repeats, one arc. Keep all its events.')
+}
+
 /** Between two scenes: a link, shown on hover, that merges them. */
 function MergeGap({ a, b }: { a: Scene; b: Scene }) {
   const t = useT()
-  const merge = async () => {
-    if (!(await askDialog(t('Merge “{a}” with “{b}”? Their outlines and texts are joined into the first; the second goes to the trash.', { a: a.title, b: b.title }), { title: t('Merge scenes'), kind: 'warning' }))) return
-    useStore.getState().updateScene(a.id, mergeCards(a, b))
-    await useStore.getState().removeScene(b.id)
-  }
+  const merge = () => mergeScenes(a, b, t)
   return <div className="pl-ol-gap"><button type="button" className="pl-quiet" onClick={merge}><Combine size={12} /> {t('Merge these two scenes')}</button></div>
 }
 
@@ -177,11 +189,7 @@ function SceneCard({ book, c, s, k }: { book: Book; c: Chapter; s: Scene; k: num
   const words = countWords(s.text)
   const regenerate = async () => { const d = await askText(t('Direction for Claude (optional)'), '', t('e.g. darker, Alice doesn’t show up, end on the letter')); if (d !== null) planScene(s.id, d) }
   const detail = () => planScene(s.id, book.meta.language === 'fr' ? 'Garde ses événements ; remplis la fiche en entier.' : 'Keep its events; fill in the whole card.')
-  const merge = async () => {
-    if (!next || !(await askDialog(t('Merge “{a}” with “{b}”? Their outlines and texts are joined into the first; the second goes to the trash.', { a: s.title, b: next.title }), { title: t('Merge scenes'), kind: 'warning' }))) return
-    update(mergeCards(s, next))
-    await st().removeScene(next.id)
-  }
+  const merge = () => { if (next) mergeScenes(s, next, t) }
   const more = (e: React.MouseEvent) => { e.stopPropagation(); showMenu(e, [
     { label: t('Edit'), onClick: () => edit(s.id) },
     { label: t('Detail'), disabled: !!busy || s.locked, onClick: detail },
