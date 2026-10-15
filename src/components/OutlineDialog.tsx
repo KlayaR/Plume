@@ -1,63 +1,34 @@
 // Outline from a premise: you write a few lines, Claude proposes chapters and
-// scenes (using the bible), you read the list and add it to the plan.
+// scenes (using the bible), you read the list and add it to the plan. This is
+// the first pass; Plan → Outline then details each chapter (the second pass).
 import { useState } from 'react'
 import { foldText } from '../lib/text'
 import { ListTree, Sparkles } from 'lucide-react'
 import { Dialog } from '../studio-kit/shell.js'
 import { useStore } from '../store'
-import { WORLD_TYPES, type Book, type EntryType } from '../lib/types'
+import { WORLD_TYPES } from '../lib/types'
+import { findEntrySlug, outlineRules, type SceneMode } from '../lib/outline'
 import { ask, parseJSON } from '../ai'
 import { useT } from '../i18n'
 
-interface Outline { title: string; goal?: string; ending?: string; scenes: { title: string; note: string; pov?: string; place?: string }[] }
-
-/** What makes a scene, said once to Claude so the outline isn't a grid of identical chapters. */
-const SCENE_RULES = {
-  en: `What a scene is:
-- One continuous moment: one place, unbroken time, one point-of-view character. A change of any of these starts a new scene.
-- Something changes: someone wants something, meets an obstacle, and the scene ends with the situation different (better, worse, a revelation, a decision). If nothing changes, it is not a scene.
-- Action scenes are often followed by a quieter reaction scene (feeling, dilemma, decision).
-- In fantasy a scene runs about 1,000 to 4,000 words, a chapter about 2,000 to 5,000.
-- The number of scenes per chapter follows what the chapter needs: a battle or a confrontation can be one long scene, a journey or a setup chapter several short ones. Never give every chapter the same number of scenes.
-
-What a chapter is:
-- A concrete, immediate goal for the point-of-view character (get past the guard, decode one line), not the big quest.
-- It escalates: each attempt gives “yes, but…” or “no, and what’s more…”.
-- It ends on a turn: the problem solved reveals a worse one, a revelation forces a new plan, a quiet chapter lands on an image or a realisation, or a question is left that the next chapter answers. No mid-action cliffhanger.`,
-  fr: `Ce qu’est une scène :
-- Un seul moment continu : un lieu, un temps sans coupure, un personnage de point de vue. Si l’un des trois change, c’est une nouvelle scène.
-- Quelque chose change : quelqu’un veut quelque chose, rencontre un obstacle, et la scène finit sur une situation différente (meilleure, pire, une révélation, une décision). Si rien ne change, ce n’est pas une scène.
-- Une scène d’action est souvent suivie d’une scène de réaction plus calme (émotion, dilemme, décision).
-- En fantasy, une scène fait environ 1 000 à 4 000 mots, un chapitre environ 2 000 à 5 000.
-- Le nombre de scènes par chapitre suit ce dont le chapitre a besoin : une bataille ou une confrontation peut être une seule longue scène, un voyage ou un chapitre d’installation plusieurs courtes. Ne donne jamais le même nombre de scènes à tous les chapitres.
-
-Ce qu’est un chapitre :
-- Un but concret et immédiat pour le personnage du point de vue (passer le garde, déchiffrer une ligne), pas la grande quête.
-- Il monte en tension : chaque tentative donne « oui, mais… » ou « non, et en plus… ».
-- Il finit sur un tournant : le problème réglé en révèle un pire, une révélation oblige à revoir le plan, un chapitre calme se pose sur une image ou une prise de conscience, ou il laisse une question à laquelle le chapitre suivant répond. Pas de suspense coupé en pleine action.`,
-}
-
-/** A bible entry named (or aliased) exactly so, of one of these types. */
-const findEntry = (book: Book, name: string | undefined, types: EntryType[]) => {
-  const f = foldText(String(name ?? '').trim())
-  if (!f) return null
-  return book.entries.find(e => types.includes(e.type) && [e.name, ...e.aliases].some(a => foldText(a.replace(/!$/, '')) === f))?.slug ?? null
-}
+interface Outline { title: string; goal?: string; ending?: string; scenes: { title: string; summary?: string; note?: string; pov?: string; place?: string }[] }
 
 export default function OutlineDialog({ onClose }: { onClose: () => void }) {
   const book = useStore(s => s.book)!
   const t = useT()
   const lang = book.meta.language
+  const fr = lang === 'fr'
   const [premise, setPremise] = useState(book.meta.summary ?? '')
   const [chapters, setChapters] = useState(12)
-  // Scenes per chapter: Claude decides from what each chapter needs, or within a range you set.
-  const [range, setRange] = useState<[number, number] | null>(null)
+  // Scenes per chapter: mostly one (the default), as each chapter needs, or within a range you set.
+  const [mode, setMode] = useState<SceneMode>({ kind: 'one' })
   const [words, setWords] = useState(book.meta.goal.book || 90000)
   const [busy, setBusy] = useState(false)
   const [outline, setOutline] = useState<Outline[]>([])
   /** Scenes (key "c-s") the author unticked. */
   const [off, setOff] = useState<Set<string>>(new Set())
   const toggle = (k: string) => setOff(prev => { const n = new Set(prev); if (n.has(k)) n.delete(k); else n.add(k); return n })
+  const noteOf = (s: Outline['scenes'][number]) => String(s.summary ?? s.note ?? '').trim()
 
   const generate = async () => {
     setBusy(true)
@@ -67,12 +38,12 @@ export default function OutlineDialog({ onClose }: { onClose: () => void }) {
       const beats = book.meta.structure.beats.map(b => `- ${b.name} (${b.at} %)`).join('\n')
       const reply = await ask({
         model: 'sonnet', effort: 'medium',
-        system: lang === 'fr'
+        system: fr
           ? 'Tu aides un romancier de fantasy à bâtir le plan de son livre. Réponds uniquement en JSON valide, en français.'
           : 'You help a fantasy novelist build the outline of their book. Reply with valid JSON only.',
-        message: `<premise>\n${premise.trim()}\n</premise>\n${bible ? `<bible>\n${bible}\n</bible>\n` : ''}${beats ? `<structure>\n${beats}\n</structure>\n` : ''}\n${lang === 'fr'
-          ? `${SCENE_RULES.fr}\n\nPropose ${chapters} chapitres pour un livre d’environ ${words.toLocaleString('fr-FR')} mots${range ? `, de ${range[0]} à ${range[1]} scènes par chapitre selon ce que chacun demande` : ''}. Chaque scène a un titre court, une note d’une ou deux phrases (qui veut quoi, ce qui l’en empêche, ce qui change à la fin), son personnage de point de vue et son lieu, avec les noms de la bible quand ils y sont. Chaque chapitre a son but immédiat (goal) et sa fin (ending : le tournant ou la question sur lesquels il se termine). Respecte la structure donnée si elle existe.`
-          : `${SCENE_RULES.en}\n\nPropose ${chapters} chapters for a book of about ${words.toLocaleString('en-US')} words${range ? `, ${range[0]} to ${range[1]} scenes per chapter as each one needs` : ''}. Each scene gets a short title, a one-or-two-sentence note (who wants what, what stands in the way, what changes by the end), its point-of-view character and its place, using the bible's names when they are there. Each chapter gets its immediate goal (goal) and its ending (the turn or question it lands on). Follow the given structure if there is one.`}\nJSON: [{"title": "...", "goal": "...", "ending": "...", "scenes": [{"title": "...", "note": "...", "pov": "...", "place": "..."}]}]`,
+        message: `<premise>\n${premise.trim()}\n</premise>\n${bible ? `<bible>\n${bible}\n</bible>\n` : ''}${beats ? `<structure>\n${beats}\n</structure>\n` : ''}\n${outlineRules(lang, mode)}\n\n${fr
+          ? `Propose ${chapters} chapitres pour un livre d’environ ${words.toLocaleString('fr-FR')} mots. Chaque chapitre a son but immédiat (goal) et sa fin (ending : le tournant ou la question sur lesquels il se termine). Chaque scène a un titre court, un résumé de 2 à 3 phrases (qui veut quoi, ce qui l’en empêche, ce qui change à la fin), son personnage de point de vue et son lieu, avec les noms de la bible quand ils y sont. Pas encore d’étapes détaillées : elles viendront chapitre par chapitre. Respecte la structure donnée si elle existe.`
+          : `Propose ${chapters} chapters for a book of about ${words.toLocaleString('en-US')} words. Each chapter gets its immediate goal (goal) and its ending (the turn or question it lands on). Each scene gets a short title, a 2-to-3-sentence summary (who wants what, what stands in the way, what changes by the end), its point-of-view character and its place, using the bible's names when they are there. No detailed beats yet: they come chapter by chapter. Follow the given structure if there is one.`}\nJSON: [{"title": "...", "goal": "...", "ending": "...", "scenes": [{"title": "...", "summary": "...", "pov": "...", "place": "..."}]}]`,
       })
       const list = parseJSON<Outline[]>(reply)
       if (!list?.length) throw new Error(t('Claude’s reply could not be read. Try again.'))
@@ -86,39 +57,38 @@ export default function OutlineDialog({ onClose }: { onClose: () => void }) {
     const st = useStore.getState()
     let made = 0
     outline.forEach((c, ci) => {
-      const kept = c.scenes.filter((_, si) => !off.has(`${ci}-${si}`))
-      if (!kept.length) return
-      // The chapter's goal goes in its first scene's note, its ending in its last one's: writing from the plan reads them there.
-      const fr = lang === 'fr'
-      const scenes = kept.map((s, i) => ({ ...s, note: [
-        String(s.note ?? '').trim(),
-        i === 0 && c.goal?.trim() ? `${fr ? 'But du chapitre' : 'Chapter goal'} : ${c.goal.trim()}` : '',
-        i === kept.length - 1 && c.ending?.trim() ? `${fr ? 'Fin du chapitre' : 'Chapter ending'} : ${c.ending.trim()}` : '',
-      ].filter(Boolean).join('\n') }))
+      const scenes = c.scenes.filter((_, si) => !off.has(`${ci}-${si}`))
+      if (!scenes.length) return
       made++
-      // A chapter that already has this title receives the scenes; otherwise a new chapter is made.
-      const same = useStore.getState().book!.chapters.find(x => x.title.trim() && foldText(x.title) === foldText(String(c.title ?? '')))
       // POV and place become the card's own fields when the bible knows them.
       const fields = (s: Outline['scenes'][number]) => {
-        const pov = findEntry(book, s.pov, ['character'])
-        const place = findEntry(book, s.place, ['place'])
+        const pov = findEntrySlug(book, s.pov, ['character'])
+        const place = findEntrySlug(book, s.place, ['place'])
         return { ...(pov ? { pov } : {}), ...(place ? { place } : {}) }
       }
       const put = (chapterId: string, s: Outline['scenes'][number]) => {
-        const sid = useStore.getState().addScene(chapterId, String(s.title ?? ''), { stay: true, note: String(s.note ?? '') })
+        const sid = useStore.getState().addScene(chapterId, String(s.title ?? ''), { stay: true, note: noteOf(s) })
         const f = fields(s)
         if (Object.keys(f).length) useStore.getState().updateScene(sid, f)
       }
-      if (same) { scenes.forEach(s => put(same.id, s)); return }
+      const plan = { ...(c.goal?.trim() ? { goal: c.goal.trim() } : {}), ...(c.ending?.trim() ? { ending: c.ending.trim() } : {}) }
+      // A chapter that already has this title receives the scenes; otherwise a new chapter is made.
+      const same = useStore.getState().book!.chapters.find(x => x.title.trim() && foldText(x.title) === foldText(String(c.title ?? '')))
+      if (same) {
+        scenes.forEach(s => put(same.id, s))
+        if (!same.goal && !same.ending) useStore.getState().updateChapter(same.id, plan)
+        return
+      }
       const id = st.addChapter(String(c.title ?? ''), { stay: true })
+      useStore.getState().updateChapter(id, plan)
       const chapter = useStore.getState().book!.chapters.find(x => x.id === id)!
       scenes.forEach((s, i) => {
-        if (i === 0) useStore.getState().updateScene(chapter.scenes[0].id, { title: String(s.title ?? ''), note: String(s.note ?? ''), ...fields(s) })
+        if (i === 0) useStore.getState().updateScene(chapter.scenes[0].id, { title: String(s.title ?? ''), note: noteOf(s), ...fields(s) })
         else put(id, s)
       })
     })
-    st.notify('ok', t('{n} chapters added to the plan.', { n: made }))
-    useStore.setState({ view: 'plan', planTab: 'board' })
+    st.notify('ok', t('{n} chapters added to the plan. Next: Detail each chapter in Plan → Outline.', { n: made }))
+    useStore.setState({ view: 'plan', planTab: 'outline' })
     onClose()
   }
 
@@ -130,7 +100,7 @@ export default function OutlineDialog({ onClose }: { onClose: () => void }) {
       </>}>
       <div className="pl-find">
         <textarea className="sk-input" rows={5} autoFocus value={premise} placeholder={t('Your premise: who, what they want, what stands in the way, how it might end…')} onChange={e => setPremise(e.target.value)} />
-        <div className="pl-row">
+        <div className="pl-row" style={{ flexWrap: 'wrap' }}>
           <label className="pl-row">{t('Chapters')}
             <input type="number" className="sk-input" style={{ width: '5rem' }} min={3} max={60} value={chapters} onChange={e => setChapters(Math.max(3, Math.min(60, Number(e.target.value) || 12)))} />
           </label>
@@ -139,14 +109,15 @@ export default function OutlineDialog({ onClose }: { onClose: () => void }) {
             {t('words')}
           </label>
           <label className="pl-row">{t('Scenes per chapter')}
-            <select className="sk-select" value={range ? 'range' : 'auto'} onChange={e => setRange(e.target.value === 'auto' ? null : [1, 4])}>
+            <select className="sk-select" value={mode.kind} onChange={e => setMode(e.target.value === 'range' ? { kind: 'range', min: 1, max: 3 } : { kind: e.target.value as 'one' | 'auto' })}>
+              <option value="one">{t('Mostly one')}</option>
               <option value="auto">{t('As each chapter needs')}</option>
               <option value="range">{t('Between…')}</option>
             </select>
-            {range && <>
-              <input type="number" className="sk-input" style={{ width: '4rem' }} min={1} max={10} value={range[0]} onChange={e => setRange([Math.max(1, Math.min(range[1], Number(e.target.value) || 1)), range[1]])} aria-label={t('At least')} />
+            {mode.kind === 'range' && <>
+              <input type="number" className="sk-input" style={{ width: '4rem' }} min={1} max={10} value={mode.min} onChange={e => setMode({ ...mode, min: Math.max(1, Math.min(mode.max, Number(e.target.value) || 1)) })} aria-label={t('At least')} />
               <span>–</span>
-              <input type="number" className="sk-input" style={{ width: '4rem' }} min={1} max={10} value={range[1]} onChange={e => setRange([range[0], Math.max(range[0], Math.min(10, Number(e.target.value) || range[0]))])} aria-label={t('At most')} />
+              <input type="number" className="sk-input" style={{ width: '4rem' }} min={1} max={10} value={mode.max} onChange={e => setMode({ ...mode, max: Math.max(mode.min, Math.min(10, Number(e.target.value) || mode.min)) })} aria-label={t('At most')} />
             </>}
           </label>
           <span className="pl-grow" />
@@ -154,7 +125,7 @@ export default function OutlineDialog({ onClose }: { onClose: () => void }) {
             <Sparkles size={14} /> {busy ? t('Thinking…') : outline.length ? t('Again') : t('Propose an outline')}
           </button>
         </div>
-        <span className="sk-hint">{t('Untick the scenes you don’t want. Chapters are added after yours; a chapter with the same title as one of yours receives its scenes. Nothing you wrote is changed.')}</span>
+        <span className="sk-hint">{t('Untick the scenes you don’t want. Chapters are added after yours; a chapter with the same title as one of yours receives its scenes. Nothing you wrote is changed. Then detail each chapter in Plan → Outline.')}</span>
         <div className="pl-find-list">
           {outline.map((c, i) => (
             <div key={i} className="pl-outline-ch">
@@ -163,7 +134,7 @@ export default function OutlineDialog({ onClose }: { onClose: () => void }) {
               {c.scenes.map((s, j) => (
                 <label key={j} className="pl-outline-sc pl-row pl-check-label">
                   <input type="checkbox" className="sk-check" checked={!off.has(`${i}-${j}`)} onChange={() => toggle(`${i}-${j}`)} />
-                  <span><span>{s.title}</span> <span className="sk-hint">{[s.pov, s.place].filter(Boolean).join(' · ')}{s.pov || s.place ? ' — ' : ''}{s.note}</span></span>
+                  <span><span>{s.title}</span> <span className="sk-hint">{[s.pov, s.place].filter(Boolean).join(' · ')}{s.pov || s.place ? ' — ' : ''}{noteOf(s)}</span></span>
                 </label>
               ))}
             </div>

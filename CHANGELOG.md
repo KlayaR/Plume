@@ -7,6 +7,16 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.27.0
+**Plan → Outline: read the whole outline, change any part, keep Claude in check**
+- **A new Outline tab**, first in the Plan (the Board stays for the cards): the whole outline on one page, chapter after chapter, every field editable in place. Each chapter has its **goal** and **how it ends**; each scene its summary, POV, place, story time, who is there, numbered **beats** (add, reorder, remove), what the reader learns, the arc and the pace. Search and fold chapters.
+- **Two-pass outline:** *Outline from a premise* now proposes mostly one scene per chapter (or as each needs, or a range), with 2-to-3-sentence summaries; then **Detail** (a chapter, or **Detail all**) has Claude fill in the full cards, reading the chapters before it.
+- **Regenerate…** a chapter or one card, with your direction ("darker", "Alice doesn't show up"). **Lock** a card and Claude leaves it alone.
+- **Claude only proposes:** what it writes for the outline appears first beside what is there; **Accept** (with Undo) or **Reject**.
+- **Merge** a scene with the next (outlines and texts), **split** a scene at a beat, **merge** a chapter with the next.
+- **Check the outline:** Claude lists gaps, dropped threads, contradictions with the bible and chapters with no turn. **Copy** the outline as Markdown.
+- Writing from the plan reads all of it: beats, who is there, what the reader learns, arc, pace, and the chapter's goal and ending.
+
 ## 0.26.0
 **Fixes that use the Review report, and scenes that reach their length**
 - **The scorecard under a proposal now includes the Review report:** the three reports furthest from their target (echoes, repeated phrases, adverbs…) are listed with your rules, for passages of 150 words or more. **Retry fixing** sends them back with a few exact quotes, and Claude changes only those sentences.

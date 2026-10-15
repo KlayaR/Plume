@@ -166,6 +166,18 @@ export interface Scene {
   /** Revision passes (ids of meta.passes) already done on this scene. */
   passes?: string[]
   comments?: Comment[]
+  /** The detailed outline of the scene (Plan → Outline), read when Claude writes it from the plan. */
+  beats?: string[]
+  /** What the reader learns here: revelations, clues planted, earlier clues paid off. */
+  reveals?: string
+  /** The point-of-view character's state at the start → at the end. */
+  arc?: string
+  /** Pace and tone: fast and tense, slow and inward… */
+  pace?: string
+  /** Characters present (bible names). */
+  cast?: string[]
+  /** Claude leaves a locked card alone when it regenerates the outline. */
+  locked?: boolean
   extra: Record<string, unknown>
 }
 
@@ -179,6 +191,9 @@ export interface Chapter {
   summaryOf?: string
   /** Title of a part of the book that starts with this chapter (exports put a part page before it). */
   part?: string
+  /** The chapter's immediate goal for its point-of-view character, and how it ends (the turn or question it lands on). */
+  goal?: string
+  ending?: string
   scenes: Scene[]
 }
 

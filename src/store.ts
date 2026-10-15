@@ -19,7 +19,7 @@ export type View = 'bible' | 'plan' | 'manuscript'
 export type BibleTab = 'entry' | 'review' | 'aicheck' | 'tracker' | 'map' | 'relations' | 'contradictions'
 /** Bible tabs grouped under "More". */
 export const MORE_TABS: BibleTab[] = ['tracker', 'map', 'relations', 'contradictions']
-export type PlanTab = 'board' | 'structure' | 'timeline' | 'lines' | 'dashboard' | 'revision'
+export type PlanTab = 'outline' | 'board' | 'structure' | 'timeline' | 'lines' | 'dashboard' | 'revision'
 /** What the right pane of the Manuscript shows in Write mode. */
 export type RightTab = 'write' | 'chat' | 'notes'
 
@@ -400,7 +400,7 @@ export const useStore = create<State>((set, get) => {
     settingsTab: null,
     editorTick: 0,
     bibleTab: 'entry',
-    planTab: 'board',
+    planTab: 'outline',
     dialog: null,
     jump: null,
     printing: false,
@@ -418,7 +418,7 @@ export const useStore = create<State>((set, get) => {
       const back = spot && book.chapters.some(c => c.scenes.some(x => x.id === spot.sceneId)) ? spot : null
       const sceneId = back?.sceneId ?? book.chapters[0]?.scenes[0]?.id ?? null
       session = { root: book.root, words: bookCounts(book.chapters).words, start: Date.now() }
-      set({ book, recent, view: 'manuscript', sceneId, jump: back ? { sceneId: back.sceneId, from: back.pos, to: back.pos } : null, entrySlug: null, freshSceneId: null, bibleTab: 'entry', planTab: 'board' })
+      set({ book, recent, view: 'manuscript', sceneId, jump: back ? { sceneId: back.sceneId, from: back.pos, to: back.pos } : null, entrySlug: null, freshSceneId: null, bibleTab: 'entry', planTab: 'outline' })
       import('./chat').then(m => m.loadChat(book))
       import('./writing').then(m => m.loadNotes(book))
       import('./agents').then(m => m.loadAgents())

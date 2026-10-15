@@ -245,6 +245,22 @@ export function sceneWords(book: Book, sceneId: string): [number, number] {
   return [r(a), r(b)]
 }
 
+/** The scene's detailed outline (Plan → Outline) as lines of <scene>, with its chapter's goal, and its ending for the last scene. */
+export function outlineLines(book: Book, sc: Scene, lang: Lang): string[] {
+  const fr = lang === 'fr'
+  const ch = book.chapters.find(c => c.scenes.some(s => s.id === sc.id))
+  const last = ch?.scenes[ch.scenes.length - 1]?.id === sc.id
+  return [
+    ch?.goal?.trim() ? `${fr ? 'But du chapitre' : 'Chapter goal'} : ${ch.goal.trim()}` : '',
+    sc.beats?.length ? `${fr ? 'Étapes, dans l’ordre' : 'Beats, in order'} :\n${sc.beats.map((b, i) => `${i + 1}. ${b}`).join('\n')}` : '',
+    sc.cast?.length ? `${fr ? 'Présents' : 'Present'} : ${sc.cast.join(', ')}` : '',
+    sc.reveals?.trim() ? `${fr ? 'Ce que le lecteur apprend' : 'What the reader learns'} : ${sc.reveals.trim()}` : '',
+    sc.arc?.trim() ? `${fr ? 'Trajet intérieur du point de vue' : 'Point-of-view arc'} : ${sc.arc.trim()}` : '',
+    sc.pace?.trim() ? `${fr ? 'Rythme et ton' : 'Pace and tone'} : ${sc.pace.trim()}` : '',
+    last && ch?.ending?.trim() ? `${fr ? 'Fin du chapitre' : 'Chapter ending'} : ${ch.ending.trim()}` : '',
+  ].filter(Boolean)
+}
+
 /** The length to aim for, and whether the scene opens or closes its chapter. */
 export function scenePlace(book: Book, sceneId: string): { range: [number, number]; first: boolean; last: boolean } {
   const scenes = book.chapters.find(c => c.scenes.some(s => s.id === sceneId))?.scenes ?? []
@@ -347,6 +363,7 @@ export function buildContext(input: ContextInput): Built {
       sc.time ? `${lang === 'fr' ? 'Moment' : 'Time'} : ${sc.time}` : '',
       placeName ? `${lang === 'fr' ? 'Lieu' : 'Place'} : ${placeName}` : '',
       sc.note?.trim() ? `${lang === 'fr' ? 'Ce qui se passe dans la scène' : 'What happens in the scene'} : ${sc.note.trim()}` : '',
+      ...outlineLines(book, sc, lang),
     ] : []),
   ].filter(Boolean).join('\n')
   const bibleBlock = bible ? `<bible>\n${bible}\n</bible>` : ''
@@ -357,7 +374,7 @@ export function buildContext(input: ContextInput): Built {
     edges,
     info ? `<scene>\n${info}\n</scene>` : '',
     taskMessage(lang, input.action, input.instruction, story, ai, sc ? scenePlace(book, sc.id) : undefined),
-    !isRewrite(input.action) && (edges || sc?.note?.trim()) ? SCOPE[lang] : '',
+    !isRewrite(input.action) && (edges || sc?.note?.trim() || sc?.beats?.length) ? SCOPE[lang] : '',
   ].filter(Boolean).join('\n\n')
   const parts = {
     rules: estimateTokens(rules) + 830, // + the CLI's own minimum, measured

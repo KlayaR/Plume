@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { parseEntry, serializeEntry, parseScene, serializeScene, factApplies, parseFact } from './bible'
-import { buildContext, buildMatcher, findMentions, ownShare, proseSamples, sceneWords } from './context'
+import { buildContext, buildMatcher, findMentions, outlineLines, ownShare, proseSamples, sceneWords } from './context'
 import { autoCapitalRule, fixTypography, loneI, typingRule } from './typography'
 import { pasteText, wrapMarks } from './paste'
 import { matterPages, FRONT, BACK } from './matter'
@@ -8,6 +8,7 @@ import { checkBible } from './bibleCheck'
 import { jumpItems, rankJump } from './quickjump'
 import { aiBlocks, joinBlocks, parseBlocks, toBlocks } from './blocks'
 import { tidy } from '../contextMenu'
+import { cardPatch, mergeCards, outlineRules, readChapterProposal } from './outline'
 import { sessionOf, worthShowing } from './session'
 import { addDirection, ordered, togglePin, type Direction } from './directions'
 import { EMPTY_RATE, learnCall, learnWindow, shareOf } from './windowCost'
@@ -916,5 +917,46 @@ describe('scorecard from the review', () => {
     expect(checks.length).toBeGreaterThan(0)
     expect(checks.length).toBeLessThanOrEqual(3)
     expect(checks[0].fix).toContain('« ')
+  })
+})
+
+describe('outline', () => {
+  const alice = entry({ slug: 'alice', type: 'character', name: 'Alice Cullen', aliases: ['Alice'] })
+  const forks = entry({ slug: 'forks', type: 'place', name: 'Forks' })
+  it('keeps the outline fields in the scene file', () => {
+    const s = { ...scene('a', 'Text.'), beats: ['He waits.', 'She comes, late, tired.'], cast: ['Alice'], reveals: 'The letter.', arc: 'calm → afraid', pace: 'slow', locked: true }
+    const back = parseScene(s.path, serializeScene(s))
+    expect(back.beats).toEqual(['He waits.', 'She comes, late, tired.'])
+    expect(back.cast).toEqual(['Alice'])
+    expect(back.locked).toBe(true)
+    expect(back.extra).toEqual({})
+  })
+  it('reads Claude’s chapter as a proposal: real ids only, never a locked card, no id twice', () => {
+    const book = bookOf([scene('a', ''), { ...scene('b', ''), locked: true }], [alice, forks])
+    const c = book.chapters[0]
+    const p = readChapterProposal(book, c, { goal: 'Get in.', scenes: [
+      { id: 'a', title: 'One', summary: 'S', pov: 'Alice', place: 'forks', beats: '1. Go\n2. Stop' },
+      { id: 'a', title: 'Two' }, { id: 'b', title: 'Three' }, { id: 'zz', title: 'Four' },
+    ] }, 'regenerate')!
+    expect(p.goal).toBe('Get in.')
+    expect(p.scenes.map(s => s.id)).toEqual(['a', null, null, null])
+    expect(p.scenes[0]).toMatchObject({ pov: 'alice', place: 'forks', beats: ['Go', 'Stop'], note: 'S' })
+  })
+  it('merges two cards and keeps what a draft leaves empty', () => {
+    const a = { ...scene('a', 'First.'), beats: ['x'], arc: 'calm → tense', cast: ['A'] }
+    const b = { ...scene('b', 'Second.'), beats: ['y'], arc: 'tense → afraid', cast: ['A', 'B'] }
+    expect(mergeCards(a, b)).toMatchObject({ beats: ['x', 'y'], arc: 'calm → afraid', cast: ['A', 'B'], text: 'First.\n\nSecond.' })
+    const d = { id: 'a', title: 'T', note: '', pov: null, place: null, beats: [], cast: [], reveals: 'R', arc: '', pace: '' }
+    expect(cardPatch(d, a)).toMatchObject({ title: 'T', beats: ['x'], reveals: 'R', arc: 'calm → tense' })
+  })
+  it('says one scene is the norm by default, and sends the detailed card when writing', () => {
+    expect(outlineRules('en', { kind: 'one' })).toContain('Most chapters are a single scene')
+    const s = { ...scene('a', '', { note: 'N' }), beats: ['He waits.'], reveals: 'The letter.' }
+    const book = bookOf([s], [])
+    book.chapters[0] = { ...book.chapters[0], goal: 'Get in.', ending: 'The door was open all along.' }
+    const lines = outlineLines(book, book.chapters[0].scenes[0], 'en').join('\n')
+    expect(lines).toContain('Chapter goal : Get in.')
+    expect(lines).toContain('1. He waits.')
+    expect(lines).toContain('Chapter ending : The door was open all along.')
   })
 })

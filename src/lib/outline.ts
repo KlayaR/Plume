@@ -1,0 +1,189 @@
+// The outline, for Claude and back: the rules of a scene and a chapter, the
+// book's outline as compact text, and Claude's JSON turned into a proposal
+// that the Outline tab shows before anything changes. No screen, no calls.
+import { foldText } from './text'
+import type { Book, Chapter, EntryType, Lang, Scene } from './types'
+
+/** How many scenes a chapter gets: mostly one (the default), as each chapter needs, or within a range. */
+export type SceneMode = { kind: 'one' } | { kind: 'auto' } | { kind: 'range'; min: number; max: number }
+
+/** What a scene and a chapter are, said once to Claude. */
+export function outlineRules(lang: Lang, mode: SceneMode): string {
+  const fr = lang === 'fr'
+  const count = mode.kind === 'one'
+    ? (fr ? '- La plupart des chapitres sont une seule scène. N’ajoute une scène que si le lieu, le moment ou le point de vue change vraiment.' : '- Most chapters are a single scene. Add a scene only when the place, the time or the point of view really changes.')
+    : mode.kind === 'range'
+      ? (fr ? `- De ${mode.min} à ${mode.max} scènes par chapitre, selon ce que chacun demande.` : `- ${mode.min} to ${mode.max} scenes per chapter, as each one needs.`)
+      : (fr ? '- Le nombre de scènes suit ce dont le chapitre a besoin : une seule scène est normal et souvent le mieux ; plusieurs seulement quand le lieu, le moment ou le point de vue change.' : '- The number of scenes follows what the chapter needs: a single scene is normal and often best; several only when the place, the time or the point of view changes.')
+  return fr ? `Ce qu’est une scène :
+- Un seul moment continu : un lieu, un temps sans coupure, un personnage de point de vue.
+- Quelque chose change : quelqu’un veut quelque chose, rencontre un obstacle, et la scène finit sur une situation différente. Si rien ne change, ce n’est pas une scène.
+${count}
+- Un moment de réaction plus calme (émotion, dilemme, décision) peut clore un chapitre ou ouvrir le suivant ; il n’a pas besoin de sa propre scène.
+
+Ce qu’est un chapitre (environ 3 000 à 4 500 mots) :
+- Un but concret et immédiat pour le personnage du point de vue, pas la grande quête.
+- Il monte en tension : chaque tentative donne « oui, mais… » ou « non, et en plus… ».
+- Il finit sur un tournant : un problème pire, une révélation qui change le plan, une image ou une prise de conscience pour un chapitre calme, ou une question pour le suivant.` : `What a scene is:
+- One continuous moment: one place, unbroken time, one point-of-view character.
+- Something changes: someone wants something, meets an obstacle, and the scene ends with the situation different. If nothing changes, it is not a scene.
+${count}
+- A quieter reaction moment (feeling, dilemma, decision) can close a chapter or open the next; it doesn’t need its own scene.
+
+What a chapter is (about 3,000 to 4,500 words):
+- A concrete, immediate goal for the point-of-view character, not the big quest.
+- It escalates: each attempt gives “yes, but…” or “no, and what’s more…”.
+- It ends on a turn: a worse problem, a revelation that changes the plan, an image or a realisation for a quiet chapter, or a question for the next one.`
+}
+
+/** What a detailed card holds, for the request that fills it. */
+export function cardSpec(lang: Lang): string {
+  return lang === 'fr'
+    ? `Pour chaque scène : "summary" (2 à 3 phrases : qui veut quoi, l’obstacle, ce qui change), "pov" et "place" (noms de la bible si possible), "beats" (5 à 10 étapes concrètes, dans l’ordre, chacune une phrase : ce qui se passe, pas des intentions), "cast" (les personnages présents), "reveals" (ce que le lecteur apprend, les indices posés ou repris), "arc" (l’état du point de vue au début → à la fin), "pace" (rythme et ton, quelques mots).`
+    : `For each scene: "summary" (2 to 3 sentences: who wants what, the obstacle, what changes), "pov" and "place" (bible names when possible), "beats" (5 to 10 concrete steps, in order, one sentence each: what happens, not intentions), "cast" (characters present), "reveals" (what the reader learns, clues planted or paid off), "arc" (the point-of-view character's state at the start → at the end), "pace" (pace and tone, a few words).`
+}
+
+export const SCENE_JSON = '{"id": "…", "title": "…", "summary": "…", "pov": "…", "place": "…", "beats": ["…"], "cast": ["…"], "reveals": "…", "arc": "… → …", "pace": "…"}'
+export const CHAPTER_JSON = `{"goal": "…", "ending": "…", "scenes": [${SCENE_JSON}]}`
+
+const nameOf = (book: Book, slug: string | null | undefined) => (slug ? book.entries.find(e => e.slug === slug)?.name ?? slug : '')
+
+/** One scene's card as compact text (what Claude reads of the outline). */
+export function sceneText(book: Book, s: Scene, withId = false): string {
+  return [
+    `- ${withId ? `[${s.id}]${s.locked ? ' [locked]' : ''} ` : ''}${s.title}${s.pov ? ` (POV ${nameOf(book, s.pov)})` : ''}${s.place ? ` @ ${nameOf(book, s.place)}` : ''}: ${s.note?.trim() ?? ''}`,
+    ...(s.beats ?? []).map((b, i) => `    ${i + 1}. ${b}`),
+  ].join('\n')
+}
+
+/** A chapter's outline as compact text. */
+export function chapterText(book: Book, c: Chapter, n: number, withIds = false): string {
+  return [
+    `## ${n}. ${c.title || '…'}`,
+    c.goal ? `Goal: ${c.goal}` : '',
+    c.ending ? `Ending: ${c.ending}` : '',
+    ...c.scenes.map(s => sceneText(book, s, withIds)),
+  ].filter(Boolean).join('\n')
+}
+
+/** The whole outline, or the chapters before a given one (what came before, for continuity). */
+export function outlineText(book: Book, before?: number): string {
+  return book.chapters.slice(0, before ?? book.chapters.length).map((c, i) => chapterText(book, c, i + 1)).join('\n\n')
+}
+
+/** A bible entry named (or aliased) so, of one of these types. */
+export function findEntrySlug(book: Book, name: unknown, types: EntryType[]): string | null {
+  const f = foldText(String(name ?? '').trim())
+  if (!f) return null
+  return book.entries.find(e => types.includes(e.type) && [e.name, ...e.aliases].some(a => foldText(a.replace(/!$/, '')) === f))?.slug ?? null
+}
+
+/** A scene as Claude proposes it: the outline fields only, never the text. */
+export interface CardDraft {
+  /** The existing scene it replaces; null = a new scene. */
+  id: string | null
+  title: string
+  note: string
+  pov: string | null
+  place: string | null
+  beats: string[]
+  cast: string[]
+  reveals: string
+  arc: string
+  pace: string
+}
+
+export interface OutlineProposal {
+  chapterId: string
+  kind: 'detail' | 'regenerate' | 'scene'
+  goal?: string
+  ending?: string
+  scenes: CardDraft[]
+}
+
+const str = (v: unknown) => (typeof v === 'string' ? v.trim() : Array.isArray(v) ? v.map(String).join(' ').trim() : '')
+const list = (v: unknown) => (Array.isArray(v) ? v.map(x => String(x).trim()).filter(Boolean) : typeof v === 'string' ? v.split(/\n|;/).map(x => x.replace(/^\s*(?:\d+[.)]|[-*])\s*/, '').trim()).filter(Boolean) : [])
+
+/** Claude's scene JSON as a card draft; ids it invents are dropped, locked scenes can't be targeted. */
+export function readCard(book: Book, chapter: Chapter, raw: Record<string, unknown>): CardDraft {
+  const id = typeof raw.id === 'string' && chapter.scenes.some(s => s.id === raw.id && !s.locked) ? raw.id : null
+  return {
+    id,
+    title: str(raw.title) || (book.meta.language === 'fr' ? 'Scène' : 'Scene'),
+    note: str(raw.summary ?? raw.note),
+    pov: findEntrySlug(book, raw.pov, ['character']),
+    place: findEntrySlug(book, raw.place, ['place']),
+    beats: list(raw.beats),
+    cast: list(raw.cast),
+    reveals: str(raw.reveals),
+    arc: str(raw.arc),
+    pace: str(raw.pace),
+  }
+}
+
+/** Claude's chapter JSON as a proposal. Locked scenes are never part of it. */
+export function readChapterProposal(book: Book, chapter: Chapter, raw: unknown, kind: OutlineProposal['kind']): OutlineProposal | null {
+  if (!raw || typeof raw !== 'object') return null
+  const r = raw as Record<string, unknown>
+  const scenes = (Array.isArray(r.scenes) ? r.scenes : Array.isArray(raw) ? raw : [raw])
+    .filter((x): x is Record<string, unknown> => !!x && typeof x === 'object')
+    .map(x => readCard(book, chapter, x))
+  if (!scenes.length) return null
+  // Two drafts can't replace the same scene: the second becomes a new one.
+  const seen = new Set<string>()
+  for (const s of scenes) { if (s.id && seen.has(s.id)) s.id = null; if (s.id) seen.add(s.id) }
+  return { chapterId: chapter.id, kind, goal: str(r.goal) || undefined, ending: str(r.ending) || undefined, scenes }
+}
+
+/** The outline fields of a scene, to compare, apply or put back. */
+export const cardOf = (s: Scene): Omit<CardDraft, 'id'> => ({
+  title: s.title, note: s.note ?? '', pov: s.pov, place: s.place ?? null, beats: s.beats ?? [], cast: s.cast ?? [], reveals: s.reveals ?? '', arc: s.arc ?? '', pace: s.pace ?? '',
+})
+
+/** The patch that gives a scene a draft's outline (keeping what the draft leaves empty). */
+export function cardPatch(d: CardDraft, s?: Scene): Partial<Scene> {
+  return {
+    title: d.title || s?.title || '',
+    note: d.note || s?.note,
+    pov: d.pov ?? s?.pov ?? null,
+    place: d.place ?? s?.place ?? null,
+    beats: d.beats.length ? d.beats : s?.beats,
+    cast: d.cast.length ? d.cast : s?.cast,
+    reveals: d.reveals || s?.reveals,
+    arc: d.arc || s?.arc,
+    pace: d.pace || s?.pace,
+  }
+}
+
+/** Merging a scene with the next one: outlines joined, texts joined. */
+export function mergeCards(a: Scene, b: Scene): Partial<Scene> {
+  const join = (x?: string, y?: string) => [x?.trim(), y?.trim()].filter(Boolean).join('\n') || undefined
+  return {
+    note: join(a.note, b.note),
+    beats: [...(a.beats ?? []), ...(b.beats ?? [])],
+    cast: [...new Set([...(a.cast ?? []), ...(b.cast ?? [])])],
+    reveals: join(a.reveals, b.reveals),
+    arc: a.arc && b.arc ? `${a.arc.split('→')[0].trim()} → ${(b.arc.split('→').pop() ?? '').trim()}` : a.arc || b.arc,
+    pace: a.pace || b.pace,
+    text: [a.text.trim(), b.text.trim()].filter(Boolean).join('\n\n'),
+  }
+}
+
+/** The outline as Markdown, to copy elsewhere. */
+export function outlineMarkdown(book: Book): string {
+  const fr = book.meta.language === 'fr'
+  return [`# ${book.meta.title}`, ...book.chapters.map((c, i) => [
+    `## ${i + 1}. ${c.title || '…'}`,
+    c.goal ? `*${fr ? 'But' : 'Goal'} :* ${c.goal}` : '',
+    c.ending ? `*${fr ? 'Fin' : 'Ending'} :* ${c.ending}` : '',
+    ...c.scenes.map(s => [
+      `### ${s.title}`,
+      [s.pov && `${fr ? 'Point de vue' : 'POV'} : ${nameOf(book, s.pov)}`, s.place && `${fr ? 'Lieu' : 'Place'} : ${nameOf(book, s.place)}`, s.time].filter(Boolean).join(' · '),
+      s.note ?? '',
+      ...(s.beats ?? []).map((b, j) => `${j + 1}. ${b}`),
+      s.reveals ? `*${fr ? 'Le lecteur apprend' : 'Reveals'} :* ${s.reveals}` : '',
+      s.arc ? `*Arc :* ${s.arc}` : '',
+      s.pace ? `*${fr ? 'Rythme' : 'Pace'} :* ${s.pace}` : '',
+    ].filter(Boolean).join('\n\n')),
+  ].filter(Boolean).join('\n\n'))].join('\n\n')
+}

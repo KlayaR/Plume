@@ -60,7 +60,9 @@ async function invoke(cmd: string, args: any = {}): Promise<unknown> {
         return null
       }
       let i = 0
-      const words = REPLY.split(/(?<= )/)
+      // window.__mockReply: what the fake claude answers next (an outline's JSON, say); otherwise the canned prose.
+      const reply = (window as any).__mockReply ?? REPLY
+      const words = reply.split(/(?<= )/)
       const timer = setInterval(() => {
         if (i < words.length) {
           line({ type: 'stream_event', event: { type: 'content_block_delta', delta: { type: 'text_delta', text: words[i++] } } })
@@ -68,7 +70,7 @@ async function invoke(cmd: string, args: any = {}): Promise<unknown> {
         }
         clearInterval(timer)
         line({ type: 'rate_limit_event', rate_limit_info: { unifiedWindows: { five_hour: { utilization: 0.12, resetsAt: Date.now() / 1000 + 7200 }, seven_day: { utilization: 0.52, resetsAt: Date.now() / 1000 + 86400 * 3 } } } })
-        line({ type: 'result', is_error: false, result: REPLY, usage: { input_tokens: 3, cache_creation_input_tokens: 420, cache_read_input_tokens: 1650, output_tokens: 61 } })
+        line({ type: 'result', is_error: false, result: reply, usage: { input_tokens: 3, cache_creation_input_tokens: 420, cache_read_input_tokens: 1650, output_tokens: 61 } })
         emit('claude-done', { id, code: 0, stderr: '' })
       }, 60)
       return null

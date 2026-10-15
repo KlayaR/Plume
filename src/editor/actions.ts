@@ -80,7 +80,7 @@ export async function runAction(action: ActionId, instruction: string, overrides
   if (view.state.field(proposalField)) return st.notify('warn', t('Accept or discard the current proposal first.'))
   if (isRewrite(action) && view.state.selection.main.empty) return st.notify('warn', t('Select the passage to rewrite first.'))
   if (action === 'beats' && !instruction.trim()) return st.notify('warn', t('Write the beats first, one per line.'))
-  if (action === 'scene' && !findScene(st.book, st.sceneId)?.scene.note?.trim()) return st.notify('warn', t('Give this scene a note in the Plan first: Claude writes it from that note.'))
+  if (action === 'scene' && !findScene(st.book, st.sceneId)?.scene.note?.trim() && !findScene(st.book, st.sceneId)?.scene.beats?.length) return st.notify('warn', t('Give this scene a note in the Plan first: Claude writes it from that note.'))
   const ctx = currentContext(action, instruction, overrides)
   if (!ctx) return
   useAI.setState({ last: { action, instruction, overrides } })
@@ -172,7 +172,7 @@ export async function writeFromPlan(sceneId: string) {
   const st = useStore.getState()
   const found = findScene(st.book, sceneId)
   if (!found) return
-  if (!found.scene.note?.trim()) return st.notify('warn', t('Give this scene a note in the Plan first: Claude writes it from that note.'))
+  if (!found.scene.note?.trim() && !found.scene.beats?.length) return st.notify('warn', t('Give this scene a note in the Plan first: Claude writes it from that note.'))
   st.selectScene(sceneId)
   // The scene's editor becomes the active one a frame or two after it opens.
   for (let i = 0; i < 40 && !(view?.dom.isConnected && useStore.getState().sceneId === sceneId); i++) await frame()
@@ -193,7 +193,7 @@ export async function writeChapter(chapterId: string) {
   const chapter = book?.chapters.find(c => c.id === chapterId)
   if (!book || !chapter || useAI.getState().running) return
   if (!canRun()) return st.notify('error', t('The claude command line was not found. Set its path in Settings.'))
-  const todo = chapter.scenes.filter(s => !s.text.trim() && s.note?.trim())
+  const todo = chapter.scenes.filter(s => !s.text.trim() && (s.note?.trim() || s.beats?.length))
   if (!todo.length) return st.notify('warn', t('No empty scene with a plan note in this chapter.'))
   const [a, b] = book.meta.ai.chapterWords
   if (!(await askDialog(t('Claude will write {n} scene(s) of this chapter from their plan notes, about {a} to {b} words in all. Scenes that already have text are left alone, and a snapshot is taken first.', { n: todo.length, a, b }), { title: t('Write the chapter'), kind: 'info' }))) return
