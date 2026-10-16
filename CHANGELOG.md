@@ -7,6 +7,13 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.33.0
+**Edit this chapter: check a whole chapter and fix what's wrong**
+- One button (Review panel, chapter menu, Ctrl+K) for any chapter, written by you or by Claude. Choose **Polish** (language, repetition, clunky sentences, clichés, AI tells) or **Deep** (also continuity with the bible as true at that chapter, character voices against their voice cards, the chapter's plan, pacing and dialogue).
+- Claude reads the chapter once and lists the real problems, each with the exact words, grouped into errors, what weakens the chapter, and finish. LanguageTool's spelling and grammar join the list when it is your checker, with its own corrections (no request needed). What Plume measures for free (your rules, the reports) is given to Claude as hints.
+- Untick what you disagree with, then **Fix the ticked ones**: Claude fixes only those, in your voice, as tracked changes in the text. A small error becomes a few words; a passage that drags or a missed goal becomes a rewritten passage beside the old one. Accept or reject each with ✓ / ✕, Ctrl+Z works, and a snapshot is taken first.
+- **Check again** shows what is left once you have gone through the changes.
+
 ## 0.32.0
 **Series: Claude knows what comes next, without putting it in this book**
 - **The series** (Plan → Outline, above The story, for books in a series): the series' arc and endgame, one line per book, and the big reveals with the book each belongs to. Saved in the series folder, so every book of the series shares it.

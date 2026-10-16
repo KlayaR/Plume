@@ -16,7 +16,8 @@ import { editorMenu } from '../menus'
 import { enterStartsScene } from '../lib/chapters'
 import { proposalField, sceneExtensions, setNames } from './cm'
 import { accept, discard, fillPlaceholder, getEditorView, runAction, setEditorView, syncProposalState, useAI } from './actions'
-import { inlineExt, marksExt, placeholderExt, setHighlights, trackedChangesExt, unknownNamesExt, type Highlight } from './marks'
+import { changesField, inlineExt, marksExt, placeholderExt, setChanges, setHighlights, trackedChangesExt, unknownNamesExt, type Highlight } from './marks'
+import { takePending, useEdit } from '../edit'
 import type { Comment, EntryType } from '../lib/types'
 import { cutToDarlings } from '../writing'
 import { useReview } from '../review'
@@ -283,6 +284,14 @@ export default function Editor({ scene }: { scene: Scene }) {
   }, [jump, active, scene.id])
   // Another scene became the active one: LanguageTool moves with it.
   useEffect(() => { viewRef.current?.dispatch({ effects: refreshLT.of(null) }) }, [active])
+  // Edit this chapter: Claude's fixes for this scene arrive as tracked changes.
+  const fixes = useEdit(s => s.pending[scene.id])
+  useEffect(() => {
+    const v = viewRef.current
+    if (!v || !fixes) return
+    const list = takePending(scene.id)
+    if (list) v.dispatch({ effects: setChanges.of([...v.state.field(changesField), ...list.filter(c => c.to <= v.state.doc.length)]) })
+  }, [fixes, scene.id])
 
   // Chosen in the tree, or just created: become the active editor, focused and in view.
   useEffect(() => {

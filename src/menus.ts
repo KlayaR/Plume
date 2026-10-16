@@ -1,5 +1,6 @@
 // The content of every right-click menu, one function per place. Screens call
 // these with what was clicked; the menu itself is drawn by ContextMenuHost.
+import { openEdit } from './edit'
 import { ownShare } from './lib/context'
 import type { EditorView } from '@codemirror/view'
 import { ask as askDialog } from '@tauri-apps/plugin-dialog'
@@ -197,6 +198,7 @@ export function chapterMenu(chapterId: string): MenuItem[] {
   const words = c.scenes.reduce((n, s) => n + countWords(s.text), 0)
   return [
     { label: t('New scene'), onClick: () => st.addScene(chapterId, `${t('Scene')} ${c.scenes.length + 1}`) },
+    { label: t('Edit this chapter (Claude)…'), disabled: !c.scenes.some(s => s.text.trim()), onClick: () => openEdit(chapterId) },
     { label: t('Write the chapter from the plan (Claude)'), disabled: !c.scenes.some(s => !s.text.trim() && (s.note?.trim() || s.beats?.length)), onClick: () => writeChapter(chapterId) },
     { label: t('Rename…'), onClick: async () => { const v = await askText(t('Chapter title'), c.title); if (v !== null) st.updateChapter(chapterId, { title: v.trim() }) } },
     kinds.length > 1 && { label: t('Kind'), sub: kinds.map(k => ({ label: t(kindNames[k]), checked: c.kind === k, onClick: () => st.updateChapter(chapterId, { kind: k }) })) },

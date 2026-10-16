@@ -66,7 +66,7 @@ export function currentContext(action: ActionId, instruction: string, overrides:
 }
 
 /** The model the Assistant uses: its own two choices (backend, model); the effort stays per action. */
-function assistantChoice(action: ActionId): { model: Model; effort: Effort; orModel?: string } {
+export function assistantChoice(action: ActionId): { model: Model; effort: Effort; orModel?: string } {
   const st = useStore.getState()
   const act = st.book!.meta.ai.actions[action]
   if (st.prefs.assistBackend === 'openrouter' && st.prefs.assistModel) return { model: act.model, effort: act.effort, orModel: st.prefs.assistModel }

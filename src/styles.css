@@ -647,6 +647,19 @@ body.pl-typing .pl-toolbar { opacity: 0.08; }
 .pl-tour b { display: block; }
 .pl-tour span { color: var(--text-dim); font-size: var(--fs-sm); line-height: 1.5; }
 
+/* Edit this chapter. */
+.pl-edit { display: flex; flex-direction: column; gap: 12px; }
+.pl-edit-depths { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.pl-edit-depth { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; text-align: left; padding: 12px 14px; border-radius: 8px; border: 1px solid var(--border-strong); background: var(--surface-1); color: var(--text); font: inherit; cursor: pointer; }
+.pl-edit-depth:hover { border-color: var(--accent); }
+.pl-edit-busy { padding: 18px 0; color: var(--text-dim); }
+.pl-edit-group { display: flex; flex-direction: column; gap: 6px; }
+.pl-edit-item { display: flex; gap: 10px; align-items: flex-start; padding: 8px 10px; border-radius: 6px; background: var(--surface-1); cursor: pointer; }
+.pl-edit-item > span { display: flex; flex-direction: column; gap: 3px; }
+.pl-edit-off { opacity: .5; }
+.pl-edit-quote { font-style: italic; color: var(--text-dim); }
+.pl-edit-fix { color: var(--accent); }
+
 /* LanguageTool underlines. */
 .cm-lt { text-decoration: underline wavy; text-decoration-thickness: 1px; text-underline-offset: 3px; }
 .cm-lt-spell { text-decoration-color: #d0533f; }

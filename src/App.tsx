@@ -26,6 +26,7 @@ import ContextMenuHost from './components/ContextMenuHost'
 import LTFields from './components/LTFields'
 import HelpDialog from './components/HelpDialog'
 import SnapshotsDialog from './components/SnapshotsDialog'
+import EditChapterDialog from './components/EditChapterDialog'
 
 /** Scroll positions per space and scrolling element, for this run of the app. */
 const scrolls = new Map<string, number>()
@@ -161,6 +162,7 @@ export default function App() {
       {book && dialog === 'agents' && <AgentDialog onClose={() => useStore.setState({ dialog: null })} />}
       {book && printing && <PrintView />}
       {book && !prefs.seen?.includes('basics') && <TipCard />}
+      {book && <EditChapterDialog />}
       <ContextMenuHost />
       <LTFields />
       <Toasts />

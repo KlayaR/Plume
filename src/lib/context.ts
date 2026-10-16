@@ -112,7 +112,7 @@ function voiceBlock(e: Entry, lang: Lang): string {
   return rows.length ? `<voice>\n${rows.join('\n')}\n</voice>` : ''
 }
 
-function renderEntry(e: Entry, mode: Mode, chapter: number, lang: Lang, bookIndex = 1, pov = false): string {
+export function renderEntry(e: Entry, mode: Mode, chapter: number, lang: Lang, bookIndex = 1, pov = false): string {
   const aka = e.aliases.filter(a => a !== e.name).map(a => a.replace(/!$/, ''))
   const head = `<entry type="${e.type}" name="${e.name}"${aka.length ? ` aka="${aka.join(', ')}"` : ''}${pov ? ' pov="true"' : ''}>`
   // Blocks marked never are not sent; blocks marked always travel with the short version.

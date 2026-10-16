@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { locate } from '../edit'
 import { parseEntry, serializeEntry, parseScene, serializeScene, factApplies, parseFact } from './bible'
 import { buildContext, buildMatcher, findMentions, outlineLines, ownShare, proseSamples, sceneWords, systemPrompt } from './context'
 import { autoCapitalRule, fixTypography, loneI, typingRule } from './typography'
@@ -966,6 +967,15 @@ describe('outline', () => {
     expect(lines).toContain('Chapter goal : Get in.')
     expect(lines).toContain('1. He waits.')
     expect(lines).toContain('Chapter ending : The door was open all along.')
+  })
+})
+
+describe('edit this chapter', () => {
+  it('places a fix on its words, never on top of another fix', () => {
+    const text = 'She ran. She ran again.'
+    expect(locate(text, 'She ran', [])).toBe(0)
+    expect(locate(text, 'She ran', [{ from: 0, to: 7 }])).toBe(9)
+    expect(locate(text, 'flew', [])).toBe(-1)
   })
 })
 

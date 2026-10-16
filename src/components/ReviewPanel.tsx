@@ -2,8 +2,9 @@
 // category (pacing, dialogue, strong writing, word choice, repetition,
 // readability) compared with targets, each highlighted in the text with
 // next / previous. Then the AI checks on demand, read aloud, and the figures.
+import { openEdit } from '../edit'
 import { useEffect, useMemo, useState } from 'react'
-import { ChevronDown, ChevronLeft, ChevronRight, Pause, Play, Sparkles, Users, Wand2 } from 'lucide-react'
+import { ChevronDown, ChevronLeft, ChevronRight, Pause, Play, FileCheck2, Sparkles, Users, Wand2 } from 'lucide-react'
 import { findScene, useStore } from '../store'
 import { textStats, type TextStats } from '../lib/stats'
 import { CATEGORIES, review, topProblems, type ReportResult } from '../lib/review'
@@ -240,6 +241,7 @@ function AIChecks({ sceneId, chapterId, chapterText }: { sceneId: string; chapte
   return (
     <section className="pl-cat">
       <div className="sk-label">{t('Ask Claude')}</div>
+      <button type="button" className="sk-btn sk-btn-sm sk-btn-primary" disabled={!!busy || !chapterText.trim()} onClick={() => openEdit(chapterId)} title={t('Checks the whole chapter and fixes what you keep, as tracked changes')}><FileCheck2 size={13} /> {t('Edit this chapter…')}</button>
       <div className="pl-aichecks">
         <button type="button" className="sk-btn sk-btn-sm" disabled={!!busy} onClick={() => voiceCheck(sceneId)} title={cost(voiceCheckCost(sceneId))}><Sparkles size={13} /> {busy === 'voice' ? t('Reading…') : t('Voice check')}</button>
         <button type="button" className="sk-btn sk-btn-sm" disabled={!!busy} onClick={() => continuityCheck(sceneId)} title={cost(continuityCost(sceneId))}><Sparkles size={13} /> {busy === 'continuity' ? t('Reading…') : t('Continuity check')}</button>
