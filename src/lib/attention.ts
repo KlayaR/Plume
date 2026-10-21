@@ -2,12 +2,28 @@
 // locally. Shown at the top of the Dashboard, each with the first scene to open.
 import type { Book } from './types'
 import { nextToDo } from './revision'
+import { bufferOf, isLitRPG, isSerial, serialOf, statConflicts, threadStates } from './serial'
 
-export type AttentionKind = 'empty' | 'no-pov' | 'no-note' | 'beats-unplaced' | 'unrated' | 'next-pass'
+export type AttentionKind = 'empty' | 'no-pov' | 'no-note' | 'beats-unplaced' | 'unrated' | 'next-pass' | 'buffer' | 'threads' | 'stats'
 
 export interface Attention { kind: AttentionKind; n: number; sceneId?: string; pass?: string }
 
-export function attention(book: Book): Attention[] {
+/** Web novels: a buffer under a week, threads left hanging, LitRPG boxes that disagree with the stats. */
+function serialAttention(book: Book, today: Date): Attention[] {
+  const out: Attention[] = []
+  const need = serialOf(book).days.length
+  const buf = bufferOf(book, today)
+  if (need && buf.published > 0 && buf.ready.length < need) out.push({ kind: 'buffer', n: buf.ready.length })
+  const hanging = threadStates(book).filter(s => s.flagged)
+  if (hanging.length) out.push({ kind: 'threads', n: hanging.length })
+  if (isLitRPG(book)) {
+    const bad = statConflicts(book)
+    if (bad.length) out.push({ kind: 'stats', n: bad.length, sceneId: bad[0].sceneId })
+  }
+  return out
+}
+
+export function attention(book: Book, today = new Date()): Attention[] {
   const scenes = book.chapters.flatMap(c => c.scenes)
   const out: Attention[] = []
   const written = scenes.filter(s => s.text.trim())
@@ -25,5 +41,6 @@ export function attention(book: Book): Attention[] {
   if (rated && unrated.length) out.push({ kind: 'unrated', n: unrated.length, sceneId: unrated[0].id })
   const next = nextToDo(book)
   if (next && written.length) out.push({ kind: 'next-pass', n: 1, sceneId: next.scene.id, pass: next.pass.name })
+  if (isSerial(book)) out.push(...serialAttention(book, today))
   return out
 }

@@ -9,6 +9,7 @@ import type { ActionId, Book, Scene } from './lib/types'
 import { newId } from './lib/text'
 import { ask, hashText } from './ai'
 import { findScene, useStore } from './store'
+import { arcsOf } from './lib/serial'
 import { t } from './i18n'
 
 export interface Darling { id: string; sceneId: string; sceneTitle: string; text: string; before: string; after: string; date: string }
@@ -198,6 +199,17 @@ export async function updateSummaries() {
       useNotes.setState({ summarizing: c.title || '…' })
       const text = await ask({ model: 'haiku', effort: 'low', system: summarySystem(fr), message: `<scenes>\n${parts}\n</scenes>\n\n${fr ? 'Résume ce chapitre en 3 à 5 phrases.' : 'Summarise this chapter in 3 to 5 sentences.'}` })
       useStore.getState().updateChapter(c.id, { summary: text.trim(), summaryOf: hashText(parts) })
+    }
+    // Web novels: each arc's summary, which the AI reads instead of its chapters once the arc is over.
+    for (const a of arcsOf(useStore.getState().book!)) {
+      const b = useStore.getState().book!
+      const parts = b.chapters.slice(a.start, a.end).filter(c => c.summary).map(c => `- ${c.title || '…'} : ${c.summary}`).join('\n')
+      if (!parts || a.plan?.summaryOf === hashText(parts)) continue
+      useNotes.setState({ summarizing: a.title })
+      const text = await ask({ model: 'haiku', effort: 'low', system: summarySystem(fr), message: `<chapters>\n${parts}\n</chapters>\n\n${fr ? 'Résume cet arc en 4 à 6 phrases : ce qui s’y passe, ce qui change, ce qui reste ouvert.' : 'Summarise this arc in 4 to 6 sentences: what happens, what changes, what is left open.'}` })
+      const arcs = useStore.getState().book!.meta.arcs ?? {}
+      const was = arcs[a.id] ?? { template: '', beats: [], planned: 30 }
+      useStore.getState().updateMeta({ arcs: { ...arcs, [a.id]: { ...was, summary: text.trim(), summaryOf: hashText(parts) } } })
     }
     const book = useStore.getState().book!
     const all = book.chapters.filter(c => c.summary).map(c => `- ${c.title || '…'} : ${c.summary}`).join('\n')

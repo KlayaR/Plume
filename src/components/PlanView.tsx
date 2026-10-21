@@ -19,34 +19,45 @@ import Dashboard from './Dashboard'
 import Tension from './Tension'
 import { ShowEverything } from './BibleView'
 import OutlineView from './OutlineView'
+import { Arcs, Release, Threads } from './SerialPlan'
 
 const TABS: [PlanTab, string][] = [['outline', 'Outline'], ['board', 'Board'], ['structure', 'Structure']]
+/** A web novel plans by arcs and by release instead of one structure. */
+const SERIAL_TABS: [PlanTab, string][] = [['outline', 'Outline'], ['board', 'Board'], ['arcs', 'Arcs'], ['release', 'Release']]
 /** Plan tabs grouped under "Analysis". Revision moved to Manuscript → Review. */
 const ANALYSIS: [PlanTab, string][] = [['timeline', 'Timeline'], ['lines', 'Story lines'], ['dashboard', 'Dashboard']]
-const isAnalysis = (t: PlanTab) => ANALYSIS.some(([id]) => id === t)
+const SERIAL_ANALYSIS: [PlanTab, string][] = [['threads', 'Threads'], ...ANALYSIS]
 
 export default function PlanView() {
   const simple = useStore(s => s.prefs.simple)
+  const serial = useStore(s => s.book?.meta.kind === 'serial')
   const chosen = useStore(s => s.planTab)
-  // Beginner mode keeps the Outline, the Board and Structure; the other tabs come with "Show everything".
-  const tab = (simple && !['outline', 'board', 'structure'].includes(chosen)) || chosen === 'revision' ? 'outline' : chosen
+  const tabs = serial ? SERIAL_TABS : TABS
+  const analysis = serial ? SERIAL_ANALYSIS : ANALYSIS
+  const isAnalysis = (x: PlanTab) => analysis.some(([id]) => id === x)
+  // Beginner mode keeps the main tabs; the analysis ones come with "Show everything". A tab of the other kind of book falls back to the Outline.
+  const known = [...tabs, ...analysis].some(([id]) => id === chosen)
+  const tab = !known || (simple && !tabs.some(([id]) => id === chosen)) ? 'outline' : chosen
   const pinned = useStore(s => s.prefs.chatOpen)
   const t = useT()
   return (
     <div className="pl-withdock" data-pin={pinned}>
       <div className="pl-plan">
         <nav className="pl-switch pl-plan-tabs" aria-label={t('Plan')}>
-          {TABS.map(([id, label]) => <button key={id} type="button" aria-pressed={tab === id} onClick={() => useStore.setState({ planTab: id })}>{t(label)}</button>)}
-          {simple ? <ShowEverything /> : <button type="button" aria-pressed={isAnalysis(tab)} onClick={() => !isAnalysis(tab) && useStore.setState({ planTab: 'timeline' })}>{t('Analysis')}</button>}
+          {tabs.map(([id, label]) => <button key={id} type="button" aria-pressed={tab === id} onClick={() => useStore.setState({ planTab: id })}>{t(label)}</button>)}
+          {simple ? <ShowEverything /> : <button type="button" aria-pressed={isAnalysis(tab)} onClick={() => !isAnalysis(tab) && useStore.setState({ planTab: analysis[0][0] })}>{t('Analysis')}</button>}
         </nav>
         {isAnalysis(tab) && (
           <nav className="pl-switch pl-plan-sub" aria-label={t('Analysis')}>
-            {ANALYSIS.map(([id, label]) => <button key={id} type="button" aria-pressed={tab === id} onClick={() => useStore.setState({ planTab: id })}>{t(label)}</button>)}
+            {analysis.map(([id, label]) => <button key={id} type="button" aria-pressed={tab === id} onClick={() => useStore.setState({ planTab: id })}>{t(label)}</button>)}
           </nav>
         )}
         {tab === 'outline' && <OutlineView />}
         {tab === 'board' && <Board />}
         {tab === 'structure' && <Structure />}
+        {tab === 'arcs' && <><Tension /><Arcs /></>}
+        {tab === 'release' && <Release />}
+        {tab === 'threads' && <Threads />}
         {tab === 'timeline' && <Timeline />}
         {tab === 'lines' && <Lines />}
         {tab === 'dashboard' && <Dashboard />}
@@ -146,7 +157,8 @@ function Board() {
               <span className="pl-col-num">{c.kind === 'chapter' ? labels[ci].number : labels[ci].label}</span>
               <input data-lt className="pl-col-title" value={c.title} placeholder={t('Untitled')} onChange={e => st().updateChapter(c.id, { title: e.target.value })} />
             </div>
-            <input data-lt className="pl-col-part" value={c.part ?? ''} placeholder={t('Starts a part: its title')} title={t('A part page goes before this chapter in exports')} onChange={e => st().updateChapter(c.id, { part: e.target.value })} />
+            <input data-lt className="pl-col-part" value={c.part ?? ''} placeholder={book.meta.kind === 'serial' ? t('Starts a volume: its title') : t('Starts a part: its title')} title={book.meta.kind === 'serial' ? t('Volumes group arcs; a volume can be exported as a book of its own') : t('A part page goes before this chapter in exports')} onChange={e => st().updateChapter(c.id, { part: e.target.value })} />
+            {book.meta.kind === 'serial' && <input data-lt className="pl-col-part" value={c.arc ?? ''} placeholder={t('Starts an arc: its title')} onChange={e => st().updateChapter(c.id, { arc: e.target.value })} />}
             {c.scenes.map((s, si) => (
               <Card key={s.id} scene={s} active={selected === s.id} tint={tintOf(s)} dim={dimmed(s)}
                 onSelect={() => setSelected(selected === s.id ? null : s.id)}

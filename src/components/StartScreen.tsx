@@ -10,7 +10,7 @@ import { loadSpots, useStore } from '../store'
 import { worthShowing } from '../lib/session'
 import { createBook, createExample, isBook } from '../lib/project'
 import { exampleTitle } from '../lib/example'
-import type { Lang } from '../lib/types'
+import type { BookKind, Lang } from '../lib/types'
 import { importManuscript, loadShelf, type ShelfBook } from '../library'
 import { numLocale, useT } from '../i18n'
 
@@ -149,6 +149,7 @@ function NewBook({ onClose }: { onClose: () => void }) {
   const [author, setAuthor] = useState('')
   const [premise, setPremise] = useState('')
   const [lang, setLang] = useState<Lang>(useStore.getState().prefs.ui)
+  const [kind, setKind] = useState<BookKind>('book')
   const [parent, setParent] = useParent()
   const [busy, setBusy] = useState(false)
 
@@ -162,7 +163,7 @@ function NewBook({ onClose }: { onClose: () => void }) {
     setBusy(true)
     try {
       const root = await join(parent, folderName(title))
-      const book = await createBook(root, title.trim(), author.trim(), lang)
+      const book = await createBook(root, title.trim(), author.trim(), lang, kind)
       useStore.getState().setBook(book)
       // A premise, if given, is kept and offered as the start of an outline.
       if (premise.trim()) {
@@ -201,6 +202,16 @@ function NewBook({ onClose }: { onClose: () => void }) {
           <button type="button" aria-pressed={lang === 'fr'} onClick={() => setLang('fr')}>Français</button>
           <button type="button" aria-pressed={lang === 'en'} onClick={() => setLang('en')}>English</button>
         </div>
+      </div>
+      <div className="sk-field">
+        <label>{t('Kind of book')}</label>
+        <div className="sk-segmented" role="group" aria-label={t('Kind of book')}>
+          <button type="button" aria-pressed={kind === 'book'} onClick={() => setKind('book')}>{t('Book')}</button>
+          <button type="button" aria-pressed={kind === 'serial'} onClick={() => setKind('serial')}>{t('Web novel')}</button>
+        </div>
+        <span className="sk-hint">{kind === 'serial'
+          ? t('Published chapter by chapter (Royal Road): chapters of 2,000 to 3,500 words, a release schedule and a buffer, arcs and volumes, published chapters kept as canon. LitRPG can be turned on in Settings → This book.')
+          : t('A novel written for ebook or print, with front and back matter.')}</span>
       </div>
       <div className="sk-field">
         <label htmlFor="nb-premise">{t('Premise (optional)')}</label>

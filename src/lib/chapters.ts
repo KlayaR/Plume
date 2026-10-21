@@ -13,11 +13,11 @@ export function chapterLabels(chapters: Pick<Chapter, 'kind'>[], lang: Lang): Ch
   })
 }
 
-/** Only the first chapter can be a prologue, only the last an epilogue. */
-export function allowedKinds(index: number, count: number): Chapter['kind'][] {
+/** Only the first chapter can be a prologue, only the last an epilogue; a web novel has no last chapter, so no epilogue. */
+export function allowedKinds(index: number, count: number, serial = false): Chapter['kind'][] {
   const kinds: Chapter['kind'][] = ['chapter']
   if (index === 0) kinds.push('prologue')
-  if (index === count - 1 && count > 1) kinds.push('epilogue')
+  if (index === count - 1 && count > 1 && !serial) kinds.push('epilogue')
   return kinds
 }
 

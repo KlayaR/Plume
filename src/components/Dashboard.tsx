@@ -89,6 +89,9 @@ export default function Dashboard() {
       case 'beats-unplaced': return t('{n} beats of your structure aren’t placed in a scene.', { n: a.n })
       case 'unrated': return t('{n} scenes have no tension rating yet.', { n: a.n })
       case 'next-pass': return t('Next revision step: {pass}.', { pass: a.pass ?? '' })
+      case 'buffer': return t('Only {n} chapters written ahead: less than a week of releases.', { n: a.n })
+      case 'threads': return t('{n} threads untouched for a long while (Plan → Threads).', { n: a.n })
+      case 'stats': return t('{n} system boxes disagree with the characters’ stats.', { n: a.n })
     }
   }
   const { words } = bookCounts(book.chapters)

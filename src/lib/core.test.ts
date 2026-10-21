@@ -28,6 +28,11 @@ import { aiTells, checkRules, expandVariables } from './voice'
 import { review, reviewChecks, topProblems } from './review'
 import { parseStoryTime } from './structures'
 import { makeZip, readZip, utf8, fromUtf8 } from './zip'
+import { arcsOf, beatChapter, bufferOf, hookFlags, maskSystem, mergeStats, readBox, releaseDates, releaseStreak, statConflicts, statsAt, systemBoxes, textKey, threadStates, volumesOf, weekReleases } from './serial'
+import { chapterTitleFor, royalRoadHtml, volumeBook } from './export'
+import { serialStorySoFar } from './context'
+import type { Chapter } from './types'
+import { DEFAULT_SERIAL } from './types'
 import { scenePositions, timeFlags } from './structures'
 import { bookCounts, sceneCounts } from './stats'
 import { darlingSpot, diffWords } from '../writing'
@@ -1020,5 +1025,120 @@ describe('story foundation, turning points and outline versions', () => {
     const p = versionProposal(c, all[c.id][0])
     expect(p.goal).toBe('Old goal.')
     expect(p.scenes[0]).toMatchObject({ id: 'a', note: 'Old summary.', beats: ['x'] })
+  })
+})
+
+describe('web novels', () => {
+  const ch = (id: string, text: string, over: Partial<Chapter> = {}): Chapter => ({ id, folder: id, kind: 'chapter', title: id.toUpperCase(), notes: '', scenes: [scene(`s-${id}`, text)], ...over })
+  const words = (n: number) => Array.from({ length: n }, (_, i) => `word${i}`).join(' ')
+  const serialBook = (chapters: Chapter[], entries: Entry[] = []): Book => {
+    const b = bookOf([], entries)
+    return { ...b, chapters, meta: { ...b.meta, kind: 'serial', serial: { ...DEFAULT_SERIAL, days: [1, 3, 5] }, ai: { ...b.meta.ai, chapterWords: [2000, 3500] } } }
+  }
+  const wed = new Date(2026, 9, 21)
+
+  it('counts the buffer after the last published chapter, and until when it lasts', () => {
+    const book = serialBook([ch('a', words(2500), { published: '2026-10-19' }), ch('b', words(2500)), ch('c', words(1700)), ch('d', words(100)), ch('e', words(2500))])
+    const buf = bufferOf(book, wed)
+    expect(buf.ready.map(c => c.id)).toEqual(['b', 'c'])
+    expect(buf.next).toEqual(wed)
+    expect(buf.until).toEqual(new Date(2026, 9, 23))
+  })
+  it('starts the schedule tomorrow when a chapter went out today', () => {
+    const book = serialBook([ch('a', words(2500), { published: '2026-10-21' }), ch('b', words(2500))])
+    expect(bufferOf(book, wed).next).toEqual(new Date(2026, 9, 23))
+  })
+  it('lists release days and counts the weeks on schedule', () => {
+    expect(releaseDates(wed, [1, 5], 3)).toEqual([new Date(2026, 9, 23), new Date(2026, 9, 26), new Date(2026, 9, 30)])
+    const pub = (id: string, day: string) => ch(id, words(10), { published: day })
+    const book = serialBook([pub('a', '2026-10-05'), pub('b', '2026-10-07'), pub('c', '2026-10-09'), pub('d', '2026-10-12'), pub('e', '2026-10-14'), pub('f', '2026-10-16'), pub('g', '2026-10-19')])
+    expect(weekReleases(book, wed)).toBe(1)
+    expect(releaseStreak(book, wed)).toBe(2)
+  })
+  it('reads arcs and volumes from the chapters that start them', () => {
+    const book = serialBook([ch('a', '', { part: 'Book One', arc: 'The Trial' }), ch('b', ''), ch('c', '', { arc: 'The Tower' }), ch('d', '', { part: 'Book Two' })])
+    expect(arcsOf(book).map(a => [a.title, a.start, a.end])).toEqual([['The Trial', 0, 2], ['The Tower', 2, 4]])
+    expect(volumesOf(book).map(v => [v.title, v.start, v.end])).toEqual([['Book One', 0, 3], ['Book Two', 3, 4]])
+    expect([beatChapter(30, 0), beatChapter(30, 50), beatChapter(30, 100)]).toEqual([1, 16, 30])
+  })
+  it('flags a missing hook and a flat ending, never on a published chapter', () => {
+    const c = ch('a', words(2500))
+    const book = serialBook([c])
+    expect(hookFlags(book, c)).toEqual(['no-hook', 'no-ending'])
+    const read = { ...c, hook: 'x', ending: 'y', hookCheck: { of: textKey(c.scenes[0].text), hook: 4, end: 2, note: '' } }
+    expect(hookFlags(book, read)).toEqual(['weak-end'])
+    // Claude read an older text: its rating no longer counts.
+    expect(hookFlags(book, { ...read, scenes: [scene('s', words(2600))] })).toEqual([])
+    expect(hookFlags(book, { ...c, published: '2026-10-01' })).toEqual([])
+  })
+  it('flags a thread left untouched for too long', () => {
+    const book = serialBook(Array.from({ length: 14 }, (_, i) => ch(`c${i}`, 'text')))
+    book.meta.threads = [
+      { id: 't1', text: 'Who sent the letter?', kind: 'mystery', planted: 'c1', touched: ['c2'], resolved: null },
+      { id: 't2', text: 'The tournament', kind: 'promise', planted: 'c1', touched: ['c9'], resolved: null },
+      { id: 't3', text: 'The sword', kind: 'setup', planted: 'c0', touched: [], resolved: 'c5' },
+    ]
+    expect(threadStates(book).map(x => [x.thread.id, x.gap, x.flagged])).toEqual([['t1', 11, true], ['t2', 4, false], ['t3', 13, false]])
+  })
+  it('finds system boxes and reads their stats', () => {
+    const text = 'Kael looked.\n| Status\n| Name: Kael\n| Level: 12\n| Strength: 30\nHe grinned.'
+    const boxes = systemBoxes(text)
+    expect(boxes).toHaveLength(1)
+    expect(text.slice(boxes[0].from, boxes[0].to)).toBe('| Status\n| Name: Kael\n| Level: 12\n| Strength: 30')
+    expect(readBox(boxes[0].lines)).toEqual({ name: 'Kael', stats: [{ name: 'Level', value: '12' }, { name: 'Strength', value: '30' }] })
+    expect(maskSystem(text)).toHaveLength(text.length)
+    expect(maskSystem(text)).not.toContain('Level')
+  })
+  it('keeps stats by chapter and flags a box that disagrees', () => {
+    let stats = mergeStats([], [{ name: 'Level', value: '5' }], 1)
+    stats = mergeStats(stats, [{ name: 'level', value: '12' }, { name: 'Strength', value: '30' }], 80)
+    expect(statsAt(stats, 40)).toEqual([{ name: 'Level', value: '5', from: 1 }])
+    expect(statsAt(stats, 80).map(s => `${s.name} ${s.value}`)).toEqual(['Level 12', 'Strength 30'])
+    expect(mergeStats(stats, [{ name: 'Level', value: '12' }], 81)).toEqual(stats)
+    const kael = entry({ slug: 'kael', name: 'Kael', stats })
+    const chapters = Array.from({ length: 80 }, (_, i) => ch(`c${i}`, i === 79 ? '| Name: Kael\n| Level: 11' : ''))
+    expect(statConflicts(serialBook(chapters, [kael]))).toEqual([{ sceneId: 's-c79', chapter: 80, who: 'Kael', stat: 'Level', inText: '11', known: '12' }])
+    // The AI gets the values as they stand at the chapter.
+    const ctx = buildContext({ book: serialBook(chapters, [kael]), chapter: 80, pov: 'kael', action: 'continue', instruction: '', before: 'Kael ran.', selection: '', after: '', overrides: {} })
+    expect(ctx.message).toContain('Stats at this point : Level 12, Strength 30')
+  })
+  it('copies a chapter for Royal Road and gives its title', () => {
+    const c = { ...ch('a', ''), title: 'The Gate', scenes: [scene('s1', 'She *ran*.\n| Level up!\n| Level: 2'), scene('s2', 'Night fell.')] }
+    const book = serialBook([c])
+    const html = royalRoadHtml(book, c)
+    expect(html).toContain('<p>She <em>ran</em>.</p>')
+    expect(html).toContain('<table><tbody><tr><td>Level up!<br>Level: 2</td></tr></tbody></table>')
+    expect(html).toContain('\n<hr>\n<p>Night fell.</p>')
+    expect(chapterTitleFor(book, 0)).toBe('Chapter 1: The Gate')
+  })
+  it('makes a volume a book of its own, numbered from 1, without recaps', () => {
+    const book = serialBook([ch('a', 'One.', { part: 'Book One' }), ch('b', 'Previously, she fell.\nShe woke.', { part: 'Book Two', published: '2026-10-01' }), ch('c', 'Three.')])
+    const v = volumeBook(book, 1, 3, 'Book Two')
+    expect(v.meta.title).toBe('T: Book Two')
+    expect(v.chapters.map(c => c.id)).toEqual(['b', 'c'])
+    expect(v.chapters[0]).toMatchObject({ part: undefined, published: undefined })
+    expect(v.chapters[0].scenes[0].text).toBe('She woke.')
+    const o = { format: 'md' as const, layout: 'book' as const, titlePage: true, sceneBreak: '* * *' }
+    expect(toMarkdown(v, o)).toContain('## Chapter 1 : B')
+    const range = toMarkdown(book, { ...o, range: [1, 2] })
+    expect(range).toContain('## Chapter 2 : B')
+    expect(range).not.toContain('Three.')
+  })
+  it('remembers a long serial by arcs, published chapters marked as canon', () => {
+    const book = serialBook([ch('a', 'x', { arc: 'One', summary: 'A1.' }), ch('b', 'x', { summary: 'B1.', published: '2026-10-01' }), ch('c', 'x', { arc: 'Two', summary: 'C1.', published: '2026-10-03' }), ch('d', 'x')])
+    book.meta.arcs = { a: { template: '', beats: [], planned: 2, summary: 'Arc one sum.' } }
+    const s = serialStorySoFar(book, 's-d')
+    expect(s).toContain('Arc « One » : Arc one sum.')
+    expect(s).not.toContain('A1.')
+    expect(s).toContain('C (published) : C1.')
+    book.meta.summary = 'Everything so far.'
+    expect(serialStorySoFar(book, 's-d', 10)).toContain('Earlier : Everything so far.')
+    expect(systemPrompt(book, 'continue', 4)).toContain('Chapters marked (published) have been read')
+  })
+  it('flags walls of text, in a web novel only', () => {
+    const wall = words(100) + '.'
+    const ids = (b: Book) => review(wall, b).results.map(r => r.def.id)
+    expect(ids(bookOf([]))).not.toContain('walls')
+    expect(ids(serialBook([]))).toContain('walls')
   })
 })

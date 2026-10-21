@@ -11,6 +11,7 @@ import { findScene, useStore, type Scope, type View } from '../store'
 import { useAI } from '../editor/actions'
 import { bookCounts, feuillets, sceneCounts } from '../lib/stats'
 import { numLocale, useT } from '../i18n'
+import { bufferOf, isSerial, serialOf } from '../lib/serial'
 
 const scopes: [Scope, string, string][] = [
   ['scene', 'Scene', 'Show the current scene only'],
@@ -61,6 +62,7 @@ export default function BottomBar() {
             {here && <span className="pl-count" title={t('Signs: characters including spaces, as French publishers count') + ` : ${n(here.signs)}`}><b>{n(here.words)}</b> {t('words')}</span>}
             <span className="pl-count pl-hide-sm" title={`${n(signs)} ${t('signs')} · ${t('A feuillet is 1,500 signs')}`}>{t('Book')} <b>{n(words)}</b> · <b>{n(feuillets(signs), 1)}</b> {t('feuillets')}</span>
             <GoalsPanel />
+            {isSerial(book) && <BufferChip />}
           </>
         )}
       </div>
@@ -89,6 +91,21 @@ export default function BottomBar() {
         <button type="button" className="pl-quiet" onClick={() => useStore.setState({ showSettings: true })} title={t('Settings') + ' (Ctrl+,)'}><Settings size={15} /></button>
       </div>
     </footer>
+  )
+}
+
+/** Web novels: how many chapters are written ahead, and until when they last; opens Plan → Release. */
+function BufferChip() {
+  const book = useStore(s => s.book)!
+  const t = useT()
+  const buf = bufferOf(book)
+  const low = buf.ready.length < serialOf(book).days.length
+  const until = buf.until ? buf.until.toLocaleDateString(numLocale(), { weekday: 'short', day: 'numeric', month: 'short' }) : ''
+  return (
+    <button type="button" className={`pl-quiet pl-count ${low ? 'pl-warn' : ''}`} onClick={() => useStore.setState({ view: 'plan', planTab: 'release' })}
+      title={until ? t('The buffer lasts until {day}', { day: until }) : t('No written chapter waiting')}>
+      {t('Buffer')} <b>{buf.ready.length}</b>
+    </button>
   )
 }
 

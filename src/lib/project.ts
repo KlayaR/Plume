@@ -2,7 +2,8 @@
 // to it is relative to the book folder; the native side refuses anything else.
 import { invoke } from '@tauri-apps/api/core'
 import type { Book, BookMeta, Chapter, Entry, EntryType, Lang, Scene } from './types'
-import { DEFAULT_AI, DEFAULT_RULES, DEFAULT_VOICE, typeInfo } from './types'
+import type { BookKind } from './types'
+import { DEFAULT_AI, DEFAULT_RULES, DEFAULT_SERIAL, DEFAULT_VOICE, typeInfo } from './types'
 import { FANTASY_LISTS, FANTASY_STYLE, fantasyVoice } from './defaults'
 import { joinFrontmatter, parseEntry, parseScene, serializeEntry, serializeScene, splitFrontmatter } from './bible'
 import { newId, slugify } from './text'
@@ -92,12 +93,17 @@ function normalizeMeta(raw: Partial<BookMeta>): BookMeta {
     summary: raw.summary,
     foundation: raw.foundation && typeof raw.foundation === 'object' ? raw.foundation : undefined,
     sceneMode: raw.sceneMode && typeof raw.sceneMode === 'object' ? raw.sceneMode : undefined,
+    kind: raw.kind === 'serial' ? 'serial' : undefined,
+    serial: raw.kind === 'serial' || raw.serial ? { ...DEFAULT_SERIAL, ...(raw.serial ?? {}) } : undefined,
+    arcs: raw.arcs && typeof raw.arcs === 'object' ? raw.arcs : undefined,
+    threads: Array.isArray(raw.threads) ? raw.threads : undefined,
   }
 }
 
 async function readChapter(root: string, folder: string, files: string[]): Promise<Chapter> {
   let id = folder, title = folder, notes = ''
   let summary: string | undefined, summaryOf: string | undefined, part: string | undefined, goal: string | undefined, ending: string | undefined
+  let hook: string | undefined, promise: string | undefined, arc: string | undefined, published: string | undefined, hookCheck: Chapter['hookCheck']
   let kind: Chapter['kind'] = 'chapter'
   try {
     const { data, body } = splitFrontmatter(await read(root, `manuscript/${folder}/chapter.md`))
@@ -109,13 +115,22 @@ async function readChapter(root: string, folder: string, files: string[]): Promi
     if (data.part) part = String(data.part)
     if (data.goal) goal = String(data.goal)
     if (data.ending) ending = String(data.ending)
+    if (data.hook) hook = String(data.hook)
+    if (data.promise) promise = String(data.promise)
+    if (data.arc) arc = String(data.arc)
+    // YAML reads an unquoted date as a Date: keep it as the day it is.
+    if (data.published) published = data.published instanceof Date ? data.published.toISOString().slice(0, 10) : String(data.published)
+    if (data.hookCheck && typeof data.hookCheck === 'object') {
+      const h = data.hookCheck as Record<string, unknown>
+      hookCheck = { of: String(h.of ?? ''), hook: Number(h.hook) || 0, end: Number(h.end) || 0, note: String(h.note ?? '') }
+    }
     notes = body.trim()
   } catch { /* chapter.md missing: keep the folder name */ }
   const scenes: Scene[] = []
   for (const f of files) {
     try { scenes.push(parseScene(`manuscript/${folder}/${f}`, await read(root, `manuscript/${folder}/${f}`))) } catch { /* moved away */ }
   }
-  return { id, folder, kind, title, notes, summary, summaryOf, part, goal, ending, scenes }
+  return { id, folder, kind, title, notes, summary, summaryOf, part, goal, ending, hook, promise, arc, published, hookCheck, scenes }
 }
 
 export async function loadBook(root: string): Promise<Book> {
@@ -171,7 +186,7 @@ export async function saveSeriesPlan(book: Book) {
 export const saveScene = (root: string, s: Scene) => guarded(root, s.path, serializeScene(s))
 export const saveEntry = (root: string, e: Entry) => guarded(root, e.path, serializeEntry(e))
 export const saveChapter = (root: string, c: Chapter) =>
-  write(root, `manuscript/${c.folder}/chapter.md`, joinFrontmatter({ id: c.id, title: c.title, kind: c.kind === 'chapter' ? undefined : c.kind, summary: c.summary, summaryOf: c.summaryOf, part: c.part || undefined, goal: c.goal || undefined, ending: c.ending || undefined }, c.notes ? `\n${c.notes}\n` : '\n'))
+  write(root, `manuscript/${c.folder}/chapter.md`, joinFrontmatter({ id: c.id, title: c.title, kind: c.kind === 'chapter' ? undefined : c.kind, summary: c.summary, summaryOf: c.summaryOf, part: c.part || undefined, goal: c.goal || undefined, ending: c.ending || undefined, hook: c.hook || undefined, promise: c.promise || undefined, arc: c.arc || undefined, published: c.published || undefined, hookCheck: c.hookCheck }, c.notes ? `\n${c.notes}\n` : '\n'))
 
 const unique = (base: string, taken: Set<string>) => {
   let s = base, i = 2
@@ -213,9 +228,15 @@ export async function createExample(root: string, language: Lang): Promise<Book>
   return loadBook(root)
 }
 
-export async function createBook(root: string, title: string, author: string, language: Lang): Promise<Book> {
+/** What a web novel starts with: Royal Road-length chapters of one scene, no total word goal. */
+export function serialDefaults(meta: BookMeta): Partial<BookMeta> {
+  return { kind: 'serial', serial: { ...DEFAULT_SERIAL, ...(meta.serial ?? {}) }, ai: { ...meta.ai, chapterWords: [2000, 3500] }, goal: { ...meta.goal, book: 0 }, sceneMode: meta.sceneMode ?? { kind: 'one' } }
+}
+
+export async function createBook(root: string, title: string, author: string, language: Lang, kind: BookKind = 'book'): Promise<Book> {
   if (await isBook(root)) throw new Error('This folder already holds a book.')
-  const meta = normalizeMeta({ title, author, language })
+  let meta = normalizeMeta({ title, author, language })
+  if (kind === 'serial') meta = { ...meta, ...serialDefaults(meta) }
   meta.voice = fantasyVoice(language) // new books start with the fantasy voice
   const style: Entry = { slug: 'style', type: 'style', path: 'bible/style.md', name: language === 'fr' ? 'Guide de style' : 'Style guide', aliases: [], include: 'always', links: [], short: '', full: FANTASY_STYLE[language], facts: [], extra: {} }
   const book: Book = { root, meta, entries: [style], chapters: [] }

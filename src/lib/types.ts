@@ -130,9 +130,13 @@ export interface Entry {
   resolved?: boolean
   /** Shared with every book of the series (lives in the series folder). */
   shared?: boolean
+  /** LitRPG: a character's stats, each value true from a chapter on (Level 12 from chapter 80). */
+  stats?: Stat[]
   /** Frontmatter keys Plume doesn't know, kept as they were. */
   extra: Record<string, unknown>
 }
+
+export interface Stat { name: string; value: string; from: number }
 
 export type SceneStatus = 'draft' | 'revised' | 'done'
 
@@ -198,6 +202,13 @@ export interface Chapter {
   /** The chapter's immediate goal for its point-of-view character, and how it ends (the turn or question it lands on). */
   goal?: string
   ending?: string
+  /** Web novels: how the chapter opens (its hook), what it gives the reader, the arc that starts here, and the day it went out. */
+  hook?: string
+  promise?: string
+  arc?: string
+  published?: string
+  /** Claude's last reading of the opening and the ending (1 to 5), for the text it was made from. */
+  hookCheck?: { of: string; hook: number; end: number; note: string }
   scenes: Scene[]
 }
 
@@ -279,11 +290,51 @@ export type SceneMode = { kind: 'one' } | { kind: 'auto' } | { kind: 'range'; mi
 export const FOUNDATION_KEYS: (keyof Foundation)[] = ['logline', 'shape', 'tone', 'comps', 'want', 'need', 'antagonist', 'stakes', 'theme', 'magic']
 export interface LooseCard { id: string; title: string; note: string }
 
+/** A book written for print, or a web novel published chapter by chapter (Royal Road). */
+export type BookKind = 'book' | 'serial'
+
+/** An arc of a web novel, keyed by the id of the chapter that starts it. */
+export interface ArcPlan {
+  template: string
+  beats: Beat[]
+  /** How many chapters the arc should take: where each beat is expected. */
+  planned: number
+  summary?: string
+  summaryOf?: string
+}
+
+export type ThreadKind = 'mystery' | 'promise' | 'setup' | 'foreshadow'
+
+/** A promise made to the reader: planted in a chapter, touched again later, paid off one day. */
+export interface Thread {
+  id: string
+  text: string
+  kind: ThreadKind
+  planted: string | null
+  touched: string[]
+  resolved: string | null
+}
+
+export interface Serial {
+  /** Release days (0 = Sunday … 6 = Saturday), one chapter each. */
+  days: number[]
+  /** System windows, status screens and character stats. */
+  litrpg: boolean
+  /** An open thread untouched for this many chapters is flagged. */
+  threadGap: number
+}
+
+export const DEFAULT_SERIAL: Serial = { days: [1, 3, 5], litrpg: false, threadGap: 10 }
+
 export interface BookMeta {
   format: 1
   title: string
   author: string
   language: Lang
+  kind?: BookKind
+  serial?: Serial
+  arcs?: Record<string, ArcPlan>
+  threads?: Thread[]
   order: { folder: string; scenes: string[] }[]
   ai: {
     actions: Record<ActionId, ActionSettings>

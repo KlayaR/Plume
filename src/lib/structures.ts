@@ -35,6 +35,21 @@ export const TEMPLATES: Template[] = [
     b('Ki: introduction', 'Ki : introduction', 0), b('Shō: development', 'Shō : développement', 25), b('Ten: twist', 'Ten : retournement', 50), b('Ketsu: reconciliation', 'Ketsu : conclusion', 80)] },
 ]
 
+/** Shapes for one arc of a web novel (the share is of the arc, not the book). */
+export const ARC_TEMPLATES: Template[] = [
+  { id: 'serial-arc', name: 'Web novel arc', beats: [
+    b('Hook: the arc’s new problem', 'Accroche : le nouveau problème de l’arc', 0), b('Escalation', 'Escalade', 15), b('First win', 'Première victoire', 30),
+    b('Complication', 'Complication', 45), b('Midpoint reveal', 'Révélation du milieu', 55), b('Setback', 'Revers', 70),
+    b('Climax', 'Climax', 85), b('Payoff and the next hook', 'Récompense et accroche suivante', 97)] },
+  { id: 'progression-arc', name: 'Progression arc', beats: [
+    b('A wall the hero can’t climb', 'Un mur que le héros ne peut franchir', 0), b('Training and first gains', 'Entraînement et premiers progrès', 15),
+    b('Test: a fight or a trial', 'Épreuve : un combat ou un défi', 35), b('Breakthrough', 'Percée', 50), b('A stronger enemy', 'Un ennemi plus fort', 65),
+    b('Everything on the line', 'Tout se joue', 85), b('Power-up and the next wall', 'Montée en puissance et mur suivant', 97)] },
+]
+
+export const arcTemplateBeats = (id: string, lang: Lang) =>
+  ([...ARC_TEMPLATES, ...TEMPLATES].find(t => t.id === id)?.beats ?? []).map(x => ({ name: x[lang], at: x.at, note: '', sceneId: null as string | null }))
+
 export const templateBeats = (id: string, lang: Lang) =>
   (TEMPLATES.find(t => t.id === id)?.beats ?? []).map(x => ({ name: x[lang], at: x.at, note: '', sceneId: null as string | null }))
 

@@ -1,8 +1,8 @@
 // One scene's editor. A chapter shows one per scene; the scene you are in is
 // the "active" one: the AI panel, Accept/Discard and the counters follow it.
 import { useEffect, useRef } from 'react'
-import { Compartment, EditorState, StateField } from '@codemirror/state'
-import { EditorView, highlightActiveLine, keymap, placeholder, showTooltip, type Tooltip } from '@codemirror/view'
+import { Compartment, EditorState, RangeSetBuilder, StateField } from '@codemirror/state'
+import { Decoration, EditorView, highlightActiveLine, keymap, placeholder, showTooltip, ViewPlugin, type DecorationSet, type Tooltip, type ViewUpdate } from '@codemirror/view'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { findScene, useStore } from '../store'
 import { locateQuote } from '../lib/text'
@@ -22,6 +22,26 @@ import type { Comment, EntryType } from '../lib/types'
 import { cutToDarlings } from '../writing'
 import { useReview } from '../review'
 import { occurrences, REPORTS } from '../lib/review'
+import { isLitRPG, isLocked, isSystemLine, maskSystem } from '../lib/serial'
+
+// LitRPG system windows: lines starting with "|" drawn as a box (they stay plain text in the file).
+const systemLine = Decoration.line({ class: 'cm-system' })
+const systemLinesExt = ViewPlugin.fromClass(class {
+  decorations: DecorationSet
+  constructor(view: EditorView) { this.decorations = this.build(view) }
+  update(u: ViewUpdate) { if (u.docChanged || u.viewportChanged) this.decorations = this.build(u.view) }
+  build(view: EditorView) {
+    const b = new RangeSetBuilder<Decoration>()
+    for (const { from, to } of view.visibleRanges) {
+      for (let pos = from; pos <= to;) {
+        const line = view.state.doc.lineAt(pos)
+        if (isSystemLine(line.text)) b.add(line.from, line.from, systemLine)
+        pos = line.to + 1
+      }
+    }
+    return b.finish()
+  }
+}, { decorations: v => v.decorations })
 
 /** The findings of the Review report chosen in the panel, on one scene's text. */
 function reviewHighlights(text: string, report: string | null, ai: { quote: string; note: string }[]): Highlight[] {
@@ -37,7 +57,7 @@ function reviewHighlights(text: string, report: string | null, ai: { quote: stri
   }
   if (report.startsWith('word:')) return occurrences(text, report.slice(5)).map(f => ({ ...f, cls: 'cm-review' }))
   const def = REPORTS.find(r => r.id === report)
-  return def ? def.find(text, book.meta.language, book).map(f => ({ from: f.from, to: f.to, cls: `cm-review cm-review-${def.category}`, title: f.note })) : []
+  return def ? def.find(isLitRPG(book) ? maskSystem(text) : text, book.meta.language, book).map(f => ({ from: f.from, to: f.to, cls: `cm-review cm-review-${def.category}`, title: f.note })) : []
 }
 
 // The bible matcher for unknown-name detection, rebuilt only when the entries change.
@@ -73,6 +93,10 @@ export function commentHighlights(text: string, comments: Comment[] | undefined)
 }
 
 const names = (entries: Entry[]) => setNames.of({ matcher: buildMatcher(entries), entries: new Map(entries.map(e => [e.slug, e])) })
+
+// A published chapter of a web novel is read-only until you unlock it.
+const lockC = new Compartment()
+const lockExt = (on: boolean) => EditorState.readOnly.of(on)
 
 // No red lines while writing; Review turns on the Windows spellchecker.
 const spelling = new Compartment()
@@ -145,13 +169,15 @@ const selectionBarField = StateField.define<readonly Tooltip[]>({
   provide: f => showTooltip.computeN([f], st => st.field(f)),
 })
 
-function makeState(s: Scene, lang: Lang) {
+function makeState(s: Scene, lang: Lang, locked: boolean) {
   let tick: ReturnType<typeof setTimeout> | undefined
   return EditorState.create({
     doc: s.text,
     selection: { anchor: s.text.length }, // writers pick up where the scene stops
     extensions: [
       history(),
+      lockC.of(lockExt(locked)),
+      systemLinesExt,
       spelling.of(spellingExt(windowsSpell())),
       languageToolExt({
         // Review mode, LanguageTool chosen, and this is the scene you are in.
@@ -234,9 +260,10 @@ export default function Editor({ scene }: { scene: Scene }) {
   const entries = useStore(s => s.book!.entries)
   const mode = useStore(s => s.prefs.mode)
   const active = useStore(s => s.sceneId === scene.id)
+  const locked = useStore(s => { const f = findScene(s.book, scene.id); return !!f && isLocked(f.chapter, s.unlocked) })
 
   useEffect(() => {
-    const view = new EditorView({ state: makeState(scene, lang), parent: host.current! })
+    const view = new EditorView({ state: makeState(scene, lang, locked), parent: host.current! })
     viewRef.current = view
     view.dispatch({ effects: names(useStore.getState().book!.entries) })
     return () => {
@@ -256,6 +283,7 @@ export default function Editor({ scene }: { scene: Scene }) {
   }, [scene.text])
 
   useEffect(() => { viewRef.current?.dispatch({ effects: names(entries) }) }, [entries])
+  useEffect(() => { viewRef.current?.dispatch({ effects: lockC.reconfigure(lockExt(locked)) }) }, [locked])
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { viewRef.current?.dispatch({ effects: setHighlights.of({ key: 'comments', list: commentHighlights(viewRef.current.state.doc.toString(), scene.comments) }) }) }, [scene.comments])
 

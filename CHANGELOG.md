@@ -7,6 +7,20 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.34.0
+**Web novels: write for Royal Road, chapter by chapter**
+- A book can now be a **web novel** (New book → Kind of book, or Settings → This book). Chapters default to 2,000–3,500 words, one scene each, with no total word goal and no epilogue. Your books stay as they are.
+- **Release schedule and buffer:** tick your release days; **Plan → Release** shows how many chapters are written ahead, the day the buffer runs out, the next release, this week's releases and how many weeks in a row you kept the schedule. The bottom bar shows the buffer, and the Dashboard warns when it drops under a week.
+- **Copy for Royal Road** (Release, or right-click a chapter) puts the chapter on the clipboard the way Royal Road's editor takes it: paragraphs, italics, scene breaks, system boxes. **Copy the title** gives "Chapter 12: The Gate" for its own field.
+- **Published chapters are canon:** **Mark as published** locks the chapter (read-only until **Edit anyway**), Claude is told never to contradict it, and its summary is brought up to date.
+- **Hooks and endings:** each chapter has an opening hook, what it gives the reader and how it ends (Release or Outline). Claude writes a chapter's last scene to end on a pull to the next one, and **Check hooks with Claude** rates written chapters from their first 150 and last 200 words only.
+- **Arcs and volumes** replace the single structure: start an arc on a chapter, give it a shape (web novel arc, progression arc, or any structure) and a planned length, and each beat says around which chapter it is due. Volumes group arcs.
+- **Threads** (Plan → Analysis): the mysteries, promises and setups the reader waits on, where each was planted, last touched and paid off; one left untouched too long is flagged. **Find threads with Claude** reads your chapter summaries.
+- **Memory for long serials:** Claude reads finished arcs as their summaries and the current arc chapter by chapter, so it stays consistent at chapter 300. Summaries now include one per arc.
+- **Review for phones:** a **Walls of text** report (paragraphs over 80 words), and slightly looser targets for book habits web novel readers forgive (adverbs, filter words, tags…).
+- **LitRPG and progression** (Settings → This book): lines starting with **|** are system windows, drawn as a box in the editor and exported as one (a table for Royal Road). Characters get **Stats** by chapter in the bible; right-click a status box to update them from it. Claude gets each character's stats as they stand at the chapter, and the Dashboard flags boxes that disagree.
+- **A volume as a book:** Export → Chapters → a volume, numbered from 1, with your front and back matter and without "Previously…" recaps, as EPUB, Word, PDF… or **Make it a Plume book** beside the web novel, to revise for Kindle. Export can also take any range of chapters.
+
 ## 0.33.0
 **Edit this chapter: check a whole chapter and fix what's wrong**
 - One button (Review panel, chapter menu, Ctrl+K) for any chapter, written by you or by Claude. Choose **Polish** (language, repetition, clunky sentences, clichés, AI tells) or **Deep** (also continuity with the bible as true at that chapter, character voices against their voice cards, the chapter's plan, pacing and dialogue).

@@ -16,6 +16,7 @@ import { t } from '../i18n'
 import { ask as askDialog } from '@tauri-apps/plugin-dialog'
 import { makeSnap, saveSnap } from '../lib/snapshots'
 import { fixTypography } from '../lib/typography'
+import { isLocked } from '../lib/serial'
 import { acceptProposal, appendProposal, discardProposal, endStream, proposalField, setProposal } from './cm'
 
 let view: EditorView | null = null
@@ -78,6 +79,8 @@ export async function runAction(action: ActionId, instruction: string, overrides
   if (!view || !st.book || useAI.getState().running) return
   if (!canRun()) return st.notify('error', t('The claude command line was not found. Set its path in Settings.'))
   if (view.state.field(proposalField)) return st.notify('warn', t('Accept or discard the current proposal first.'))
+  const here = findScene(st.book, st.sceneId)
+  if (here && isLocked(here.chapter, st.unlocked)) return st.notify('warn', t('This chapter is published: press Edit anyway above it to change it.'))
   if (isRewrite(action) && view.state.selection.main.empty) return st.notify('warn', t('Select the passage to rewrite first.'))
   if (action === 'beats' && !instruction.trim()) return st.notify('warn', t('Write the beats first, one per line.'))
   if (action === 'scene' && !findScene(st.book, st.sceneId)?.scene.note?.trim() && !findScene(st.book, st.sceneId)?.scene.beats?.length) return st.notify('warn', t('Give this scene a note in the Plan first: Claude writes it from that note.'))
@@ -193,6 +196,7 @@ export async function writeChapter(chapterId: string) {
   const chapter = book?.chapters.find(c => c.id === chapterId)
   if (!book || !chapter || useAI.getState().running) return
   if (!canRun()) return st.notify('error', t('The claude command line was not found. Set its path in Settings.'))
+  if (isLocked(chapter, st.unlocked)) return st.notify('warn', t('This chapter is published: press Edit anyway above it to change it.'))
   const todo = chapter.scenes.filter(s => !s.text.trim() && (s.note?.trim() || s.beats?.length))
   if (!todo.length) return st.notify('warn', t('No empty scene with a plan note in this chapter.'))
   const [a, b] = book.meta.ai.chapterWords

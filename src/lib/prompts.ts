@@ -15,8 +15,22 @@ const SAMPLES: Record<Lang, string> = {
   en: '- <author_prose> holds passages the author wrote themselves. That is the voice to match: their rhythm, vocabulary, sentence length, paragraphing and the way they write dialogue. Never reuse their content.',
 }
 
-export function systemRules(lang: Lang, title: string, opts: { adult?: boolean; sceneRules?: SceneRule[]; tense?: string; samples?: boolean } = {}): string {
+/** A web novel: published chapters are canon, and it is read on phones. */
+const SERIAL: Record<Lang, string> = {
+  fr: '- Ce livre est un web novel publié chapitre par chapitre. Les chapitres marqués (publié) ont été lus : ils font foi, ne les contredis jamais. Paragraphes courts, lisibles sur un téléphone.',
+  en: '- This book is a web novel published chapter by chapter. Chapters marked (published) have been read: they are canon, never contradict them. Short paragraphs, easy to read on a phone.',
+}
+
+/** LitRPG: how system windows are written, and keeping the numbers right. */
+const LITRPG: Record<Lang, string> = {
+  fr: '- Les fenêtres du système, écrans de statut et notifications s’écrivent en lignes qui commencent par « | », une information par ligne (| Niveau : 12). Leurs chiffres suivent les statistiques de la bible à ce stade ; une montée de niveau ou de stat se montre dans une de ces fenêtres.',
+  en: '- System windows, status screens and notifications are written as lines starting with "| ", one item per line (| Level: 12). Their numbers follow the stats in the bible at this point; a level-up or a stat gain shows in one of those windows.',
+}
+
+export function systemRules(lang: Lang, title: string, opts: { adult?: boolean; sceneRules?: SceneRule[]; tense?: string; samples?: boolean; serial?: boolean; litrpg?: boolean } = {}): string {
   const extra = [
+    opts.serial ? SERIAL[lang] : '',
+    opts.litrpg ? LITRPG[lang] : '',
     opts.samples ? SAMPLES[lang] : '',
     opts.tense ? (lang === 'fr' ? `- Temps du récit : ${opts.tense}.` : `- Narrative tense: ${opts.tense}.`) : '',
     sceneRulesText(opts.sceneRules ?? [], lang),
@@ -50,8 +64,8 @@ Rules:
 
 interface Story { before: string; selection: string; after: string }
 
-/** Where the scene stands in its chapter, for writing from the plan. */
-export interface ScenePlace { range: [number, number]; first: boolean; last: boolean }
+/** Where the scene stands in its chapter, for writing from the plan; in a web novel a chapter ends on a pull to the next. */
+export interface ScenePlace { range: [number, number]; first: boolean; last: boolean; serial?: boolean }
 
 /** How a scene written from the plan is built, and how the chapter opens and lands when this scene holds its opening or its end. */
 function craft(lang: Lang, at: ScenePlace): string {
@@ -62,7 +76,9 @@ function craft(lang: Lang, at: ScenePlace): string {
     fr ? '- Chaque tentative complique la situation : « oui, mais… » ou « non, et en plus… ». Ne la résous pas trop facilement.' : '- Every attempt complicates things: “yes, but…” or “no, and what’s more…”. Don’t resolve it too easily.',
     fr ? '- Le monde se révèle dans l’action et la difficulté, jamais dans une pause pour l’expliquer.' : '- The world shows through action and struggle, never in a pause to explain it.',
     at.first ? (fr ? '- Cette scène ouvre le chapitre : ancre-le tout de suite dans le présent (lieu, moment, un détail sensoriel), au plus près de ce qui dérange. Pas de réveil, pas de monologue, pas de résumé du chapitre précédent.' : '- This scene opens the chapter: anchor it at once in the now (place, time, a sensory detail), as close to the disruption as possible. No waking up, no long inner monologue, no recap of the previous chapter.') : '',
-    at.last
+    at.last && at.serial
+      ? (fr ? '- Cette scène termine un chapitre de web novel : finis sur ce qui donne envie de cliquer sur le suivant (un cliffhanger, une révélation, une question vive, la promesse de ce qui vient), à partir de la fin prévue s’il y en a une. Pas de résumé, pas de conclusion apaisée.' : '- This scene ends a web novel chapter: land it on what makes the reader click Next (a cliffhanger, a reveal, a sharp question, the promise of what comes), from the planned ending if there is one. No summary, no settled close.')
+      : at.last
       ? (fr ? '- Cette scène termine le chapitre : finis sur un tournant (le problème réglé en révèle un pire, une révélation qui oblige à revoir le plan, ou pour un chapitre calme une image forte, une prise de conscience muette, une résolution), ou sur une question à laquelle le chapitre suivant répondra. Pas de suspense coupé en pleine action, pas de résumé.' : '- This scene ends the chapter: land it on a turn (the problem solved reveals a worse one, a revelation that forces a new plan, or in a quiet chapter a striking image, an unspoken realisation, a resolve), or on a question the next chapter will answer. No mid-action cliffhanger, no summary.')
       : (fr ? '- Termine la scène là où elle bascule : le chapitre continue après elle.' : '- End the scene where it turns: the chapter goes on after it.'),
   ].filter(Boolean).join('\n')

@@ -19,7 +19,7 @@ export type View = 'bible' | 'plan' | 'manuscript'
 export type BibleTab = 'entry' | 'review' | 'aicheck' | 'tracker' | 'map' | 'relations' | 'contradictions'
 /** Bible tabs grouped under "More". */
 export const MORE_TABS: BibleTab[] = ['tracker', 'map', 'relations', 'contradictions']
-export type PlanTab = 'outline' | 'board' | 'structure' | 'timeline' | 'lines' | 'dashboard' | 'revision'
+export type PlanTab = 'outline' | 'board' | 'structure' | 'timeline' | 'lines' | 'dashboard' | 'revision' | 'arcs' | 'release' | 'threads'
 /** What the right pane of the Manuscript shows in Write mode. */
 export type RightTab = 'write' | 'chat' | 'notes'
 
@@ -270,6 +270,11 @@ interface State {
   showEntry: (slug: string) => void
   updateScene: (id: string, patch: Partial<Scene>) => void
   updateChapter: (id: string, patch: Partial<Chapter>) => void
+  /** Web novels: published chapters you chose to edit anyway, for this session. */
+  unlocked: string[]
+  unlock: (chapterId: string) => void
+  /** Marks a chapter published on a day (today by default), or not published; a published chapter gets its summaries. */
+  publishChapter: (chapterId: string, day: string | null) => void
   /** Takes back the last move of a card or chapter in the Plan. */
   undoMove: () => boolean
   addChapter: (title: string, opts?: { stay?: boolean }) => string
@@ -420,7 +425,7 @@ export const useStore = create<State>((set, get) => {
       const back = spot && book.chapters.some(c => c.scenes.some(x => x.id === spot.sceneId)) ? spot : null
       const sceneId = back?.sceneId ?? book.chapters[0]?.scenes[0]?.id ?? null
       session = { root: book.root, words: bookCounts(book.chapters).words, start: Date.now() }
-      set({ book, recent, view: 'manuscript', sceneId, jump: back ? { sceneId: back.sceneId, from: back.pos, to: back.pos } : null, entrySlug: null, freshSceneId: null, bibleTab: 'entry', planTab: 'outline' })
+      set({ book, recent, view: 'manuscript', sceneId, unlocked: [], jump: back ? { sceneId: back.sceneId, from: back.pos, to: back.pos } : null, entrySlug: null, freshSceneId: null, bibleTab: 'entry', planTab: 'outline' })
       import('./chat').then(m => m.loadChat(book))
       import('./writing').then(m => m.loadNotes(book))
       import('./agents').then(m => m.loadAgents())
@@ -472,6 +477,18 @@ export const useStore = create<State>((set, get) => {
     updateChapter: (id, patch) => {
       mutate(b => ({ ...b, chapters: b.chapters.map(c => c.id === id ? { ...c, ...patch } : c) }))
       later(`ch:${id}`, async () => { const c = get().book!.chapters.find(x => x.id === id); if (c) await saveChapter(get().book!.root, c) })
+    },
+    unlocked: [],
+    unlock: id => set({ unlocked: [...get().unlocked.filter(x => x !== id), id] }),
+    publishChapter: (id, day) => {
+      get().updateChapter(id, { published: day ?? undefined })
+      set({ unlocked: get().unlocked.filter(x => x !== id) })
+      // What readers have read becomes the AI's memory: the chapter's summaries (Haiku), if out of date.
+      const c = get().book?.chapters.find(x => x.id === id)
+      if (day && c && get().claudeExe) import('./writing').then(m => {
+        const stale = new Set(m.staleScenes(get().book!).map(s => s.id))
+        ;(async () => { for (const s of c.scenes) if (stale.has(s.id)) await m.summarizeScene(s.id).catch(() => {}) })()
+      })
     },
     addChapter: (title, opts) => {
       const b = get().book!

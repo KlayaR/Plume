@@ -6,7 +6,8 @@ import { create } from 'zustand'
 import { invoke } from '@tauri-apps/api/core'
 import type { Book, Lang } from './lib/types'
 import { bookCounts } from './lib/stats'
-import { createBook, makeChapter, makeScene, saveChapter, saveMeta, saveScene, seriesRootOf } from './lib/project'
+import { createBook, isBook, makeChapter, makeScene, saveChapter, saveEntry, saveMeta, saveScene, seriesRootOf } from './lib/project'
+import { volumeBook } from './lib/export'
 import { fromBase64, fromUtf8, makeZip, readZip, toBase64 } from './lib/zip'
 import { allPrompts, usedPromptIds } from './lib/voice'
 import { FANTASY_LISTS, FANTASY_STYLE, FANTASY_VERSION, fantasyVoice } from './lib/defaults'
@@ -315,6 +316,31 @@ export async function importManuscript(path: string, parent: string, lang: Lang)
   else await invoke('move_to_trash', { root, rel: `manuscript/${empty.folder}/chapter.md` }).catch(() => {})
   await saveMeta(book)
   return book
+}
+
+/**
+ * A volume of a web novel as a Plume book of its own, in a folder beside it: the
+ * volume's chapters (numbered from 1, recaps dropped) and the book's bible. The
+ * web novel itself is left as it is. Returns the new book's folder.
+ */
+export async function volumeToBook(book: Book, from: number, to: number, title: string): Promise<string> {
+  const v = volumeBook(book, from, to, title)
+  const folder = v.meta.title.replace(/[<>:"/\\|?*\u0000-\u001f]/g, '').trim().replace(/[. ]+$/, '') || 'Volume'
+  const root = `${parentOf(book.root)}\\${folder}`
+  if (await isBook(root)) throw new Error(t('This folder already holds a book.'))
+  const meta = { ...v.meta, serial: undefined, arcs: undefined, threads: undefined, history: {}, goal: { ...v.meta.goal, book: bookCounts(v.chapters).words } }
+  const out: Book = { ...v, root, meta }
+  for (const e of out.entries.filter(e => !e.shared)) {
+    await saveEntry(root, e)
+    // Portraits come along when they can be read; a missing one is left out.
+    if (e.image) await invoke<string>('read_base64', { root: book.root, rel: e.image }).then(data => invoke('write_file_base64', { path: `${root}\\${e.image!.replace(/\//g, '\\')}`, data })).catch(() => {})
+  }
+  for (const c of out.chapters) {
+    await saveChapter(root, c)
+    for (const s of c.scenes) await saveScene(root, s)
+  }
+  await saveMeta(out)
+  return root
 }
 
 // --- Series ----------------------------------------------------------------------------

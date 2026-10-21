@@ -57,6 +57,16 @@ editor, back them up however you like.
   readability, compared with targets or with books you admire; who says what;
   LanguageTool spelling and grammar; read aloud; beta-reader and line-edit passes.
 
+**Web novels** (Royal Road)
+- A book can be a web novel: a release schedule and the buffer of chapters
+  written ahead, arcs and volumes instead of one structure, an opening hook
+  and an ending for every chapter, threads the reader waits on.
+- Published chapters are canon: read-only until unlocked, never contradicted
+  by Claude, which reads finished arcs as summaries to stay consistent over
+  hundreds of chapters. A copy that pastes cleanly into Royal Road's editor.
+- LitRPG: system windows as boxes, character stats by chapter, and boxes that
+  disagree with them flagged. A finished volume becomes an ebook or a book.
+
 **Out**
 - EPUB (KDP-ready), Word (book or submission format), PDF, HTML for beta
   readers, Markdown; front and back matter, part pages; named snapshots.

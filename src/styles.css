@@ -932,3 +932,27 @@ body.pl-dimpara .cm-focused .cm-line.cm-activeLine { opacity: 1; }
 .pl-ol-addch { align-self: center; }
 .pl-plan-sub { margin: -10px auto 18px; justify-content: center; display: flex; font-size: var(--fs-sm); }
 @media (max-width: 760px) { .pl-ol-point { grid-template-columns: 1fr; } }
+
+/* Web novels: published chapters, arcs, release, threads; LitRPG system boxes and stats. */
+.pl-locked { display: flex; align-items: center; gap: 8px; margin: 0 0 16px; padding: 8px 12px; border-radius: 8px; font-family: var(--font-ui, system-ui); font-size: 12.5px; color: var(--pl-ink-soft); background: color-mix(in srgb, var(--accent) 12%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); }
+.pl-pubmark { display: inline-flex; color: var(--accent); flex: none; }
+.pl-tree-group { margin: 10px 0 2px; padding: 0 8px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--text-muted); }
+.pl-tree-arc { margin-top: 4px; text-transform: none; letter-spacing: 0; font-style: italic; }
+.pl-arc { display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 10px; background: var(--surface-1); border: 1px solid var(--border); }
+.pl-arc-summary { margin: 0; font-style: italic; }
+.pl-release { max-width: 64rem; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+.pl-dash-card.pl-warn b { color: var(--warning, #d39b3a); }
+.pl-rel-ch { display: flex; flex-direction: column; gap: 6px; padding: 10px 0; border-top: 1px solid var(--border); }
+.pl-rel-pub { opacity: .7; }
+.pl-rel-title { display: inline-flex; align-items: center; gap: 6px; text-align: left; }
+.pl-grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-3, 10px); }
+@media (max-width: 900px) { .pl-grid3 { grid-template-columns: 1fr; } }
+.pl-thread { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: 8px; background: var(--surface-1); border: 1px solid var(--border); }
+.pl-thread-flag { border-color: var(--warning, #d39b3a); }
+.pl-thread-done { opacity: .6; }
+.pl-thread-meta { flex-wrap: wrap; gap: 10px; font-size: var(--fs-sm); }
+.pl-stats-table { display: flex; flex-direction: column; gap: 6px; }
+.pl-stats-table .pl-row { gap: 6px; }
+.pl-stats-table .sk-input:not(.pl-num) { flex: 1; min-width: 0; }
+.pl-locked .sk-btn { color: inherit; font-weight: 600; }
+.cm-system { font-family: Consolas, 'Cascadia Mono', monospace; font-size: .86em; text-indent: 0 !important; background: color-mix(in srgb, var(--accent) 9%, transparent); border-left: 3px solid color-mix(in srgb, var(--accent) 60%, transparent); padding-left: 10px !important; }

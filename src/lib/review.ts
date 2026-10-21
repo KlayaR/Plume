@@ -10,6 +10,7 @@ import {
 } from './analysis'
 import { foldText } from './text'
 import { listWords, wordLists, type Check } from './voice'
+import { isLitRPG, isSerial, maskSystem } from './serial'
 
 export type Category = 'pacing' | 'dialogue' | 'strong' | 'choice' | 'repetition' | 'readability'
 
@@ -34,7 +35,14 @@ export interface ReportDef {
   /** Target (at most): per 1,000 words, or % of the unit. */
   target: number
   find: (text: string, lang: Lang, book: Book) => Finding[]
+  /** Only for web novels. */
+  serial?: boolean
+  /** A book habit web novel readers forgive more: the target is a quarter higher there. */
+  loose?: boolean
 }
+
+/** How much higher the loose targets are for a web novel. */
+const SERIAL_SLACK = 1.25
 
 /** Weak, imprecise adjectives: the reader has to guess what you mean. */
 const VAGUE: Record<Lang, string[]> = {
@@ -97,6 +105,9 @@ export const REPORTS: ReportDef[] = [
   { id: 'slow', category: 'pacing', label: 'Slow paragraphs', unit: 'paragraphs', target: 12,
     help: 'Long blocks of narration with no dialogue: the pace drops. Break them up, or cut.',
     find: text => paragraphs(text).filter(p => words(p.p).length > 120 && !/[«“"—–]/.test(p.p)).map(p => ({ from: p.from, to: p.to })) },
+  { id: 'walls', category: 'pacing', label: 'Walls of text (phone)', unit: 'paragraphs', target: 8, serial: true,
+    help: 'Paragraphs over 80 words fill a phone screen, and web novel readers skim them. Split them where the thought turns.',
+    find: text => paragraphs(text).filter(p => words(p.p).length > 80).map(p => ({ from: p.from, to: p.to, note: `${words(p.p).length}` })) },
   { id: 'long', category: 'pacing', label: 'Long sentences', unit: 'sentences', target: 5,
     help: 'Sentences over your longest-sentence rule (Settings → Voice).',
     find: (text, _l, book) => sentences(text).filter(s => s.words > book.meta.voice.rules.sentenceMaxWords).map(s => ({ from: s.from, to: s.to, note: `${s.words}` })) },
@@ -113,7 +124,7 @@ export const REPORTS: ReportDef[] = [
       return out
     } },
   // Dialogue
-  { id: 'tags', category: 'dialogue', label: 'Showy dialogue tags', unit: 'tags', target: 25,
+  { id: 'tags', category: 'dialogue', loose: true, label: 'Showy dialogue tags', unit: 'tags', target: 25,
     help: 'Tags other than said / asked (murmured, retorted…). A few are fine; "said" disappears and lets the line speak.',
     find: (text, lang) => tags(text, lang, true) },
   { id: 'tagadverbs', category: 'dialogue', label: 'Adverbs in dialogue tags', unit: 'per1000', target: 0.5,
@@ -128,22 +139,22 @@ export const REPORTS: ReportDef[] = [
       return out
     } },
   // Strong writing
-  { id: 'adverbs', category: 'strong', label: 'Adverbs', unit: 'per1000', target: 8,
+  { id: 'adverbs', category: 'strong', loose: true, label: 'Adverbs', unit: 'per1000', target: 8,
     help: 'Words in -ment / -ly. A stronger verb often does the job alone.',
     find: (text, lang) => adverbs(text, lang) },
-  { id: 'passive', category: 'strong', label: 'Passive voice', unit: 'sentences', target: 3,
+  { id: 'passive', category: 'strong', loose: true, label: 'Passive voice', unit: 'sentences', target: 3,
     help: '"The door was opened": who opened it? The active voice is more direct.',
     find: (text, lang) => passives(text, lang) },
-  { id: 'telling', category: 'strong', label: 'Telling words', unit: 'per1000', target: 3,
+  { id: 'telling', category: 'strong', loose: true, label: 'Telling words', unit: 'per1000', target: 3,
     help: 'Emotions named (sad, afraid, anger) instead of shown through the body, actions and dialogue.',
     find: (text, lang) => phrases(text, TELLING_WORDS[lang]) },
-  { id: 'filter', category: 'strong', label: 'Filter words', unit: 'per1000', target: 6,
+  { id: 'filter', category: 'strong', loose: true, label: 'Filter words', unit: 'per1000', target: 6,
     help: '"She saw the door open": the reader sees it through her. "The door opened" puts them in the scene.',
     find: (text, lang) => phrases(text, FILTER_WORDS[lang]) },
   { id: 'cliches', category: 'strong', label: 'Clichés', unit: 'per1000', target: 0.3,
     help: 'Worn phrases. Add your own to a word list in the bible.',
     find: (text, lang) => phrases(text, CLICHES[lang]) },
-  { id: 'sticky', category: 'strong', label: 'Sticky sentences', unit: 'sentences', target: 8,
+  { id: 'sticky', category: 'strong', loose: true, label: 'Sticky sentences', unit: 'sentences', target: 8,
     help: 'Sentences where over half the words are small glue words (the, of, que, de…): they slow the reader down. Trim the glue.',
     find: (text, lang) => stickySentences(text, lang) },
   // Word choice
@@ -156,7 +167,7 @@ export const REPORTS: ReportDef[] = [
   { id: 'filler', category: 'choice', label: 'Filler words', unit: 'per1000', target: 10,
     help: 'Just, really, very, suddenly, began to… Most can go.',
     find: (text, lang) => phrases(text, FILLER_WORDS[lang]) },
-  { id: 'conjunctions', category: 'choice', label: 'Sentences opening on a conjunction', unit: 'sentences', target: 6,
+  { id: 'conjunctions', category: 'choice', loose: true, label: 'Sentences opening on a conjunction', unit: 'sentences', target: 6,
     help: 'And, But, So… at the start of a sentence: fine now and then, a tic when frequent.',
     find: (text, lang) => sentences(text).filter(s => CONJUNCTIONS[lang].includes(firstWord(s.s))).map(s => ({ from: s.from, to: s.from + Math.min(s.s.length, 24) })) },
   { id: 'banned', category: 'choice', label: 'Your banned words', unit: 'per1000', target: 0,
@@ -229,18 +240,23 @@ export function overused(text: string, lang: Lang): [string, number][] {
   return [...counts].filter(([, c]) => c >= min).sort((a, b) => b[1] - a[1]).slice(0, 15)
 }
 
-/** Every report on a text, with an overall score out of 100. */
-export function review(text: string, book: Book, refs?: Record<string, number> | null): Review {
+/** The reports for this book: the web novel ones only in a web novel. */
+export const reportsFor = (book: Book) => REPORTS.filter(d => !d.serial || isSerial(book))
+
+/** Every report on a text, with an overall score out of 100. LitRPG system boxes are not prose and are left out. */
+export function review(raw: string, book: Book, refs?: Record<string, number> | null): Review {
   const lang = book.meta.language
+  const serial = isSerial(book)
+  const text = isLitRPG(book) ? maskSystem(raw) : raw
   const ws = words(text).length
   const ss = sentences(text)
   const ps = paragraphs(text).length
   const tagCount = tags(text, lang, false).length
-  const results = REPORTS.map(def => {
+  const results = reportsFor(book).map(def => {
     const findings = def.find(text, lang, book)
     const rate = rateOf(def, findings.length, ws, ss.length, ps, tagCount)
     const fromRef = refs?.[def.id] !== undefined
-    const target = fromRef ? Math.max(0.1, refs![def.id] * 1.15) : def.target
+    const target = (fromRef ? Math.max(0.1, refs![def.id] * 1.15) : def.target) * (serial && def.loose ? SERIAL_SLACK : 1)
     return { def, findings, count: findings.length, rate, target, fromRef, status: statusOf(rate, target) }
   })
   const dlg = dialogue(text).reduce((sum, d) => sum + d.to - d.from, 0)

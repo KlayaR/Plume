@@ -119,6 +119,7 @@ function ChapterBlock({ book, c, n, label, open, onFold }: { book: Book; c: Chap
   const proposal = useOutline(s => s.proposals[c.id])
   const editing = useEditing(s => s.id === `ch:${c.id}`)
   const st = useStore.getState
+  const serial = book.meta.kind === 'serial'
   const next = book.chapters[n + 1]
   const words = c.scenes.reduce((k, s) => k + countWords(s.text), 0)
   const regenerate = async () => { const d = await askText(t('Direction for Claude (optional)'), '', t('e.g. darker, Alice doesn’t show up, end on the letter')); if (d !== null) planChapter(c.id, 'regenerate', d) }
@@ -159,14 +160,18 @@ function ChapterBlock({ book, c, n, label, open, onFold }: { book: Book; c: Chap
         {editing ? (
           <div className="pl-grid2 pl-ol-chplan" data-editing="true">
             <label className="sk-field"><span className="sk-label">{t('Chapter goal')}</span><Grow autoFocus value={c.goal ?? ''} placeholder={t('What the point-of-view character wants right now')} onChange={v => st().updateChapter(c.id, { goal: v })} /></label>
-            <label className="sk-field"><span className="sk-label">{t('How it ends')}</span><Grow value={c.ending ?? ''} placeholder={t('The turn or the question it lands on')} onChange={v => st().updateChapter(c.id, { ending: v })} /></label>
+            <label className="sk-field"><span className="sk-label">{t('How it ends')}</span><Grow value={c.ending ?? ''} placeholder={serial ? t('The cliffhanger or question that pulls to the next') : t('The turn or the question it lands on')} onChange={v => st().updateChapter(c.id, { ending: v })} /></label>
+            {serial && <label className="sk-field"><span className="sk-label">{t('Opening hook')}</span><Grow value={c.hook ?? ''} placeholder={t('How it grabs the reader at once')} onChange={v => st().updateChapter(c.id, { hook: v })} /></label>}
+            {serial && <label className="sk-field"><span className="sk-label">{t('What it gives the reader')}</span><Grow value={c.promise ?? ''} placeholder={t('A fight, a reveal, a level-up, a laugh…')} onChange={v => st().updateChapter(c.id, { promise: v })} /></label>}
           </div>
         ) : (
           <button type="button" className="pl-ol-chread" onClick={() => edit(`ch:${c.id}`)}>
-            {c.goal || c.ending ? <>
+            {c.goal || c.ending || c.hook || c.promise ? <>
+              {serial && c.hook && <span><b>{t('Opens on')}</b> {c.hook}</span>}
               {c.goal && <span><b>{t('Goal')}</b> {c.goal}</span>}
+              {serial && c.promise && <span><b>{t('Gives')}</b> {c.promise}</span>}
               {c.ending && <span><b>{t('Ends on')}</b> {c.ending}</span>}
-            </> : <span className="pl-ol-ghost">{t('+ The chapter’s goal and how it ends')}</span>}
+            </> : <span className="pl-ol-ghost">{serial ? t('+ The chapter’s hook, goal and how it ends') : t('+ The chapter’s goal and how it ends')}</span>}
           </button>
         )}
         {showVersions && (

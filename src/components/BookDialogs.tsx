@@ -7,7 +7,10 @@ import { invoke } from '@tauri-apps/api/core'
 import { Bot, Check, Compass, FileOutput, ListChecks, Search, Square, Undo2 } from 'lucide-react'
 import { Dialog } from '../studio-kit/shell.js'
 import { useStore } from '../store'
-import { toDocx, toEpub, toHtml, toMarkdown, type DocxLayout, type ExportFormat } from '../lib/export'
+import { toDocx, toEpub, toHtml, toMarkdown, volumeBook, type DocxLayout, type ExportFormat } from '../lib/export'
+import { isSerial, volumesOf } from '../lib/serial'
+import { chapterLabels } from '../lib/chapters'
+import { volumeToBook } from '../library'
 import { toBase64, utf8 } from '../lib/zip'
 import { pageSizeFor } from '../lib/fonts'
 import { clearDone, estimate, goTo, markDone, missingSummaries, runTask, stopTask, toBible, useAgents, type AgentTask } from '../agents'
@@ -26,15 +29,26 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
   const [sceneBreak, setSceneBreak] = useState('* * *')
   const [busy, setBusy] = useState(false)
   const fr = book.meta.language === 'fr'
+  // Which chapters: all of them, one volume (as a book of its own), or a range.
+  const volumes = volumesOf(book)
+  const labels = chapterLabels(book.chapters, book.meta.language)
+  const [which, setWhich] = useState('all')
+  const [from, setFrom] = useState(0)
+  const [to, setTo] = useState(book.chapters.length - 1)
+  const volume = which.startsWith('v:') ? volumes.find(v => v.id === which.slice(2)) : undefined
+  const chosen = (): { out: typeof book; range?: [number, number] } =>
+    volume ? { out: volumeBook(book, volume.start, volume.end, volume.title) }
+      : which === 'range' ? { out: book, range: [Math.min(from, to), Math.max(from, to) + 1] } : { out: book }
 
   const go = async () => {
-    const o = { format, layout, titlePage, sceneBreak }
+    const { out, range } = chosen()
+    const o = { format, layout, titlePage, sceneBreak, range }
     if (format === 'pdf') { onClose(); useStore.setState({ printing: true }); return }
-    const path = await save({ title: t('Export the book'), defaultPath: `${book.meta.title}.${format}`, filters: [{ name: format.toUpperCase(), extensions: [format] }] })
+    const path = await save({ title: t('Export the book'), defaultPath: `${out.meta.title}.${format}`, filters: [{ name: format.toUpperCase(), extensions: [format] }] })
     if (!path) return
     setBusy(true)
     try {
-      const data = format === 'epub' ? await toEpub(book, o) : format === 'docx' ? await toDocx(book, o) : format === 'html' ? utf8(toHtml(book, o)) : utf8(toMarkdown(book, o))
+      const data = format === 'epub' ? await toEpub(out, o) : format === 'docx' ? await toDocx(out, o) : format === 'html' ? utf8(toHtml(out, o)) : utf8(toMarkdown(out, o))
       await invoke('write_file_base64', { path, data: toBase64(data) })
       useStore.getState().notify('ok', t('Exported: {path}', { path }))
       onClose()
@@ -55,6 +69,34 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
         <button type="button" className="sk-btn sk-btn-ghost" onClick={onClose}>{t('Cancel')}</button>
         <button type="button" className="sk-btn sk-btn-primary" disabled={busy} onClick={go}>{busy ? t('Exporting…') : format === 'pdf' ? t('Print…') : t('Export…')}</button>
       </>}>
+      {(volumes.length > 0 || isSerial(book)) && (
+        <div className="sk-field">
+          <label>{t('Chapters')}</label>
+          <select className="sk-select" value={which} onChange={e => setWhich(e.target.value)}>
+            <option value="all">{t('The whole book')}</option>
+            {volumes.map(v => <option key={v.id} value={`v:${v.id}`}>{t('Volume: {title}, as a book', { title: v.title })}</option>)}
+            <option value="range">{t('From one chapter to another')}</option>
+          </select>
+          {which === 'range' && (
+            <div className="pl-row">
+              <select className="sk-select" value={from} onChange={e => setFrom(Number(e.target.value))} aria-label={t('From')}>{labels.map((l, i) => <option key={i} value={i}>{l.label}</option>)}</select>
+              <span>–</span>
+              <select className="sk-select" value={to} onChange={e => setTo(Number(e.target.value))} aria-label={t('To')}>{labels.map((l, i) => <option key={i} value={i}>{l.label}</option>)}</select>
+            </div>
+          )}
+          {volume && (
+            <div className="pl-row">
+              <span className="sk-hint pl-grow">{t('Numbered from chapter 1, titled “{title}”, with your front and back matter; a first paragraph that recaps the last chapter (“Previously…”) is left out.', { title: volumeBook(book, volume.start, volume.end, volume.title).meta.title })}</span>
+              <button type="button" className="sk-btn sk-btn-sm" disabled={busy} title={t('A new Plume book beside this one, with the volume’s chapters and the bible, to revise for an ebook or print. The web novel is not changed.')}
+                onClick={async () => {
+                  setBusy(true)
+                  try { const root = await volumeToBook(book, volume.start, volume.end, volume.title); useStore.getState().notify('ok', t('Book made: {path}', { path: root }), { label: t('Open'), run: () => useStore.getState().open(root) }); onClose() } catch (e) { useStore.getState().notify('error', String(e)) }
+                  setBusy(false)
+                }}>{t('Make it a Plume book')}</button>
+            </div>
+          )}
+        </div>
+      )}
       <div className="pl-formats">
         {FORMATS.map(([id, label, hint]) => (
           <label key={id} className={`pl-format ${format === id ? 'pl-active' : ''}`}>

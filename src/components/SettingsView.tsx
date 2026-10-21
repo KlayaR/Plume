@@ -4,7 +4,8 @@ import { useState } from 'react'
 import { BookMarked, Bot, Feather, Info, Palette, PenLine, Type, Settings as Gear } from 'lucide-react'
 import { Dialog, SettingRow, SettingsSection, Switch, ThemePicker } from '../studio-kit/shell.js'
 import { useStore } from '../store'
-import type { ActionId, Effort, MatterKey, Model } from '../lib/types'
+import type { ActionId, Effort, MatterKey, Model, Serial } from '../lib/types'
+import { isSerial, serialOf } from '../lib/serial'
 import { BACK, FRONT, MATTER_LABEL } from '../lib/matter'
 import { useT } from '../i18n'
 import ManuscriptOptions from './ManuscriptOptions'
@@ -220,8 +221,37 @@ function BookTab() {
   const num = (v: string, min: number, max: number) => Math.max(min, Math.min(max, Math.round(Number(v) || min)))
   const goal = book.meta.goal
   const setGoal = (patch: Partial<typeof goal>) => useStore.getState().updateMeta({ goal: { ...goal, ...patch } })
+  const serial = isSerial(book)
+  const sr = serialOf(book)
+  const setSerial = (patch: Partial<Serial>) => useStore.getState().updateMeta({ serial: { ...serialOf(useStore.getState().book!), ...patch } })
+  const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
   return (
     <>
+    <SettingsSection title={t('Kind of book')} description={t('A web novel is published chapter by chapter: release schedule, buffer, arcs and volumes, hooks, threads, published chapters kept as canon, and a copy for Royal Road.')}>
+      <SettingRow label={t('Kind of book')}>
+        <div className="sk-segmented" role="group" aria-label={t('Kind of book')}>
+          <button type="button" aria-pressed={!serial} onClick={() => useStore.getState().updateMeta({ kind: undefined })}>{t('Book')}</button>
+          <button type="button" aria-pressed={serial} onClick={() => useStore.getState().updateMeta({ kind: 'serial', serial: sr })}>{t('Web novel')}</button>
+        </div>
+      </SettingRow>
+      {serial && (
+        <>
+          <SettingRow label={t('Release days')} description={t('One chapter on each day ticked: the buffer counts how long your written chapters last.')}>
+            <div className="sk-segmented" role="group" aria-label={t('Release days')}>
+              {[1, 2, 3, 4, 5, 6, 0].map(d => (
+                <button key={d} type="button" aria-pressed={sr.days.includes(d)} onClick={() => setSerial({ days: sr.days.includes(d) ? sr.days.filter(x => x !== d) : [...sr.days, d].sort() })}>{t(DAYS[d])}</button>
+              ))}
+            </div>
+          </SettingRow>
+          <SettingRow label={t('LitRPG and progression')} description={t('System windows and status screens: lines starting with | (| Level: 12). Characters get stats by chapter, and boxes that disagree with them are flagged.')}>
+            <Switch checked={sr.litrpg} onChange={v => setSerial({ litrpg: v })} label={t('LitRPG and progression')} />
+          </SettingRow>
+          <SettingRow label={t('Thread alert')} description={t('An open thread untouched for this many chapters is flagged (Plan → Threads).')}>
+            <input className="sk-input pl-num" type="number" min={2} max={100} value={sr.threadGap} onChange={e => setSerial({ threadGap: num(e.target.value, 2, 100) })} />
+          </SettingRow>
+        </>
+      )}
+    </SettingsSection>
     <SettingsSection title={t('Goals')}>
       <SettingRow label={t('Words for the whole book')}>
         <input className="sk-input pl-num" type="number" min={0} step={5000} value={goal.book} onChange={e => setGoal({ book: Math.max(0, Number(e.target.value) || 0) })} />
@@ -238,7 +268,9 @@ function BookTab() {
         <input className="sk-input pl-num" type="number" min={0} step={100} value={goal.daily} onChange={e => setGoal({ daily: Math.max(0, Number(e.target.value) || 0) })} />
       </SettingRow>
     </SettingsSection>
-    <SettingsSection title={t('Front and back matter')} description={t('Printed around the chapters in every export and in Page view of the whole book. One paragraph per line; empty pages are left out. A part page goes before a chapter (Plan → Board).')}>
+    <SettingsSection title={t('Front and back matter')} description={serial
+      ? t('Printed around the chapters when you export the book or a volume as a book (Export → Chapters). One paragraph per line; empty pages are left out.')
+      : t('Printed around the chapters in every export and in Page view of the whole book. One paragraph per line; empty pages are left out. A part page goes before a chapter (Plan → Board).')}>
       {[...FRONT, ...BACK].map((k: MatterKey) => (
         <div key={k} className="pl-matter">
           <span className="sk-label">{MATTER_LABEL[k][book.meta.language]}</span>

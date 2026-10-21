@@ -27,6 +27,32 @@ export const HELP: HelpTopic[] = [
     },
   },
   {
+    id: 'serial',
+    title: { en: 'Web novels (Royal Road)', fr: 'Web novels (Royal Road)' },
+    lines: {
+      en: [
+        'Choose **Web novel** when you create a book, or in **Settings → This book**. Chapters default to 2,000–3,500 words, one scene each, and Settings gets your **release days**.',
+        '**Plan → Release** shows the **buffer** (chapters written ahead and until when they last), the next release, this week and how many weeks you kept the schedule. **Copy for Royal Road** puts a chapter on the clipboard as Royal Road\'s editor takes it; **Mark as published today** locks it.',
+        'A published chapter is canon: it is read-only until you press **Edit anyway**, and Claude is told never to contradict it. Publishing also brings its summary up to date.',
+        'Each chapter has an **opening hook**, **what it gives the reader** and **how it ends** (Plan → Release or Outline). **Check hooks with Claude** rates the written ones from their first and last lines only.',
+        '**Arcs** replace the single structure: right-click a chapter → **Start an arc here**, give it a shape and a planned length, and each beat says around which chapter it is due. **Volumes** group arcs; **Export → Chapters** turns a volume into an ebook or a Plume book of its own.',
+        '**Plan → Analysis → Threads** keeps the mysteries and promises open for the reader, and flags one untouched for too long. **Find threads with Claude** reads your chapter summaries.',
+        'For long serials, Claude reads finished arcs as their summaries and the current arc chapter by chapter, so it stays consistent at chapter 300. Keep summaries up to date (Plan → Dashboard).',
+        '**LitRPG** (Settings → This book): lines starting with **|** are system windows (| Level: 12), drawn as a box and exported as one. Characters get **Stats** by chapter (bible → Advanced); right-click a status box → **Update stats from this box**. The Dashboard flags boxes that disagree.',
+      ],
+      fr: [
+        'Choisissez **Web novel** en créant un livre, ou dans **Paramètres → Ce livre**. Les chapitres font par défaut 2 000 à 3 500 mots, une scène chacun, et les Paramètres ont vos **jours de publication**.',
+        '**Plan → Publication** montre l’**avance** (les chapitres écrits d’avance et jusqu’à quand ils tiennent), la prochaine publication, la semaine et le nombre de semaines tenues. **Copier pour Royal Road** met un chapitre dans le presse-papiers comme l’éditeur de Royal Road le prend ; **Marquer comme publié aujourd’hui** le verrouille.',
+        'Un chapitre publié fait foi : il n’est plus modifiable jusqu’à **Modifier quand même**, et Claude a pour consigne de ne jamais le contredire. La publication met aussi son résumé à jour.',
+        'Chaque chapitre a une **accroche d’ouverture**, **ce qu’il offre au lecteur** et **sa fin** (Plan → Publication ou Structure). **Vérifier les accroches avec Claude** note ceux qui sont écrits à partir de leurs premières et dernières lignes seulement.',
+        'Les **arcs** remplacent la structure unique : clic droit sur un chapitre → **Commencer un arc ici**, donnez-lui une forme et une longueur prévue, et chaque temps fort dit vers quel chapitre il est attendu. Les **volumes** regroupent les arcs ; **Exporter → Chapitres** fait d’un volume un livre numérique ou un livre Plume à part.',
+        '**Plan → Analyse → Fils** suit les mystères et promesses ouverts pour le lecteur, et signale ceux laissés trop longtemps. **Trouver les fils avec Claude** lit vos résumés de chapitres.',
+        'Pour un long feuilleton, Claude lit les arcs terminés en résumé et l’arc en cours chapitre par chapitre, pour rester cohérent au chapitre 300. Gardez les résumés à jour (Plan → Tableau de bord).',
+        '**LitRPG** (Paramètres → Ce livre) : les lignes qui commencent par **|** sont des fenêtres du système (| Niveau : 12), dessinées en encadré et exportées comme telles. Les personnages ont des **Statistiques** par chapitre (bible → Avancé) ; clic droit sur une fenêtre de statut → **Mettre à jour les statistiques**. Le tableau de bord signale les fenêtres qui les contredisent.',
+      ],
+    },
+  },
+  {
     id: 'writing',
     title: { en: 'Writing', fr: 'Écrire' },
     lines: {

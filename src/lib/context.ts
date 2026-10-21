@@ -9,6 +9,7 @@ import { estimateTokens, fold, lastWords, firstWords } from './text'
 import { taskMessage, systemRules } from './prompts'
 import { expandVariables, promptFor, promptText } from './voice'
 import { aiBlocks } from './blocks'
+import { arcsOf, isLitRPG, isSerial, statsAt } from './serial'
 
 /** Entry types that are never looked for in the text. */
 const UNNAMED = new Set(['style', 'wordlist', 'excerpt'])
@@ -123,7 +124,10 @@ export function renderEntry(e: Entry, mode: Mode, chapter: number, lang: Lang, b
   // POV awareness: what the point-of-view character knows and doesn't.
   const knows = pov && e.knows?.trim() ? `${lang === 'fr' ? 'Sait' : 'Knows'} : ${e.knows.trim()}` : ''
   const unaware = pov && e.unaware?.trim() ? `${lang === 'fr' ? 'Ignore (ne le pense ni ne le devine jamais)' : 'Does not know (never thinks or guesses it)'} : ${e.unaware.trim()}` : ''
-  return [head, body?.trim(), facts.length ? `${label}\n${facts.join('\n')}` : '', knows, unaware, voiceBlock(e, lang), '</entry>'].filter(Boolean).join('\n')
+  // LitRPG: the numbers as they stand at this chapter, so status screens stay consistent.
+  const now = statsAt(e.stats, chapter)
+  const stats = now.length ? `${lang === 'fr' ? 'Statistiques à ce stade' : 'Stats at this point'} : ${now.map(s => `${s.name} ${s.value}`).join(', ')}` : ''
+  return [head, body?.trim(), facts.length ? `${label}\n${facts.join('\n')}` : '', stats, knows, unaware, voiceBlock(e, lang), '</entry>'].filter(Boolean).join('\n')
 }
 
 /** Samples of the author's prose, at most this many words in all (cached, so cheap after the first call). */
@@ -178,7 +182,7 @@ export function systemPrompt(book: Book, action: ActionId, chapter: number): str
   const styleText = style ? [style.short, style.full].filter(s => s.trim()).join('\n\n').trim() : ''
   const samples = proseSamples(book, chapter)
   return [
-    systemRules(lang, book.meta.title, { adult: voice.adult, sceneRules: voice.sceneRules, tense: body.includes('{book.tense}') ? '' : voice.tense, samples: samples.length > 0 }),
+    systemRules(lang, book.meta.title, { adult: voice.adult, sceneRules: voice.sceneRules, tense: body.includes('{book.tense}') ? '' : voice.tense, samples: samples.length > 0, serial: isSerial(book), litrpg: isLitRPG(book) }),
     body ? `<author_instructions>\n${expandVariables(body, vars)}\n</author_instructions>` : '',
     book.meta.foundation?.tone?.trim() ? `<tone>\n${book.meta.foundation.tone.trim()}\n</tone>` : '',
     voice.description.trim() ? `<author_voice>\n${voice.description.trim()}\n</author_voice>` : '',
@@ -188,8 +192,40 @@ export function systemPrompt(book: Book, action: ActionId, chapter: number): str
   ].filter(Boolean).join('\n\n')
 }
 
+/**
+ * A web novel can run to hundreds of chapters: arcs already over go as their
+ * summaries, the current arc chapter by chapter (published ones marked as canon),
+ * then this chapter's earlier scenes. When it runs past the budget the oldest go
+ * first, and the summary of the story so far stands in for them.
+ */
+export function serialStorySoFar(book: Book, sceneId: string, maxTokens = 1200): string {
+  const at = book.chapters.findIndex(c => c.scenes.some(s => s.id === sceneId))
+  if (at < 0) return ''
+  const fr = book.meta.language === 'fr'
+  const done = arcsOf(book).filter(a => a.end <= at && a.plan?.summary?.trim())
+  const lines: string[] = done.map(a => `Arc « ${a.title} » : ${a.plan!.summary!.trim()}`)
+  const covered = (i: number) => done.some(a => i >= a.start && i < a.end)
+  book.chapters.slice(0, at).forEach((c, i) => {
+    if (!covered(i) && c.summary) lines.push(`${c.title || '…'}${c.published ? (fr ? ' (publié)' : ' (published)') : ''} : ${c.summary}`)
+  })
+  const here = book.chapters[at]
+  for (const s of here.scenes.slice(0, here.scenes.findIndex(s => s.id === sceneId))) if (s.summary) lines.push(`${s.title} : ${s.summary}`)
+  const out: string[] = []
+  let used = 0
+  let cut = false
+  for (const l of lines.reverse()) {
+    used += estimateTokens(l)
+    if (used > maxTokens) { cut = true; break }
+    out.unshift(l)
+  }
+  const earlier = book.meta.summary?.trim()
+  if (cut && earlier) out.unshift(`${fr ? 'Plus tôt' : 'Earlier'} : ${firstWords(earlier, 180)}`)
+  return out.join('\n')
+}
+
 /** Summaries of what came before this scene, for long books: earlier chapters, then earlier scenes of this one. */
 export function storySoFar(book: Book, sceneId: string, maxTokens = 700): string {
+  if (isSerial(book)) return serialStorySoFar(book, sceneId)
   const lines: string[] = []
   for (const c of book.chapters) {
     const at = c.scenes.findIndex(s => s.id === sceneId)
@@ -251,8 +287,11 @@ export function outlineLines(book: Book, sc: Scene, lang: Lang): string[] {
   const fr = lang === 'fr'
   const ch = book.chapters.find(c => c.scenes.some(s => s.id === sc.id))
   const last = ch?.scenes[ch.scenes.length - 1]?.id === sc.id
+  const first = ch?.scenes[0]?.id === sc.id
   return [
+    first && ch?.hook?.trim() ? `${fr ? 'Accroche d’ouverture du chapitre' : 'The chapter’s opening hook'} : ${ch.hook.trim()}` : '',
     ch?.goal?.trim() ? `${fr ? 'But du chapitre' : 'Chapter goal'} : ${ch.goal.trim()}` : '',
+    ch?.promise?.trim() ? `${fr ? 'Ce que le chapitre offre au lecteur' : 'What the chapter gives the reader'} : ${ch.promise.trim()}` : '',
     sc.beats?.length ? `${fr ? 'Étapes, dans l’ordre' : 'Beats, in order'} :\n${sc.beats.map((b, i) => `${i + 1}. ${b}`).join('\n')}` : '',
     sc.cast?.length ? `${fr ? 'Présents' : 'Present'} : ${sc.cast.join(', ')}` : '',
     sc.reveals?.trim() ? `${fr ? 'Ce que le lecteur apprend' : 'What the reader learns'} : ${sc.reveals.trim()}` : '',
@@ -264,9 +303,9 @@ export function outlineLines(book: Book, sc: Scene, lang: Lang): string[] {
 }
 
 /** The length to aim for, and whether the scene opens or closes its chapter. */
-export function scenePlace(book: Book, sceneId: string): { range: [number, number]; first: boolean; last: boolean } {
+export function scenePlace(book: Book, sceneId: string): { range: [number, number]; first: boolean; last: boolean; serial: boolean } {
   const scenes = book.chapters.find(c => c.scenes.some(s => s.id === sceneId))?.scenes ?? []
-  return { range: sceneWords(book, sceneId), first: scenes[0]?.id === sceneId, last: scenes[scenes.length - 1]?.id === sceneId }
+  return { range: sceneWords(book, sceneId), first: scenes[0]?.id === sceneId, last: scenes[scenes.length - 1]?.id === sceneId, serial: isSerial(book) }
 }
 
 export function storyParts(input: Pick<ContextInput, 'action' | 'before' | 'selection' | 'after'>, windowWords: number) {
@@ -351,7 +390,7 @@ export function buildContext(input: ContextInput): Built {
   const kept = list.filter(p => !p.dropped).sort((a, b) => a.slug.localeCompare(b.slug))
   const bible = kept.map(render).join('\n\n')
   const voice = book.meta.voice
-  const rules = systemRules(lang, book.meta.title, { adult: voice.adult, sceneRules: voice.sceneRules })
+  const rules = systemRules(lang, book.meta.title, { adult: voice.adult, sceneRules: voice.sceneRules, serial: isSerial(book), litrpg: isLitRPG(book) })
   const system = systemPrompt(book, input.action, chapter)
 
   // Who tells the scene, and (not for rewrites: the passage is enough) what happened before, where and when.

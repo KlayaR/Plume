@@ -5,6 +5,7 @@ import { Flame, Target, Timer } from 'lucide-react'
 import { useStore } from '../store'
 import { bookWords, dailyWords, endSprint, startSprint, streak, todayWords, useSprint } from '../library'
 import { numLocale, useT } from '../i18n'
+import { bufferOf, isSerial, releaseStreak, serialOf, weekReleases } from '../lib/serial'
 
 const n = (x: number) => x.toLocaleString(numLocale())
 
@@ -54,6 +55,15 @@ export default function GoalsPanel() {
           </div>
           {daily > 0 && <div className="pl-goalbar"><i style={{ width: `${Math.min(100, (today / daily) * 100)}%` }} /></div>}
           <div className="pl-row"><Flame size={14} className="pl-flame" /> <span>{t('{n} days in a row', { n: streak(book) })}</span></div>
+          {isSerial(book) && (
+            <>
+              <div className="pl-row">
+                <span className="sk-label pl-grow">{t('Releases this week')}</span>
+                <span className="sk-num">{weekReleases(book)} / {serialOf(book).days.length}</span>
+              </div>
+              <div className="pl-row"><span>{t('{n} weeks on schedule · {b} chapters in the buffer', { n: releaseStreak(book), b: bufferOf(book).ready.length })}</span></div>
+            </>
+          )}
 
           <div className="pl-row">
             <span className="sk-label pl-grow">{t('The book')}</span>

@@ -17,6 +17,24 @@ import { accept, discard, getEditorView, retry, runAction, writeChapter, writeFr
 import { proposalField } from './editor/cm'
 import { insertPlaceholder, toggleInline, unknownNames } from './editor/marks'
 import { cutToDarlings, removeComment } from './writing'
+import { boxOwner, dayOf, isLitRPG, isLocked, isSerial, mergeStats, readBox, systemBoxes } from './lib/serial'
+import { chapterTitleFor, royalRoadHtml, royalRoadText } from './lib/export'
+
+/** A chapter on the clipboard as Royal Road's editor takes it: paragraphs, italics, scene breaks, system boxes as tables. */
+export async function copyForRoyalRoad(chapterId: string) {
+  const st = useStore.getState()
+  const book = st.book!
+  const c = book.chapters.find(x => x.id === chapterId)
+  if (!c) return
+  const html = royalRoadHtml(book, c), text = royalRoadText(book, c)
+  try {
+    await navigator.clipboard.write([new ClipboardItem({ 'text/html': new Blob([html], { type: 'text/html' }), 'text/plain': new Blob([text], { type: 'text/plain' }) })])
+  } catch {
+    // No rich clipboard: plain text still pastes, without italics.
+    try { await navigator.clipboard.writeText(text) } catch { st.notify('error', t('The system did not allow writing to the clipboard.')); return }
+  }
+  st.notify('ok', t('Chapter copied: paste it into Royal Road’s editor.'))
+}
 import { deleteMessage, turnIntoEntries, useChat } from './chat'
 
 const NAMED_TYPES: EntryType[] = ENTRY_TYPES.map(x => x.type).filter(x => !['style', 'wordlist', 'excerpt'].includes(x))
@@ -87,6 +105,21 @@ export function editorMenu(view: EditorView, pos: number): MenuItem[] {
         st.notify('ok', t('{name} added to the bible.', { name: unknown.name }), { label: t('Open'), run: () => st.showEntry(e.slug) })
       } })),
     }, { label: t('Ignore “{name}”', { name: unknown.name }), onClick: () => st.updateMeta({ ignored: [...(book.meta.ignored ?? []), unknown.name] }) }, { separator: true })
+  }
+
+  // LitRPG: a status box under the pointer can update its character's stats from this chapter on.
+  const box = isLitRPG(book) ? systemBoxes(doc.toString()).find(b => pos >= b.from && pos <= b.to) : undefined
+  if (box) {
+    const found = findScene(book, st.sceneId)
+    const read = readBox(box.lines)
+    const owner = found && boxOwner(book, read, found.scene.pov)
+    if (found && owner && read.stats.length) {
+      items.push({ label: t('Update {name}’s stats from this box', { name: owner.name }), onClick: () => {
+        const n = found.number || 1
+        st.updateEntry(owner.slug, { stats: mergeStats(owner.stats, read.stats, n) })
+        st.notify('ok', t('{name}: {n} stats from chapter {ch}.', { name: owner.name, n: read.stats.length, ch: n }), { label: t('Open'), run: () => st.showEntry(owner.slug) })
+      } }, { separator: true })
+    }
   }
 
   // A margin comment under the pointer.
@@ -193,16 +226,29 @@ export function chapterMenu(chapterId: string): MenuItem[] {
   const i = book.chapters.findIndex(c => c.id === chapterId)
   const c = book.chapters[i]
   if (!c) return []
-  const kinds = allowedKinds(i, book.chapters.length)
+  const serial = isSerial(book)
+  const kinds = allowedKinds(i, book.chapters.length, serial)
   const kindNames = { chapter: 'Numbered chapter', prologue: 'Prologue', epilogue: 'Epilogue' }
   const words = c.scenes.reduce((n, s) => n + countWords(s.text), 0)
+  const locked = isLocked(c, st.unlocked)
   return [
     { label: t('New scene'), onClick: () => st.addScene(chapterId, `${t('Scene')} ${c.scenes.length + 1}`) },
-    { label: t('Edit this chapter (Claude)…'), disabled: !c.scenes.some(s => s.text.trim()), onClick: () => openEdit(chapterId) },
+    { label: t('Edit this chapter (Claude)…'), disabled: !c.scenes.some(s => s.text.trim()) || locked, onClick: () => openEdit(chapterId) },
+    ...(serial ? [
+      { separator: true },
+      c.published
+        ? { label: t('Published on {day}: mark as not published', { day: c.published }), onClick: () => st.publishChapter(chapterId, null) }
+        : { label: t('Mark as published today'), disabled: !words, onClick: () => st.publishChapter(chapterId, dayOf(new Date())) },
+      { label: t('Copy for Royal Road'), disabled: !words, onClick: () => copyForRoyalRoad(chapterId) },
+      { label: t('Copy the title'), onClick: () => { navigator.clipboard?.writeText(chapterTitleFor(book, i)); st.notify('ok', t('Title copied.')) } },
+      { label: c.arc ? t('Arc: {title}…', { title: c.arc }) : t('Start an arc here…'), onClick: async () => { const v = await askText(t('Title of the arc that starts here (empty: none)'), c.arc ?? ''); if (v !== null) st.updateChapter(chapterId, { arc: v.trim() }) } },
+    ] as MenuItem[] : []),
     { label: t('Write the chapter from the plan (Claude)'), disabled: !c.scenes.some(s => !s.text.trim() && (s.note?.trim() || s.beats?.length)), onClick: () => writeChapter(chapterId) },
     { label: t('Rename…'), onClick: async () => { const v = await askText(t('Chapter title'), c.title); if (v !== null) st.updateChapter(chapterId, { title: v.trim() }) } },
     kinds.length > 1 && { label: t('Kind'), sub: kinds.map(k => ({ label: t(kindNames[k]), checked: c.kind === k, onClick: () => st.updateChapter(chapterId, { kind: k }) })) },
-    { label: c.part ? t('Part: {title}…', { title: c.part }) : t('Start a part here…'), onClick: async () => { const v = await askText(t('Title of the part that starts here (empty: none)'), c.part ?? ''); if (v !== null) st.updateChapter(chapterId, { part: v.trim() }) } },
+    serial
+      ? { label: c.part ? t('Volume: {title}…', { title: c.part }) : t('Start a volume here…'), onClick: async () => { const v = await askText(t('Title of the volume that starts here (empty: none)'), c.part ?? ''); if (v !== null) st.updateChapter(chapterId, { part: v.trim() }) } }
+      : { label: c.part ? t('Part: {title}…', { title: c.part }) : t('Start a part here…'), onClick: async () => { const v = await askText(t('Title of the part that starts here (empty: none)'), c.part ?? ''); if (v !== null) st.updateChapter(chapterId, { part: v.trim() }) } },
     { separator: true },
     { label: t('Move up'), disabled: i === 0, onClick: () => st.moveChapter(chapterId, i - 1) },
     { label: t('Move down'), disabled: i === book.chapters.length - 1, onClick: () => st.moveChapter(chapterId, i + 1) },

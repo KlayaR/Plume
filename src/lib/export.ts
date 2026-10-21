@@ -7,13 +7,15 @@ import { chapterLabels } from './chapters'
 import { fixTypography } from './typography'
 import { countWords, newId } from './text'
 import { makeZip, utf8 } from './zip'
-import { inlineDocx, inlineHtml } from './inline'
+import { inlineDocx, inlineHtml, stripInline } from './inline'
 import { BACK, FRONT, matterPages } from './matter'
+import { isSystemLine, systemText } from './serial'
 
 export type ExportFormat = 'epub' | 'docx' | 'md' | 'pdf' | 'html'
 export type DocxLayout = 'book' | 'submission'
 
-export interface ExportOptions { format: ExportFormat; layout: DocxLayout; titlePage: boolean; sceneBreak: string }
+/** `range`: only chapters from..to (indexes, `to` excluded), keeping their numbers. */
+export interface ExportOptions { format: ExportFormat; layout: DocxLayout; titlePage: boolean; sceneBreak: string; range?: [number, number] }
 
 /** A scene's text as it should be published: no placeholders, clean typography, paragraphs. */
 export function cleanParagraphs(text: string, book: Book): string[] {
@@ -21,26 +23,81 @@ export function cleanParagraphs(text: string, book: Book): string[] {
   return clean.split('\n').map(p => p.replace(/[ \t]+/g, ' ').trim()).filter(Boolean)
 }
 
+/** Paragraphs, with the LitRPG system lines ("| Level: 12") of a row gathered into one box. */
+export function paraBlocks(paras: string[]): ({ box: string[] } | { p: string })[] {
+  const out: ({ box: string[] } | { p: string })[] = []
+  for (const p of paras) {
+    const last = out[out.length - 1]
+    if (isSystemLine(p)) { if (last && 'box' in last) last.box.push(systemText(p)); else out.push({ box: [systemText(p)] }) } else out.push({ p })
+  }
+  return out
+}
+
 interface Part { label: string; title: string; part?: string; scenes: string[][] }
 
-function parts(book: Book): Part[] {
+function parts(book: Book, o?: Pick<ExportOptions, 'range'>): Part[] {
   const labels = chapterLabels(book.chapters, book.meta.language)
+  const [from, to] = o?.range ?? [0, book.chapters.length]
   return book.chapters.map((c: Chapter, i) => ({
     label: labels[i].label,
     title: c.title && c.title !== labels[i].label ? c.title : '',
     part: c.part?.trim() || undefined,
     scenes: c.scenes.map(s => cleanParagraphs(s.text, book)).filter(s => s.length),
-  }))
+  })).slice(from, to)
 }
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+
+/** A scene's paragraphs as HTML; a system box is a <div class="system">. */
+const htmlParas = (s: string[], first = false) => paraBlocks(s).map((b, j) => 'box' in b
+  ? `<div class="system">${b.box.map(l => `<p>${inlineHtml(l)}</p>`).join('')}</div>`
+  : `<p${first && j === 0 ? ' class="first"' : ''}>${inlineHtml(b.p)}</p>`).join('\n')
+
+// --- Royal Road -------------------------------------------------------------------------
+
+/** "Chapter 12: The Gate", as Royal Road's title field wants it. */
+export function chapterTitleFor(book: Book, index: number): string {
+  const label = chapterLabels(book.chapters, book.meta.language)[index]?.label ?? ''
+  const title = book.chapters[index]?.title?.trim()
+  return title && title !== label ? `${label}${book.meta.language === 'fr' ? ' : ' : ': '}${title}` : label
+}
+
+/** One chapter for Royal Road's editor: plain paragraphs, <hr> between scenes, system boxes as one-cell tables. */
+export function royalRoadHtml(book: Book, c: Chapter): string {
+  return c.scenes.map(s => cleanParagraphs(s.text, book)).filter(s => s.length).map(s => paraBlocks(s).map(b => 'box' in b
+    ? `<table><tbody><tr><td>${b.box.map(inlineHtml).join('<br>')}</td></tr></tbody></table>`
+    : `<p>${inlineHtml(b.p)}</p>`).join('\n')).join('\n<hr>\n')
+}
+
+/** The same as plain text, for editors that take no formatting. */
+export const royalRoadText = (book: Book, c: Chapter) =>
+  c.scenes.map(s => cleanParagraphs(s.text, book).map(p => stripInline(isSystemLine(p) ? systemText(p) : p)).join('\n\n')).filter(Boolean).join('\n\n* * *\n\n')
+
+// --- A volume as a book -----------------------------------------------------------------
+
+/** Opening lines of a web novel chapter that recap the last one: dropped when a volume becomes a book. */
+const RECAP = /^(previously|last time|recap|précédemment|dans l[’']épisode précédent|résumé)\b/i
+
+/**
+ * A volume of a web novel as a book of its own: its chapters only, numbered from 1,
+ * titled "Book: Volume", without recaps at the start of chapters. Nothing is written.
+ */
+export function volumeBook(book: Book, from: number, to: number, volumeTitle: string): Book {
+  const chapters = book.chapters.slice(from, to).map((c, i) => ({
+    ...c,
+    part: i === 0 ? undefined : c.part,
+    published: undefined,
+    scenes: c.scenes.map((s, j) => j === 0 ? { ...s, text: s.text.replace(/^\s*([^\n]*)\n?/, (m, first: string) => (RECAP.test(first.trim()) ? '' : m)) } : s),
+  }))
+  return { ...book, chapters, meta: { ...book.meta, title: volumeTitle ? `${book.meta.title}${book.meta.language === 'fr' ? ' : ' : ': '}${volumeTitle}` : book.meta.title, kind: undefined } }
+}
 
 // --- Markdown -------------------------------------------------------------------------
 
 export function toMarkdown(book: Book, o: ExportOptions): string {
   const out: string[] = [`# ${book.meta.title}`, book.meta.author ? `*${book.meta.author}*` : '']
   for (const m of matterPages(book, FRONT)) out.push(m.paras.join('\n\n'))
-  for (const p of parts(book)) {
+  for (const p of parts(book, o)) {
     if (p.part) out.push(`# ${p.part}`)
     out.push(`## ${p.label}${p.title ? ` : ${p.title}` : ''}`)
     out.push(p.scenes.map(s => s.join('\n\n')).join(`\n\n${o.sceneBreak}\n\n`))
@@ -54,7 +111,7 @@ export function toMarkdown(book: Book, o: ExportOptions): string {
 /** The book as a single web page: readable on any screen, light or dark, with a table of contents. Nothing to install. */
 export function toHtml(book: Book, o: ExportOptions): string {
   const lang = book.meta.language
-  const ps = parts(book)
+  const ps = parts(book, o)
   const front = matterPages(book, FRONT), back = matterPages(book, BACK)
   const toc = [
     ...ps.map((p, i) => `<li><a href="#c${i + 1}">${p.part ? `${esc(p.part)} · ` : ''}${esc(p.label)}${p.title ? ` : ${esc(p.title)}` : ''}</a></li>`),
@@ -65,7 +122,7 @@ export function toHtml(book: Book, o: ExportOptions): string {
   const body = ps.map((p, i) => `<section id="c${i + 1}">
 ${p.part ? `<h2 class="part">${esc(p.part)}</h2>` : ''}
 <h2>${esc(p.label)}${p.title ? `<br><span>${esc(p.title)}</span>` : ''}</h2>
-${p.scenes.map(s => s.map(para => `<p>${inlineHtml(para)}</p>`).join('\n')).join(`\n<p class="break">${esc(o.sceneBreak)}</p>\n`)}
+${p.scenes.map(s => htmlParas(s)).join(`\n<p class="break">${esc(o.sceneBreak)}</p>\n`)}
 </section>`).join('\n') + '\n' + backHtml
   return `<!DOCTYPE html>
 <html lang="${lang}">
@@ -84,6 +141,7 @@ nav { margin: 0 0 4rem; } nav ul { list-style: none; padding: 0; } nav a { color
 section.matter { margin: 5rem 0; text-align: center; font-style: italic; } section.matter p { text-align: center; text-indent: 0; margin-bottom: 1rem; } h2.part { font-size: 2rem; margin-top: 8rem; }
 h2 { text-align: center; font-size: 1.4rem; margin: 5rem 0 2rem; } h2 span { font-weight: normal; color: var(--muted); font-size: 1.1rem; }
 p { margin: 0; text-align: justify; hyphens: auto; } p + p { text-indent: 1.4em; } p.break { text-indent: 0; text-align: center; margin: 1.5rem 0; color: var(--muted); }
+.system { margin: 1rem 0; padding: .6rem .9rem; border: 1px solid var(--muted); border-radius: 4px; font: .95rem/1.5 Consolas, monospace; } .system p { text-indent: 0; text-align: left; }
 </style>
 </head>
 <body>
@@ -105,7 +163,7 @@ ${body}
 export async function toEpub(book: Book, o: ExportOptions): Promise<Uint8Array> {
   const lang = book.meta.language
   const id = `urn:uuid:${newId()}${newId()}-${newId()}`
-  const ps = parts(book)
+  const ps = parts(book, o)
   const page = (title: string, body: string) => `<?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="${lang}" lang="${lang}">
@@ -127,7 +185,7 @@ ${m.paras.map(p => `<p>${inlineHtml(p)}</p>`).join('\n')}
     title: p.title ? `${p.label} : ${p.title}` : p.label,
     html: page(p.label, `<section epub:type="chapter">
 <h1><span class="num">${esc(p.label)}</span>${p.title ? `<br/><span class="title">${esc(p.title)}</span>` : ''}</h1>
-${p.scenes.map(s => s.map((para, j) => `<p${j === 0 ? ' class="first"' : ''}>${inlineHtml(para)}</p>`).join('\n')).join(`\n<p class="break">${esc(o.sceneBreak)}</p>\n`)}
+${p.scenes.map(s => htmlParas(s, true)).join(`\n<p class="break">${esc(o.sceneBreak)}</p>\n`)}
 </section>`),
   }])
   const chapters = [...frontDocs, ...chapterDocs, ...backDocs]
@@ -151,7 +209,9 @@ p.break { text-align: center; text-indent: 0; margin: 1em 0; }
 .matter p { text-indent: 0; text-align: center; margin: 0 0 1em; }
 .matter h1 { font-style: normal; margin-top: 0; }
 .partpage { text-align: center; margin-top: 35%; }
-.partpage h1 { font-size: 2em; letter-spacing: .1em; }`) },
+.partpage h1 { font-size: 2em; letter-spacing: .1em; }
+.system { margin: 1em 0; padding: .5em .8em; border: 1px solid #888; font-family: monospace; }
+.system p { text-indent: 0; text-align: left; }`) },
     ...(o.titlePage ? [{ name: 'OEBPS/title.xhtml', data: utf8(page(book.meta.title, `<section class="titlepage" epub:type="titlepage"><h1>${esc(book.meta.title)}</h1>${book.meta.author ? `<p class="first">${esc(book.meta.author)}</p>` : ''}</section>`)) }] : []),
     ...chapters.map(c => ({ name: `OEBPS/${c.file}`, data: utf8(c.html) })),
     { name: 'OEBPS/nav.xhtml', data: utf8(page(toc, `<nav epub:type="toc" id="toc"><h1>${toc}</h1><ol>
@@ -215,13 +275,16 @@ export async function toDocx(book: Book, o: ExportOptions): Promise<Uint8Array> 
   let started = o.titlePage
   const pageBreak = () => { const b = started ? '<w:pageBreakBefore/>' : ''; started = true; return b }
   for (const m of matterPages(book, FRONT)) m.paras.forEach((text, j) => body.push(`<w:p><w:pPr><w:pStyle w:val="Center"/>${j === 0 ? `${pageBreak()}<w:spacing w:before="3000"/>` : ''}</w:pPr>${inlineDocx(text, esc)}</w:p>`))
-  parts(book).forEach(p => {
+  parts(book, o).forEach(p => {
     if (p.part) body.push(`<w:p><w:pPr><w:pStyle w:val="Title"/>${pageBreak()}<w:spacing w:before="4000"/></w:pPr>${run(p.part)}</w:p>`)
     body.push(`<w:p><w:pPr><w:pStyle w:val="Heading1"/>${pageBreak()}${sub ? '<w:spacing w:before="3600"/>' : ''}</w:pPr>${run(p.label)}</w:p>`)
     if (p.title) body.push(para(p.title, 'Heading2'))
     p.scenes.forEach((s, si) => {
       if (si > 0) body.push(para(o.sceneBreak, 'Break'))
-      s.forEach((text, j) => body.push(para(text, 'Body', j === 0)))
+      paraBlocks(s).forEach((b, j) => {
+        if ('box' in b) b.box.forEach(line => body.push(para(line, 'System')))
+        else body.push(para(b.p, 'Body', j === 0))
+      })
     })
   })
   for (const m of matterPages(book, BACK)) {
@@ -255,6 +318,7 @@ ${o.titlePage ? '<w:titlePg/>' : ''}
 <w:style w:type="paragraph" w:default="1" w:styleId="Body"><w:name w:val="Body"/><w:pPr><w:ind w:firstLine="${indent}"/>${sub ? '' : '<w:jc w:val="both"/>'}</w:pPr></w:style>
 <w:style w:type="paragraph" w:styleId="Plain"><w:name w:val="Plain"/></w:style>
 <w:style w:type="paragraph" w:styleId="Center"><w:name w:val="Matter"/><w:pPr><w:jc w:val="center"/><w:spacing w:after="240"/></w:pPr><w:rPr><w:i/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="System"><w:name w:val="System box"/><w:pPr><w:shd w:val="clear" w:color="auto" w:fill="EDEDED"/><w:ind w:left="360" w:right="360"/></w:pPr><w:rPr><w:rFonts w:ascii="Consolas" w:hAnsi="Consolas" w:cs="Consolas"/><w:sz w:val="20"/></w:rPr></w:style>
 <w:style w:type="paragraph" w:styleId="Break"><w:name w:val="Scene break"/><w:pPr><w:jc w:val="center"/><w:spacing w:before="240" w:after="240"/></w:pPr></w:style>
 <w:style w:type="paragraph" w:styleId="Title"><w:name w:val="Title"/><w:pPr><w:jc w:val="center"/><w:spacing w:after="240"/></w:pPr><w:rPr><w:sz w:val="${sub ? 28 : 44}"/></w:rPr></w:style>
 <w:style w:type="paragraph" w:styleId="Subtitle"><w:name w:val="Subtitle"/><w:pPr><w:jc w:val="center"/></w:pPr></w:style>

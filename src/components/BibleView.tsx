@@ -3,7 +3,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { ask } from '@tauri-apps/plugin-dialog'
 import { ChevronDown, ChevronRight, ImagePlus, MessagesSquare, Plus, Search, Sparkles, Trash2, X } from 'lucide-react'
 import { MORE_TABS, useStore, type BibleTab } from '../store'
-import { EMPTY_VOICE, FAMILIES, typeInfo, VOICE_TYPES, type Entry, type EntryType, type Include, type VoiceCard } from '../lib/types'
+import { EMPTY_VOICE, FAMILIES, typeInfo, VOICE_TYPES, type Entry, type EntryType, type Include, type Stat, type VoiceCard } from '../lib/types'
+import { isLitRPG } from '../lib/serial'
 import { formatFact, parseFact } from '../lib/bible'
 import { buildMatcher, findMentions } from '../lib/context'
 import { estimateTokens, foldText } from '../lib/text'
@@ -280,6 +281,7 @@ export function EntryEditor({ entry }: { entry: Entry }) {
             <span className="sk-hint">{t('Linked entries are sent too (short version) when this one is.')}</span>
           </div>
           {entry.type === 'character' && <VoiceEditor entry={entry} update={update} />}
+          {entry.type === 'character' && (isLitRPG(book) || !!entry.stats?.length) && <StatsEditor entry={entry} update={update} />}
           <div className="sk-field">
             <label htmlFor="ee-facts">{t('Facts')}</label>
             <textarea id="ee-facts" className="sk-input" rows={4} value={facts} placeholder={'- [ch 3–8] Carries the sword Aube.\n- [ch 12+] Blind in the left eye.'}
@@ -323,6 +325,31 @@ export function EntryEditor({ entry }: { entry: Entry }) {
           )}
         </div>
       )}
+    </div>
+  )
+}
+
+/** LitRPG: the character's stats, each true from a chapter on; the AI gets the values as they stand at the chapter being written. */
+function StatsEditor({ entry, update }: { entry: Entry; update: (p: Partial<Entry>) => void }) {
+  const t = useT()
+  const stats = entry.stats ?? []
+  const set = (list: Stat[]) => update({ stats: [...list].sort((a, b) => a.from - b.from) })
+  const patch = (i: number, p: Partial<Stat>) => update({ stats: stats.map((s, j) => j === i ? { ...s, ...p } : s) })
+  return (
+    <div className="sk-field">
+      <label>{t('Stats')}</label>
+      <div className="pl-stats-table">
+        {stats.map((s, i) => (
+          <div key={i} className="pl-row">
+            <input className="sk-input" value={s.name} placeholder={t('Level')} onChange={e => patch(i, { name: e.target.value })} aria-label={t('Stat')} />
+            <input className="sk-input" value={s.value} placeholder="12" onChange={e => patch(i, { value: e.target.value })} aria-label={t('Value')} />
+            <label className="pl-row">{t('from chapter')}<input className="sk-input pl-num" type="number" min={1} value={s.from} onChange={e => patch(i, { from: Math.max(1, Number(e.target.value) || 1) })} onBlur={() => set(stats)} /></label>
+            <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm sk-btn-icon" aria-label={t('Delete')} onClick={() => set(stats.filter((_, j) => j !== i))}><X size={12} /></button>
+          </div>
+        ))}
+        <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm" onClick={() => set([...stats, { name: '', value: '', from: Math.max(1, ...stats.map(s => s.from)) }])}>+ {t('Stat')}</button>
+      </div>
+      <span className="sk-hint">{t('A new row for a stat from a later chapter keeps the old value before it. Right-click a status box in the text to read the stats from it.')}</span>
     </div>
   )
 }

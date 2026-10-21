@@ -3,7 +3,8 @@
 // right, on hover, or stay open when pinned.
 import { useEffect, useRef, useState } from 'react'
 import { ask } from '@tauri-apps/plugin-dialog'
-import { ChevronLeft, FilePlus2, FolderPlus, GripVertical, Pin, PinOff, Trash2 } from 'lucide-react'
+import { ChevronLeft, FilePlus2, FolderPlus, GripVertical, Lock, Pin, PinOff, Trash2 } from 'lucide-react'
+import { isLocked, isSerial } from '../lib/serial'
 import { findScene, useStore } from '../store'
 import type { Chapter, Entry, Scene, SceneStatus } from '../lib/types'
 import { countWords } from '../lib/text'
@@ -125,6 +126,7 @@ function Sheet() {
   const sceneId = useStore(s => s.sceneId)
   const prefs = useStore(s => s.prefs)
   const update = useStore(s => s.updateScene)
+  const unlocked = useStore(s => s.unlocked)
   const t = useT()
   const { chapter, scene: current } = findScene(book, sceneId)!
   const labels = chapterLabels(book.chapters, book.meta.language)
@@ -142,6 +144,13 @@ function Sheet() {
               <div className="pl-head">
                 <div className="pl-head-chapter">{label}{c.title && c.title !== label ? ` · ${c.title}` : ''}</div>
               </div>
+              {isLocked(c, unlocked) && (
+                <div className="pl-locked" role="note">
+                  <Lock size={13} />
+                  <span className="pl-grow">{t('Published on {day}: readers have read it, so it is canon and read-only.', { day: c.published! })}</span>
+                  <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm" onClick={() => useStore.getState().unlock(c.id)}>{t('Edit anyway')}</button>
+                </div>
+              )}
               {scenes.map(scene => <SheetScene key={scene.id} scene={scene} first={c.scenes[0]?.id === scene.id} solo={scenes.length === 1} characters={characters} update={update} t={t} active={scene.id === sceneId} />)}
             </div>
           )
@@ -215,8 +224,9 @@ function SceneTree() {
   const remove = async (id: string, title: string) => {
     if (await ask(t('Move "{title}" to the book\'s trash folder?', { title }), { title: t('Remove scene'), kind: 'warning' })) st().removeScene(id)
   }
+  const serial = isSerial(book)
   const cycleKind = (c: Chapter, i: number) => {
-    const kinds = allowedKinds(i, book.chapters.length)
+    const kinds = allowedKinds(i, book.chapters.length, serial)
     if (kinds.length < 2) return
     st().updateChapter(c.id, { kind: kinds[(kinds.indexOf(c.kind) + 1) % kinds.length] })
   }
@@ -224,9 +234,11 @@ function SceneTree() {
   return (
     <nav className="pl-tree" onContextMenu={e => { if (e.target === e.currentTarget) showMenu(e, newThingsMenu()) }}>
       {book.chapters.map((c, ci) => {
-        const kinds = allowedKinds(ci, book.chapters.length)
+        const kinds = allowedKinds(ci, book.chapters.length, serial)
         return (
           <div key={c.id} className="pl-chapter">
+            {serial && c.part?.trim() && <div className="pl-tree-group">{c.part}</div>}
+            {serial && c.arc?.trim() && <div className="pl-tree-group pl-tree-arc">{c.arc}</div>}
             <div
               className={`pl-chapter-head ${over === c.id ? 'pl-over' : ''}`}
               onContextMenu={e => showMenu(e, chapterMenu(c.id))}
@@ -240,6 +252,7 @@ function SceneTree() {
                 {c.kind === 'chapter' ? labels[ci].number : c.kind === 'prologue' ? 'P' : 'É'}
               </button>
               {c.scenes.some(s => countPlaceholders(s.text) > 0) && <span className="pl-redot" title={t('Placeholders to fill in this chapter')} />}
+              {c.published && <span className="pl-pubmark" title={t('Published on {day}', { day: c.published })}><Lock size={11} /></span>}
               <input data-lt className="pl-chapter-title" value={c.title} placeholder={t('Untitled')} onChange={e => st().updateChapter(c.id, { title: e.target.value })} aria-label={t('Chapter title')} />
               <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm sk-btn-icon" title={t('New scene')}
                 onClick={() => st().addScene(c.id, fr ? `Scène ${c.scenes.length + 1}` : `Scene ${c.scenes.length + 1}`)}>
