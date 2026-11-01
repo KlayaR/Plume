@@ -49,10 +49,10 @@ export default function OutlineView() {
   const copy = async () => {
     try { await navigator.clipboard.writeText(outlineMarkdown(book)); useStore.getState().notify('ok', t('Outline copied (Markdown).')) } catch { useStore.getState().notify('error', t('Could not copy.')) }
   }
-  // A click outside the open card (and outside menus and dialogs) closes it; so does Escape.
+  // A click outside the open card (and outside menus, dialogs and the spelling card) closes it; so does Escape.
   useEffect(() => {
     if (!editing) return
-    const down = (e: MouseEvent) => { if (!(e.target as HTMLElement | null)?.closest?.('[data-editing="true"], .pl-ctx, [role="dialog"]')) edit(null) }
+    const down = (e: MouseEvent) => { if (!(e.target as HTMLElement | null)?.closest?.('[data-editing="true"], .pl-ctx, .pl-ltf-card, [role="dialog"]')) edit(null) }
     const key = (e: KeyboardEvent) => { if (e.key === 'Escape') edit(null) }
     window.addEventListener('mousedown', down)
     window.addEventListener('keydown', key)

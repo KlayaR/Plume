@@ -7,6 +7,9 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.34.1
+- **Plan:** fixing a spelling or grammar mistake from the LanguageTool card no longer closes the story, the series, a chapter or a scene you are editing.
+
 ## 0.34.0
 **Web novels: write for Royal Road, chapter by chapter**
 - A book can now be a **web novel** (New book → Kind of book, or Settings → This book). Chapters default to 2,000–3,500 words, one scene each, with no total word goal and no epilogue. Your books stay as they are.
