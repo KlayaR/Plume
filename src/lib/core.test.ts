@@ -992,7 +992,7 @@ describe('fixing what is flagged', () => {
     expect(after.doc.sliceString(left.from, left.to)).toBe('Il sortit, et il but.')
   })
   it('flags a misspelt name, not a small word of a name opening a sentence', () => {
-    const book = bookOf([entry({ slug: 'p', type: 'place', name: 'Élise sous le Pont' })], [], 'fr')
+    const book = bookOf([], [entry({ slug: 'p', type: 'place', name: 'Élise sous le Pont' })], 'fr')
     const names = (t: string) => review(t, book).results.find(r => r.def.id === 'names')!.count
     expect(names('Sous la fontaine, rien.')).toBe(0)
     expect(names('Il vit Elise sur le pont.')).toBe(1)
