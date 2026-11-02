@@ -99,6 +99,10 @@ export const EMPTY_VOICE: VoiceCard = { register: '', sentences: '', tic: '', ge
 
 export type ExcerptKind = 'any' | 'dialogue' | 'action' | 'description' | 'introspection'
 
+export type Rank = 'main' | 'secondary' | 'minor' | 'mentioned'
+/** Character ranks, in the order People is split by. */
+export const RANKS: [Rank, string][] = [['main', 'Main'], ['secondary', 'Secondary'], ['minor', 'Minor'], ['mentioned', 'Mentioned']]
+
 export interface Entry {
   slug: string
   type: EntryType
@@ -110,6 +114,8 @@ export interface Entry {
   short: string
   full: string
   facts: Fact[]
+  /** Characters: how much they matter to the book. Splits People in the list; never sent to the AI. */
+  rank?: Rank
   /** Characters: their voice, and what they know and don't (for POV scenes). */
   voice?: VoiceCard
   knows?: string

@@ -7,6 +7,9 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.35.0
+- **Bible: character ranks.** Give a character a rank (**Main, Secondary, Minor, Mentioned**) in its entry or by right-click, and the People list splits into those groups, with unranked characters last. The rank is only for you: it is never sent to the AI.
+
 ## 0.34.1
 - **Plan:** fixing a spelling or grammar mistake from the LanguageTool card no longer closes the story, the series, a chapter or a scene you are editing.
 

@@ -1,9 +1,9 @@
 // Research & Bible: every entry by type, and the entry editor.
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { ask } from '@tauri-apps/plugin-dialog'
 import { ChevronDown, ChevronRight, ImagePlus, MessagesSquare, Plus, Search, Sparkles, Trash2, X } from 'lucide-react'
 import { MORE_TABS, useStore, type BibleTab } from '../store'
-import { EMPTY_VOICE, FAMILIES, typeInfo, VOICE_TYPES, type Entry, type EntryType, type Include, type Stat, type VoiceCard } from '../lib/types'
+import { EMPTY_VOICE, FAMILIES, RANKS, typeInfo, VOICE_TYPES, type Entry, type EntryType, type Include, type Rank, type Stat, type VoiceCard } from '../lib/types'
 import { isLitRPG } from '../lib/serial'
 import { formatFact, parseFact } from '../lib/bible'
 import { buildMatcher, findMentions } from '../lib/context'
@@ -22,6 +22,13 @@ import { pickImage, useImage } from '../lib/images'
 
 const TABS: [BibleTab, string][] = [['entry', 'Entries'], ['review', 'To review'], ['aicheck', 'AI check']]
 const MORE: [BibleTab, string][] = [['tracker', 'Presence'], ['map', 'Map'], ['relations', 'Relations'], ['contradictions', 'Contradictions']]
+
+/** A family's entries split by character rank, once any has one; unranked ones last. A '' label means no heading. */
+function byRank(items: Entry[]): [string, Entry[]][] {
+  if (!items.some(e => e.rank)) return [['', items]]
+  return [...RANKS.map(([id, label]): [string, Entry[]] => [label, items.filter(e => e.rank === id)]), ['No rank', items.filter(e => !e.rank)] as [string, Entry[]]]
+    .filter(([, list]) => list.length)
+}
 
 export default function BibleView() {
   const book = useStore(s => s.book)!
@@ -101,15 +108,20 @@ export default function BibleView() {
                     <Plus size={13} />
                   </button>
                 </div>
-                {open && items.map(e => (
-                  <button key={e.slug} type="button" className={`pl-group-item ${e.slug === slug ? 'pl-active' : ''}`} onClick={() => useStore.getState().selectEntry(e.slug)} onContextMenu={ev => showMenu(ev, entryMenu(e.slug))}>
-                    <span>{e.name}</span>
-                    {f.types.length > 1 && <span className="pl-type">{t(typeInfo(e.type).label)}</span>}
-                    {e.include === 'always' && <span className="sk-badge sk-badge-accent">{t('always')}</span>}
-                    {e.include === 'never' && <span className="sk-badge">{t('never')}</span>}
-                    {e.include === 'secret' && <span className="sk-badge">{t('secret')}</span>}
-                    {e.shared && <span className="sk-badge" title={t('Shared with every book of the series')}>{t('series')}</span>}
-                  </button>
+                {open && byRank(items).map(([label, list]) => (
+                  <Fragment key={label}>
+                    {label && <div className="pl-subhead">{t(label)} <span className="sk-num">{list.length}</span></div>}
+                    {list.map(e => (
+                      <button key={e.slug} type="button" className={`pl-group-item ${e.slug === slug ? 'pl-active' : ''}`} onClick={() => useStore.getState().selectEntry(e.slug)} onContextMenu={ev => showMenu(ev, entryMenu(e.slug))}>
+                        <span>{e.name}</span>
+                        {f.types.length > 1 && <span className="pl-type">{t(typeInfo(e.type).label)}</span>}
+                        {e.include === 'always' && <span className="sk-badge sk-badge-accent">{t('always')}</span>}
+                        {e.include === 'never' && <span className="sk-badge">{t('never')}</span>}
+                        {e.include === 'secret' && <span className="sk-badge">{t('secret')}</span>}
+                        {e.shared && <span className="sk-badge" title={t('Shared with every book of the series')}>{t('series')}</span>}
+                      </button>
+                    ))}
+                  </Fragment>
                 ))}
               </div>
             )
@@ -222,6 +234,16 @@ export function EntryEditor({ entry }: { entry: Entry }) {
               <option value="secret">{t('Secret: never, not even @-mentioned')}</option>
             </select>
           </div>
+          {entry.type === 'character' && (
+            <div className="sk-field">
+              <label htmlFor="ee-rank">{t('Rank')}</label>
+              <select id="ee-rank" className="sk-select" value={entry.rank ?? ''} onChange={e => update({ rank: (e.target.value || undefined) as Rank | undefined })}>
+                <option value="">{t('No rank')}</option>
+                {RANKS.map(([id, label]) => <option key={id} value={id}>{t(label)}</option>)}
+              </select>
+              <span className="sk-hint">{t('Splits People in the list. Not sent to the AI.')}</span>
+            </div>
+          )}
         </div>
       )}
 

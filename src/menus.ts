@@ -12,7 +12,7 @@ import { allowedKinds, chapterLabels } from './lib/chapters'
 import { stripInline } from './lib/inline'
 import { pasteText } from './lib/paste'
 import { countWords, foldText, locateQuote } from './lib/text'
-import { ENTRY_TYPES, typeInfo, type ActionId, type Entry, type EntryType, type Include, type Scene, type SceneStatus } from './lib/types'
+import { ENTRY_TYPES, RANKS, typeInfo, type ActionId, type Entry, type EntryType, type Include, type Scene, type SceneStatus } from './lib/types'
 import { accept, discard, getEditorView, retry, runAction, writeChapter, writeFromPlan } from './editor/actions'
 import { proposalField } from './editor/cm'
 import { insertPlaceholder, toggleInline, unknownNames } from './editor/marks'
@@ -282,6 +282,7 @@ export function entryMenu(slug: string): MenuItem[] {
     st.view !== 'bible' && { label: t('Open in the second pane'), onClick: () => { st.setPrefs({ dual: 'bible' }); st.showEntry(slug) } },
     !plain && { separator: true },
     !plain && { label: t('Sent to the AI'), sub: INCLUDES.map(([id, label]) => ({ label: t(label), checked: e.include === id, onClick: () => st.updateEntry(slug, { include: id }) })) },
+    e.type === 'character' && { label: t('Rank'), sub: [...RANKS.map(([id, label]) => ({ label: t(label), checked: e.rank === id, onClick: () => st.updateEntry(slug, { rank: id }) })), { label: t('No rank'), checked: !e.rank, onClick: () => st.updateEntry(slug, { rank: undefined }) }] },
     !plain && { label: t('Add a tag…'), onClick: async () => { const v = await askText(t('Tag'), '', t('villains, act 2, magic users')); const tag = v?.trim(); if (tag && !e.tags?.includes(tag)) st.updateEntry(slug, { tags: [...(e.tags ?? []), tag] }) } },
     !plain && !!e.tags?.length && { label: t('Remove a tag'), sub: e.tags.map(tag => ({ label: tag, onClick: () => st.updateEntry(slug, { tags: e.tags!.filter(x => x !== tag) }) })) },
     !!book.meta.series && e.type !== 'style' && { label: t('Shared with every book of the series'), checked: !!e.shared, onClick: () => st.shareEntry(slug, !e.shared) },
@@ -295,7 +296,7 @@ export function entryMenu(slug: string): MenuItem[] {
 export function duplicateEntry(e: Entry) {
   const st = useStore.getState()
   const copy = st.addEntry(e.type, `${e.name} (${t('copy')})`)
-  st.updateEntry(copy.slug, { short: e.short, full: e.full, facts: e.facts, links: e.links, sends: e.sends, tags: e.tags, voice: e.voice, knows: e.knows, unaware: e.unaware, include: e.include, notes: e.notes })
+  st.updateEntry(copy.slug, { short: e.short, full: e.full, facts: e.facts, links: e.links, sends: e.sends, tags: e.tags, rank: e.rank, voice: e.voice, knows: e.knows, unaware: e.unaware, include: e.include, notes: e.notes })
 }
 
 // --- Chat --------------------------------------------------------------------------------------

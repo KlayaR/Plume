@@ -754,6 +754,15 @@ describe('entry blocks', () => {
     expect(back.sends).toEqual({ Secrets: 'never' })
     expect(back.tags).toEqual(['thieves', 'act 1'])
   })
+  it('keeps a character rank and drops an unknown one', () => {
+    const e = { ...entry({ slug: 'kara', name: 'Kara', path: 'bible/characters/kara.md' }), rank: 'secondary' as const }
+    const text = serializeEntry(e)
+    expect(text).toContain('rank: secondary')
+    expect(parseEntry(e.path, text).rank).toBe('secondary')
+    const odd = parseEntry(e.path, text.replace('rank: secondary', 'rank: hero'))
+    expect(odd.rank).toBeUndefined()
+    expect(odd.extra.rank).toBeUndefined()
+  })
 })
 
 describe('context menu helper', () => {

@@ -862,6 +862,8 @@ const FR: Record<string, string> = {
   'Nothing matches.': 'Aucun résultat.',
   'Go to any scene or bible entry': 'Aller à une scène ou une fiche de la bible',
   'Tags': 'Étiquettes',
+  'Rank': 'Rang', 'Main': 'Principal', 'Secondary': 'Secondaire', 'Minor': 'Figurant', 'Mentioned': 'Évoqué', 'No rank': 'Sans rang',
+  'Splits People in the list. Not sent to the AI.': 'Découpe la liste Personnes. Pas envoyé à l’IA.',
   'villains, act 2, magic users': 'mâchants, acte 2, utilisateurs de magie',
   'Back to blocks': 'Retour aux blocs',
   'No block yet. Add one below, such as Appearance or Secrets.': 'Aucun bloc. Ajoutez-en un ci-dessous, comme Apparence ou Secrets.',

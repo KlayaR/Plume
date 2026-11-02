@@ -1,7 +1,7 @@
 // Bible entries and scenes as Markdown files with a YAML header.
 import YAML from 'yaml'
-import type { Entry, EntryType, ExcerptKind, Fact, Include, Scene, SceneStatus, VoiceCard } from './types'
-import { EMPTY_VOICE, ENTRY_TYPES } from './types'
+import type { Entry, EntryType, ExcerptKind, Fact, Include, Rank, Scene, SceneStatus, VoiceCard } from './types'
+import { EMPTY_VOICE, ENTRY_TYPES, RANKS } from './types'
 
 export function splitFrontmatter(text: string): { data: Record<string, unknown>; body: string } {
   const t = text.replace(/^﻿/, '').replace(/\r\n/g, '\n')
@@ -79,6 +79,7 @@ export function parseEntry(path: string, text: string): Entry {
   const str = (v: unknown) => (v === undefined || v === null ? undefined : String(v))
   const voice = data.voice && typeof data.voice === 'object' ? { ...EMPTY_VOICE, ...Object.fromEntries(Object.entries(data.voice as object).map(([k, v]) => [k, String(v ?? '')])) } as VoiceCard : undefined
   return {
+    rank: RANKS.some(([id]) => id === data.rank) ? data.rank as Rank : undefined,
     voice,
     knows: str(data.knows),
     unaware: str(data.unaware),
@@ -107,7 +108,7 @@ export function parseEntry(path: string, text: string): Entry {
   }
 }
 
-const ENTRY_KEYS = ['type', 'name', 'aliases', 'include', 'links', 'voice', 'knows', 'unaware', 'later', 'notes', 'sends', 'tags', 'image', 'kind', 'resolved', 'stats']
+const ENTRY_KEYS = ['type', 'name', 'aliases', 'include', 'links', 'rank', 'voice', 'knows', 'unaware', 'later', 'notes', 'sends', 'tags', 'image', 'kind', 'resolved', 'stats']
 const SCENE_KEYS = ['id', 'title', 'pov', 'status', 'note', 'time', 'place', 'lines', 'summary', 'summaryOf', 'comments', 'tension', 'passes', 'beats', 'reveals', 'seeds', 'arc', 'pace', 'cast', 'locked']
 const rest = (data: Record<string, unknown>, known: string[]) => Object.fromEntries(Object.entries(data).filter(([k]) => !known.includes(k)))
 const filled = (v: VoiceCard | undefined) => (v && Object.values(v).some(x => x.trim()) ? v : undefined)
@@ -117,7 +118,7 @@ export function serializeEntry(e: Entry): string {
   if (e.aliases.length) data.aliases = e.aliases
   data.include = e.include
   if (e.links.length) data.links = e.links
-  Object.assign(data, { voice: filled(e.voice), knows: e.knows, unaware: e.unaware, later: e.later || undefined, notes: e.notes || undefined, sends: e.sends && Object.keys(e.sends).length ? e.sends : undefined, tags: e.tags?.length ? e.tags : undefined, image: e.image, kind: e.kind, resolved: e.resolved, stats: e.stats?.length ? e.stats : undefined }, e.extra)
+  Object.assign(data, { rank: e.rank, voice: filled(e.voice), knows: e.knows, unaware: e.unaware, later: e.later || undefined, notes: e.notes || undefined, sends: e.sends && Object.keys(e.sends).length ? e.sends : undefined, tags: e.tags?.length ? e.tags : undefined, image: e.image, kind: e.kind, resolved: e.resolved, stats: e.stats?.length ? e.stats : undefined }, e.extra)
   const body = [
     `## Short\n${e.short.trim()}`,
     `## Full\n${e.full.trim()}`,
