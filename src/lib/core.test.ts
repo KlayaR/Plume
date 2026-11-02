@@ -26,6 +26,9 @@ import { DEFAULT_AI, DEFAULT_VOICE, ENTRY_TYPES, FAMILIES, VOICE_TYPES, familyOf
 import { adverbs, passives, echoes } from './analysis'
 import { aiTells, checkRules, expandVariables } from './voice'
 import { review, reviewChecks, topProblems } from './review'
+import { applyFixes, fixGuard, fixRequest, placeFixes } from './fixes'
+import { EditorState } from '@codemirror/state'
+import { changesField, setChanges } from '../editor/marks'
 import { parseStoryTime } from './structures'
 import { makeZip, readZip, utf8, fromUtf8 } from './zip'
 import { arcsOf, beatChapter, bufferOf, hookFlags, maskSystem, mergeStats, readBox, releaseDates, releaseStreak, statConflicts, statsAt, systemBoxes, textKey, threadStates, volumesOf, weekReleases } from './serial'
@@ -934,7 +937,10 @@ describe('scorecard from the review', () => {
     const kinds = (t: string) => aiTells(t, 'fr').map(x => x.kind)
     const link = 'Hester prit la feuille, et elle la déchira. Marlowe se leva, et il sortit. Priya posa la fiole, et elle se tut.'
     expect(kinds(link)).toContain('pronouns')
-    expect(aiTells(link, 'fr').find(x => x.kind === 'pronouns')?.quote).toContain('et elle la')
+    // Every occurrence is quoted, so Claude doesn't have to look for the others.
+    expect(aiTells(link, 'fr').find(x => x.kind === 'pronouns')?.quotes).toHaveLength(3)
+    expect(aiTells(link, 'fr').find(x => x.kind === 'pronouns')?.quotes[0]).toContain('et elle la')
+    expect(checkRules(link, bookOf([], [], 'fr')).find(c => c.id === 'tells')?.fix).toContain('et il sortit')
     expect(kinds('Hester prit la feuille, et il sortit.')).not.toContain('pronouns')
     expect(aiTells(link.replace(/et elle/g, 'and she').replace(/et il/g, 'and he'), 'en').map(x => x.kind)).not.toContain('pronouns')
     expect(kinds('Elle lut comme on lit un acte. Il attendit comme on attend un train.')).toContain('comparisons')
@@ -948,6 +954,69 @@ describe('scorecard from the review', () => {
     expect(checks.length).toBeGreaterThan(0)
     expect(checks.length).toBeLessThanOrEqual(3)
     expect(checks[0].fix).toContain('« ')
+    // A pass on a whole scene takes every report well over target, not those your rules already check.
+    const every = reviewChecks(long, book, { every: true, say: s => s.toUpperCase() })
+    const bad = review(long, book).results.filter(r => r.status === 'bad' && !['long', 'adverbs', 'passive', 'banned'].includes(r.def.id))
+    expect(every.map(c => c.id).sort()).toEqual(bad.map(r => `review-${r.def.id}`).sort())
+    expect(every[0].fix).toContain(every[0].label.toUpperCase())
+  })
+})
+
+describe('fixing what is flagged', () => {
+  const nb = ' ', nn = ' '
+  it('places replacements on their words, whatever spaces and apostrophes Claude copied', () => {
+    const text = `Elle prit l’acte${nn}! Il sortit${nb}: rien. Il sortit encore.`
+    const { fixes, missed } = placeFixes(text, [
+      { find: 'Elle prit l\'acte !', replace: 'Elle saisit l’acte !', why: 'a' },
+      { find: 'Il sortit', replace: 'Il partit' },
+      { find: 'Il sortit', replace: 'Il fila' },
+      { find: 'mots absents', replace: 'x' },
+      { find: '', replace: 'y' },
+    ], 'fr')
+    expect(missed).toBe(1)
+    expect(fixes.map(f => text.slice(f.from, f.to))).toEqual([`Elle prit l’acte${nn}!`, 'Il sortit', 'Il sortit'])
+    // Never on top of another fix, and the second "Il sortit" goes to the second place.
+    expect(fixes[1].to).toBeLessThanOrEqual(fixes[2].from)
+    expect(fixes[0].insert).toBe(`Elle saisit l’acte${nn}!`)
+    expect(applyFixes(text, fixes)).toBe(`Elle saisit l’acte${nn}! Il partit${nb}: rien. Il fila encore.`)
+  })
+  it('keeps the other tracked changes on their words when one is accepted', () => {
+    const doc = 'Elle partit, et elle rit. Il sortit, et il but.'
+    const changes = [
+      { id: 'a', from: 0, to: 25, insert: 'Elle partit et rit.', why: '' },
+      { id: 'b', from: 26, to: 47, insert: 'Il sortit et but.', why: '' },
+    ]
+    const state = EditorState.create({ doc, extensions: [changesField] }).update({ effects: setChanges.of(changes) }).state
+    const after = state.update({ changes: { from: 0, to: 25, insert: changes[0].insert }, effects: setChanges.of(changes.slice(1)) }).state
+    const [left] = after.field(changesField)
+    expect(after.doc.sliceString(left.from, left.to)).toBe('Il sortit, et il but.')
+  })
+  it('flags a misspelt name, not a small word of a name opening a sentence', () => {
+    const book = bookOf([entry({ slug: 'p', type: 'place', name: 'Élise sous le Pont' })], [], 'fr')
+    const names = (t: string) => review(t, book).results.find(r => r.def.id === 'names')!.count
+    expect(names('Sous la fontaine, rien.')).toBe(0)
+    expect(names('Il vit Elise sur le pont.')).toBe(1)
+  })
+  it('drops a replacement that changes nothing', () => {
+    expect(placeFixes('Il sortit.', [{ find: 'Il sortit', replace: 'Il sortit' }], 'fr').fixes).toEqual([])
+  })
+  it('refuses fixes that amount to a rewrite, not in short scenes', () => {
+    const text = Array.from({ length: 300 }, (_, i) => `mot${i}`).join(' ')
+    const words = text.split(' ')
+    const small = placeFixes(text, [{ find: words.slice(0, 10).join(' '), replace: 'dix mots remplacés par quelques autres' }], 'fr').fixes
+    expect(fixGuard(text, small).ok).toBe(true)
+    const half = placeFixes(text, [{ find: words.slice(0, 200).join(' '), replace: words.slice(0, 200).join('-') + ' et la suite' }], 'fr').fixes
+    expect(fixGuard(text, half).ok).toBe(false)
+    const grown = placeFixes(text, [{ find: 'mot5', replace: Array(100).fill('ajout').join(' ') }], 'fr').fixes
+    expect(fixGuard(text, grown).ok).toBe(false)
+    const short = 'Une scène de quelques mots seulement.'
+    expect(fixGuard(short, placeFixes(short, [{ find: short, replace: 'Tout est changé ici.' }], 'fr').fixes).ok).toBe(true)
+  })
+  it('asks for replacements only, with what failed', () => {
+    const msg = fixRequest('Il sortit.', [{ id: 'x', label: 'X', ok: false, detail: '1', fix: 'Corrige ceci' }], 'fr')
+    expect(msg).toContain('Corrige ceci')
+    expect(msg).toContain('"find"')
+    expect(msg).toContain('<scene>\nIl sortit.\n</scene>')
   })
 })
 

@@ -7,6 +7,14 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.38.0
+- **Fix what's flagged, on text already written.** A new button in the Review panel, for the scene or the chapter (also in the chapter menu and Ctrl+K), asks Claude to fix what Plume measures: your rules, AI tells and every report well over its target. Until now this was only offered right after Claude had written something.
+- **The fixes are safer.** Claude sends back only its replacements, so the rest of the scene can't move, and each one shows as a tracked change to accept or reject. A snapshot is taken first. A scene whose fixes would replace more than half of it, or change its length by more than 15 %, is left as written. The summary says how many points are flagged now and how many would remain once everything is accepted. "Fix them", after a chapter written straight in, now works the same way instead of replacing the text.
+- **Claude knows where to look.** "Retry fixing" and the new button quote every occurrence of a tell, a long sentence or a passive (up to 30), and up to 12 places per report instead of 3, explained in the book's language.
+- **Edit this chapter reads the measurements properly.** Claude now gets the passages behind them instead of a bare count like "AI tells: 3", and knows the French ", et il" and "comme on" habits.
+- **Fixed: accepting a tracked change moved the others.** After you accepted one, the changes still waiting stayed at their old positions, so the next one you accepted could overwrite the wrong words. This affected Edit this chapter and Line edit too.
+- **Fixed: false alarms in Name spellings.** A small word inside a bible name, such as "sous", made every "Sous" opening a sentence count as a misspelt name.
+
 ## 0.37.0
 - **Scorecard: two more French habits.** The "AI tells" check now catches ", et il / et elle…" used again and again, a link copied from English, and comparisons in "comme on…" that keep coming back. A single use is never flagged, and "Retry fixing" tells Claude how to rewrite them.
 

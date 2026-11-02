@@ -9,7 +9,7 @@ import {
   PLAIN_TAGS, phrases, readability, repeatedPhrases, repeatedStarts, sentences, STOPWORDS, TELLING_WORDS, words, type Finding,
 } from './analysis'
 import { foldText } from './text'
-import { listWords, wordLists, type Check } from './voice'
+import { listWords, quoteAround, wordLists, type Check } from './voice'
 import { isLitRPG, isSerial, maskSystem } from './serial'
 
 export type Category = 'pacing' | 'dialogue' | 'strong' | 'choice' | 'repetition' | 'readability'
@@ -80,7 +80,8 @@ function nameSpellings(text: string, book: Book): Finding[] {
   const byFold = new Set<string>()
   for (const e of book.entries) {
     if (['style', 'wordlist', 'excerpt'].includes(e.type)) continue
-    for (const raw of [e.name, ...e.aliases]) for (const tok of raw.replace(/!$/, '').split(/[\s-]+/)) if (tok.length >= 3) { exact.add(tok); byFold.add(foldText(tok)) }
+    // Only the capitalised words: the "sous" of a name is no reason to flag every "Sous" opening a sentence.
+    for (const raw of [e.name, ...e.aliases]) for (const tok of raw.replace(/!$/, '').split(/[\s-]+/)) if (tok.length >= 3 && /^\p{Lu}/u.test(tok)) { exact.add(tok); byFold.add(foldText(tok)) }
   }
   return words(text).filter(w => /^\p{Lu}/u.test(w.w) && byFold.has(foldText(w.w)) && !exact.has(w.w))
     .map(w => ({ from: w.from, to: w.to, note: w.w }))
@@ -281,26 +282,30 @@ export function topProblems(results: ReportResult[], n = 3): ReportResult[] {
   return results.filter(r => r.status !== 'good' && r.count > 0).sort((a, b) => over(b) - over(a)).slice(0, n)
 }
 
-/** A finding shown with a little of the text around it, so Claude knows which words to change. */
-const quoteOf = (text: string, f: Finding) => {
-  const a = Math.max(0, f.from - 25), b = Math.min(text.length, f.to + 25)
-  return `${a > 0 ? '…' : ''}${text.slice(a, b).replace(/\s+/g, ' ').trim()}${b < text.length ? '…' : ''}`
-}
+/** How many places a report quotes to Claude. */
+const REPORT_QUOTES = 12
+/** Reports your own rules already check, left out when every report is asked for. */
+const RULE_REPORTS = ['long', 'adverbs', 'passive', 'banned']
 
 /**
  * The Review reports furthest above their target, as scorecard items: they show
- * under the proposal and "Retry fixing" sends them back with a few quotes. Only
+ * under the proposal and "Retry fixing" sends them back with quotes. `every` asks
+ * for all the reports well over their target instead of the worst three, for a
+ * pass on a whole scene. `say` puts the explanations in the book's language. Only
  * for passages long enough for rates to mean something.
  */
-export function reviewChecks(text: string, book: Book): Check[] {
+export function reviewChecks(text: string, book: Book, opts: { every?: boolean; say?: (s: string) => string } = {}): Check[] {
   const lang = book.meta.language
+  const say = opts.say ?? (s => s)
   if (words(text).length < 150) return []
-  return topProblems(review(text, book).results).map(r => ({
+  const results = review(text, book).results
+  const list = opts.every ? topProblems(results.filter(r => r.status === 'bad' && !RULE_REPORTS.includes(r.def.id)), results.length) : topProblems(results)
+  return list.map(r => ({
     id: `review-${r.def.id}`,
     label: r.def.label,
     ok: false,
     detail: String(r.count),
-    fix: `${r.def.label}: ${r.def.help} ${lang === 'fr' ? 'Exemples' : 'For example'} : ${r.findings.slice(0, 3).map(f => `« ${quoteOf(text, f)} »`).join(', ')}.`,
+    fix: `${say(r.def.label)} : ${say(r.def.help)} ${lang === 'fr' ? `${r.count} en tout, par exemple` : `${r.count} in all, for example`} : ${r.findings.slice(0, REPORT_QUOTES).map(f => `« ${quoteAround(text, f.from, f.to)} »`).join(', ')}.`,
   }))
 }
 

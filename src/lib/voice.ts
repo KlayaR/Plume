@@ -110,6 +110,25 @@ export const sceneRulesText = (rules: SceneRule[], lang: Lang) =>
 
 export interface Check { id: string; label: string; ok: boolean; detail: string; fix: string }
 
+/** How many occurrences of one problem are quoted to Claude: enough to find them all in practice, without filling the request. */
+export const MAX_QUOTES = 30
+
+/** A place in the text with a few words either side, so Claude can find it. */
+export const quoteAround = (text: string, from: number, to: number, pad = 25) => {
+  const a = Math.max(0, from - pad), b = Math.min(text.length, to + pad)
+  return `${a > 0 ? '…' : ''}${text.slice(a, b).replace(/\s+/g, ' ').trim()}${b < text.length ? '…' : ''}`
+}
+
+/** The start of a sentence or a line of dialogue, to point at it without copying it all. */
+const startOf = (text: string, from: number) => quoteAround(text, from, from + 50, 0)
+
+/** Quotes to add after a fix: (« a » ; « b »). */
+const cited = (quotes: string[], lang: Lang) => {
+  const list = [...new Set(quotes)].slice(0, MAX_QUOTES)
+  if (!list.length) return ''
+  return lang === 'fr' ? ` (${list.map(q => `« ${q} »`).join(' ; ')})` : ` (${list.map(q => `“${q}”`).join('; ')})`
+}
+
 /** Scores a proposal against the book's measurable rules. Zero tokens. */
 export function checkRules(text: string, book: Book): Check[] {
   const lang = book.meta.language
@@ -122,8 +141,9 @@ export function checkRules(text: string, book: Book): Check[] {
 
   const pas = passives(text, lang)
   const pasPct = ss.length ? (pas.length / ss.length) * 100 : 0
+  const pasQuotes = cited(pas.map(p => quoteAround(text, p.from, p.to)), lang)
   out.push({ id: 'passive', label: 'Passive voice', ok: pasPct <= r.passiveMax, detail: `${pasPct.toFixed(1)} % ≤ ${r.passiveMax} %`,
-    fix: fr ? `Voix passive : ${pas.length} phrase(s), maximum ${r.passiveMax} % des phrases. Passe-les à l’actif.` : `Passive voice: ${pas.length} sentence(s), at most ${r.passiveMax} % of sentences. Make them active.` })
+    fix: fr ? `Voix passive : ${pas.length} phrase(s), maximum ${r.passiveMax} % des phrases. Passe-les à l’actif${pasQuotes}.` : `Passive voice: ${pas.length} sentence(s), at most ${r.passiveMax} % of sentences. Make them active${pasQuotes}.` })
 
   const adv = adverbs(text, lang)
   const allowed = Math.max(1, Math.floor((ws / 250) * r.adverbsPer250))
@@ -135,24 +155,29 @@ export function checkRules(text: string, book: Book): Check[] {
   out.push({ id: 'banned', label: 'Banned words', ok: hits.length === 0, detail: hits.length ? hits.join(', ') : '0',
     fix: fr ? `Mots interdits utilisés : ${hits.join(', ')}. Ne les emploie pas.` : `Banned words used: ${hits.join(', ')}. Don't use them.` })
 
-  const lines = dialogue(text).map(d => words(text.slice(d.from, d.to)).length)
-  const longest = lines.length ? Math.max(...lines) : 0
+  const spoken = dialogue(text).map(d => ({ from: d.from, n: words(text.slice(d.from, d.to)).length }))
+  const longest = spoken.length ? Math.max(...spoken.map(d => d.n)) : 0
+  const longLines = cited(spoken.filter(d => d.n > r.dialogueMaxWords).map(d => startOf(text, d.from)), lang)
   out.push({ id: 'dialogue', label: 'Dialogue length', ok: longest <= r.dialogueMaxWords, detail: `${longest} ≤ ${r.dialogueMaxWords}`,
-    fix: fr ? `Une réplique fait ${longest} mots, maximum ${r.dialogueMaxWords}. Coupe-la ou interromps-la.` : `A line of dialogue runs ${longest} words, at most ${r.dialogueMaxWords}. Cut it or break it up.` })
+    fix: fr ? `Une réplique fait ${longest} mots, maximum ${r.dialogueMaxWords}. Coupe-la ou interromps-la${longLines}.` : `A line of dialogue runs ${longest} words, at most ${r.dialogueMaxWords}. Cut it or break it up${longLines}.` })
 
-  const longS = ss.filter(s => s.words > r.sentenceMaxWords).length
+  const longList = ss.filter(s => s.words > r.sentenceMaxWords)
+  const longS = longList.length
+  const longQuotes = cited(longList.map(s => startOf(text, s.from)), lang)
   out.push({ id: 'sentence', label: 'Sentence length', ok: longS === 0, detail: `${longS} > ${r.sentenceMaxWords}`,
-    fix: fr ? `${longS} phrase(s) de plus de ${r.sentenceMaxWords} mots. Coupe-les.` : `${longS} sentence(s) over ${r.sentenceMaxWords} words. Split them.` })
+    fix: fr ? `${longS} phrase(s) de plus de ${r.sentenceMaxWords} mots. Coupe-les${longQuotes}.` : `${longS} sentence(s) over ${r.sentenceMaxWords} words. Split them${longQuotes}.` })
 
   const tells = aiTells(text, lang)
   out.push({ id: 'tells', label: 'AI tells', ok: tells.length === 0, detail: String(tells.length),
-    fix: (fr ? 'Tournures qui sonnent comme une IA, à réécrire simplement :\n' : 'Phrasings that sound machine-written, to rewrite plainly:\n') + tells.map(x => `  - ${TELL_FIX[x.kind][lang]}${x.quote ? (fr ? ` (« ${x.quote} »)` : ` (“${x.quote}”)`) : ''}`).join('\n') })
+    fix: (fr ? 'Tournures qui sonnent comme une IA, à réécrire simplement :\n' : 'Phrasings that sound machine-written, to rewrite plainly:\n') + tells.map(x => `  - ${TELL_FIX[x.kind][lang]}${cited(x.quotes, lang)}`).join('\n') })
 
   if (r.dashDialogue) {
     // Dialogue opens with an em dash at the start of the line; quotes or a hyphen fail.
-    const bad = text.split('\n').filter(l => /^\s*(?:[-–]|«|“|")/.test(l)).length
+    const badLines = text.split('\n').filter(l => /^\s*(?:[-–]|«|“|")/.test(l))
+    const bad = badLines.length
+    const badQuotes = cited(badLines.map(l => startOf(l, 0)), lang)
     out.push({ id: 'dash', label: 'Dialogue dashes', ok: bad === 0, detail: String(bad),
-      fix: fr ? 'Les répliques commencent par un tiret cadratin suivi d’une espace insécable (— ), sans guillemets.' : 'Lines of dialogue open with an em dash (—), without quotation marks.' })
+      fix: fr ? `Les répliques commencent par un tiret cadratin suivi d’une espace insécable (— ), sans guillemets${badQuotes}.` : `Lines of dialogue open with an em dash (—), without quotation marks${badQuotes}.` })
   }
   return out
 }
@@ -188,29 +213,31 @@ const COMMA_PRONOUN = /[^,.;!?\n]{0,30},\s+et\s+(?:il|elle)s?\s+[\p{L}'’-]+/gi
 /** French only: "comme on…", a comparison a model falls back on. */
 const COMME_ON = /\bcomme\s+(?:quand\s+)?on\b/gi
 
-/** AI tells in a passage, at most one of each kind, with a short quote. Zero tokens. */
-export function aiTells(text: string, lang: Lang): { kind: Tell; quote: string }[] {
-  const out: { kind: Tell; quote: string }[] = []
+/** AI tells in a passage, at most one of each kind, with a quote for each occurrence. Zero tokens. */
+export function aiTells(text: string, lang: Lang): { kind: Tell; quotes: string[] }[] {
+  const out: { kind: Tell; quotes: string[] }[] = []
   const n = words(text).length
   if (!n) return out
-  const contrast = CONTRAST[lang].flatMap(re => [...text.matchAll(re)].map(m => m[0]))
-  if (contrast.length >= 2) out.push({ kind: 'contrast', quote: contrast[0].slice(0, 60) })
+  const quoted = (found: RegExpMatchArray[]) => found.map(m => quoteAround(text, m.index!, m.index! + m[0].length))
+  const contrast = CONTRAST[lang].flatMap(re => [...text.matchAll(re)])
+  if (contrast.length >= 2) out.push({ kind: 'contrast', quotes: quoted(contrast) })
   // Dashes in the middle of a line (a dash opening a line is French dialogue).
   const dashes = text.split('\n').reduce((k, l) => k + (l.replace(/^\s*—/, '').match(/—/g) ?? []).length, 0)
-  if (dashes > Math.max(1, n / 150)) out.push({ kind: 'dashes', quote: '' })
-  const firsts = sentences(text).map(s => s.s.replace(/^[—–\-«“"\s]+/, '').split(/\s+/)[0]?.toLowerCase() ?? '')
-  const at = firsts.findIndex((w, i) => i >= 2 && w.length > 0 && w === firsts[i - 1] && w === firsts[i - 2])
-  if (at >= 0) out.push({ kind: 'openers', quote: firsts[at] })
-  const triads = [...text.matchAll(/\b[\p{L}'’-]+,\s+[\p{L}'’-]+,?\s+(?:and|et|or|ou)\s+[\p{L}'’-]+/gu)].map(m => m[0])
-  if (triads.length >= 3) out.push({ kind: 'triads', quote: triads[0].slice(0, 60) })
-  const similes = [...text.matchAll(SIMILE[lang])].map(m => m[0])
-  if (similes.length > Math.max(2, n / 300)) out.push({ kind: 'similes', quote: similes[0] })
+  if (dashes > Math.max(1, n / 150)) out.push({ kind: 'dashes', quotes: quoted([...text.matchAll(/(?<!^\s*)—/gm)]) })
+  const ss = sentences(text)
+  const firsts = ss.map(s => s.s.replace(/^[—–\-«“"\s]+/, '').split(/\s+/)[0]?.toLowerCase() ?? '')
+  const runs = ss.filter((_, i) => i >= 2 && firsts[i].length > 0 && firsts[i] === firsts[i - 1] && firsts[i] === firsts[i - 2])
+  if (runs.length) out.push({ kind: 'openers', quotes: runs.map(s => startOf(text, s.from)) })
+  const triads = [...text.matchAll(/\b[\p{L}'’-]+,\s+[\p{L}'’-]+,?\s+(?:and|et|or|ou)\s+[\p{L}'’-]+/gu)]
+  if (triads.length >= 3) out.push({ kind: 'triads', quotes: quoted(triads) })
+  const similes = [...text.matchAll(SIMILE[lang])]
+  if (similes.length > Math.max(2, n / 300)) out.push({ kind: 'similes', quotes: quoted(similes) })
   if (lang === 'fr') {
     // A changed subject makes ", et il" correct, so only the habit counts.
-    const linked = [...text.matchAll(COMMA_PRONOUN)].map(m => m[0].trim())
-    if (linked.length > Math.max(2, n / 400)) out.push({ kind: 'pronouns', quote: linked[0].slice(-60) })
-    const comparisons = [...text.matchAll(COMME_ON)].map(m => m[0])
-    if (comparisons.length > Math.max(1, n / 1500)) out.push({ kind: 'comparisons', quote: comparisons[0] })
+    const linked = [...text.matchAll(COMMA_PRONOUN)]
+    if (linked.length > Math.max(2, n / 400)) out.push({ kind: 'pronouns', quotes: linked.map(m => m[0].trim()) })
+    const comparisons = [...text.matchAll(COMME_ON)]
+    if (comparisons.length > Math.max(1, n / 1500)) out.push({ kind: 'comparisons', quotes: quoted(comparisons) })
   }
   return out
 }

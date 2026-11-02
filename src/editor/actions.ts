@@ -12,7 +12,8 @@ import { noteTaste } from '../writing'
 import { canRun, cancelLLM, runLLM } from '../llm'
 import type { Effort, Model } from '../lib/types'
 import { findScene, useStore } from '../store'
-import { t } from '../i18n'
+import { fixFlagged } from '../edit'
+import { t, translate } from '../i18n'
 import { ask as askDialog } from '@tauri-apps/plugin-dialog'
 import { makeSnap, saveSnap } from '../lib/snapshots'
 import { fixTypography } from '../lib/typography'
@@ -94,7 +95,7 @@ export async function runAction(action: ActionId, instruction: string, overrides
 const wordCount = (s: string) => (s.match(/\S+/g) ?? []).length
 
 /** Everything the scorecard checks: your rules, then the Review reports furthest from their target. */
-export const scorecard = (text: string, book: Book): Check[] => [...checkRules(text, book), ...reviewChecks(text, book)]
+export const scorecard = (text: string, book: Book): Check[] => [...checkRules(text, book), ...reviewChecks(text, book, { say: s => translate(book.meta.language, s) })]
 
 /** The request that fixes only what failed in a passage, keeping the rest word for word. */
 function fixMessage(text: string, failed: Check[], lang: Lang): string {
@@ -204,7 +205,7 @@ export async function writeChapter(chapterId: string) {
   await saveSnap(book.root, makeSnap(book, t('Before Claude wrote “{title}”', { title: chapter.title || t('Chapter') })))
   useAI.setState({ running: 'chapter' })
   let done = 0
-  const toFix: { id: string; failed: Check[] }[] = []
+  const toFix: string[] = []
   try {
     for (const s of todo) {
       const b2 = useStore.getState().book!
@@ -221,8 +222,7 @@ export async function writeChapter(chapterId: string) {
       if (missing) text += '\n\n' + (await call(moreMessage(built.message, text, missing, b2.meta.language))).trim()
       text = fixTypography(text.trim(), b2.meta.language)
       useStore.getState().updateScene(s.id, { text, extra: { ...f.scene.extra, aiWords: wordCount(text) } })
-      const failed = scorecard(text, b2).filter(x => !x.ok)
-      if (failed.length) toFix.push({ id: s.id, failed })
+      if (scorecard(text, b2).some(x => !x.ok)) toFix.push(s.id)
       done++
     }
   } catch (err) {
@@ -232,34 +232,8 @@ export async function writeChapter(chapterId: string) {
   }
   if (!done) return
   if (toFix.length) {
-    useStore.getState().notify('warn', t('{n} scene(s) written; {k} miss some of your rules or targets. Snapshots can put the chapter back as it was.', { n: done, k: toFix.length }), { label: t('Fix them'), run: () => fixScenes(toFix) })
+    useStore.getState().notify('warn', t('{n} scene(s) written; {k} miss some of your rules or targets. Snapshots can put the chapter back as it was.', { n: done, k: toFix.length }), { label: t('Fix them'), run: () => fixFlagged(toFix) })
   } else useStore.getState().notify('ok', t('{n} scene(s) written. Snapshots can put the chapter back as it was.', { n: done }), { label: t('Read it'), run: () => useStore.getState().selectScene(todo[0].id) })
-}
-
-/** Fixes, in place, what the scorecard flagged in scenes written straight in (a chapter). */
-async function fixScenes(list: { id: string; failed: Check[] }[]) {
-  if (useAI.getState().running) return
-  useAI.setState({ running: 'chapter' })
-  let fixed = 0
-  try {
-    for (const { id, failed } of list) {
-      const book = useStore.getState().book!
-      const f = findScene(book, id)
-      if (!f || useAI.getState().running !== 'chapter') break
-      const c = assistantChoice('scene')
-      const e = effective(c.model, c.effort)
-      useStore.getState().notify('ok', t('Fixing “{title}”…', { title: f.scene.title }))
-      const text = (await ask({ model: e.model, effort: e.effort, orModel: c.orModel, system: systemPrompt(book, 'scene', f.number), message: fixMessage(f.scene.text, failed, book.meta.language) })).trim()
-      if (!text) continue
-      useStore.getState().updateScene(id, { text: fixTypography(text, book.meta.language) })
-      fixed++
-    }
-  } catch (err) {
-    useStore.getState().notify('error', (err as Error).message)
-  } finally {
-    useAI.setState({ running: null })
-  }
-  if (fixed) useStore.getState().notify('ok', t('{n} scene(s) fixed.', { n: fixed }), { label: t('Read it'), run: () => useStore.getState().selectScene(list[0].id) })
 }
 
 /** Fill with AI: the placeholder ⟦note⟧ is replaced by a proposal written from its note. */

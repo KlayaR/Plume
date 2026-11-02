@@ -4,7 +4,7 @@ import { useStore } from './store'
 import { t } from './i18n'
 import { newThingsMenu } from './menus'
 import { writeChapter, writeFromPlan } from './editor/actions'
-import { openEdit } from './edit'
+import { fixFlagged, openEdit } from './edit'
 
 export interface Command { id: string; label: string; keys?: string; run: () => void }
 
@@ -20,6 +20,7 @@ export function commands(): Command[] {
     { id: 'chapter', label: t('New chapter'), run: () => newThingsMenu()[0]?.onClick?.() },
     { id: 'write-scene', label: t('Write this scene from the plan (Claude)'), run: () => { const id = useStore.getState().sceneId; if (id) writeFromPlan(id) } },
     { id: 'edit-chapter', label: t('Edit this chapter (Claude)…'), run: () => { const s = useStore.getState(); const c = s.book?.chapters.find(x => x.scenes.some(y => y.id === s.sceneId)); if (c) openEdit(c.id) } },
+    { id: 'fix-flagged', label: t('Fix what’s flagged (Claude)…'), run: () => { const s = useStore.getState(); const c = s.book?.chapters.find(x => x.scenes.some(y => y.id === s.sceneId)); if (c) fixFlagged(c.scenes.map(y => y.id)) } },
     { id: 'write-chapter', label: t('Write this chapter from the plan (Claude)'), run: () => { const s = useStore.getState(); const c = s.book?.chapters.find(x => x.scenes.some(y => y.id === s.sceneId)); if (c) writeChapter(c.id) } },
     { id: 'export', label: t('Export…'), run: () => set({ dialog: 'export' }) },
     { id: 'snapshots', label: t('Snapshots'), run: () => set({ dialog: 'snapshots' }) },

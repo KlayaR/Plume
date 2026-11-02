@@ -222,8 +222,10 @@ class InsertWidget extends WidgetType {
 export const changesField = StateField.define<Change[]>({
   create: () => [],
   update: (v, tr) => {
-    let out = tr.docChanged ? v.map(c => ({ ...c, from: tr.changes.mapPos(c.from, 1), to: tr.changes.mapPos(c.to, -1) })).filter(c => c.to >= c.from) : v
-    for (const e of tr.effects) if (e.is(setChanges)) out = e.value
+    // A list set by the same transaction that changes the text (accepting one) moves with the text too.
+    const moved = (list: Change[]) => tr.docChanged ? list.map(c => ({ ...c, from: tr.changes.mapPos(c.from, 1), to: tr.changes.mapPos(c.to, -1) })).filter(c => c.to >= c.from) : list
+    let out = moved(v)
+    for (const e of tr.effects) if (e.is(setChanges)) out = moved(e.value)
     return out
   },
 })

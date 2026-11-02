@@ -2,13 +2,13 @@
 // category (pacing, dialogue, strong writing, word choice, repetition,
 // readability) compared with targets, each highlighted in the text with
 // next / previous. Then the AI checks on demand, read aloud, and the figures.
-import { openEdit } from '../edit'
+import { fixFlagged, openEdit } from '../edit'
 import { useEffect, useMemo, useState } from 'react'
 import { ChevronDown, ChevronLeft, ChevronRight, Pause, Play, FileCheck2, Sparkles, Users, Wand2 } from 'lucide-react'
 import { findScene, useStore } from '../store'
 import { textStats, type TextStats } from '../lib/stats'
 import { CATEGORIES, review, topProblems, type ReportResult } from '../lib/review'
-import { getEditorView } from '../editor/actions'
+import { getEditorView, useAI } from '../editor/actions'
 import { betaCost, betaRead, continuityCheck, continuityCost, lineEdit, lineEditCost, loadVoices, PERSONAS, readAloud, stopReading, useReview, voiceCheck, voiceCheckCost, voicesFor } from '../review'
 import { refreshLT, useLT } from '../editor/lt'
 import { referenceTargets, useRefs } from '../lib/references'
@@ -121,7 +121,7 @@ export default function ReviewPanel() {
 
       {all && !simple && <Speakers text={text} scenes={scope === 'scene' ? [scene] : chapter.scenes} />}
 
-      <AIChecks sceneId={scene.id} chapterId={chapter.id} chapterText={chapter.scenes.map(s => s.text).join('\n')} />
+      <AIChecks sceneId={scene.id} chapterId={chapter.id} chapterText={chapter.scenes.map(s => s.text).join('\n')} fixIds={scope === 'scene' ? [scene.id] : chapter.scenes.map(s => s.id)} scopeLabel={scope === 'scene' ? t('This scene') : label} text={text} />
       <ReadAloud />
       {!simple && <RevisionSection scene={scene} />}
       {!simple && <Figures scene={scene.text} chapter={chapter.scenes.map(s => s.text).join('\n')} label={label} />}
@@ -224,8 +224,9 @@ function Rhythm({ lengths }: { lengths: number[] }) {
   )
 }
 
-function AIChecks({ sceneId, chapterId, chapterText }: { sceneId: string; chapterId: string; chapterText: string }) {
+function AIChecks({ sceneId, chapterId, chapterText, fixIds, scopeLabel, text }: { sceneId: string; chapterId: string; chapterText: string; fixIds: string[]; scopeLabel: string; text: string }) {
   const busy = useReview(s => s.busy)
+  const running = useAI(s => s.running)
   const ai = useReview(s => s.ai)
   const aiTitle = useReview(s => s.aiTitle)
   const report = useReview(s => s.report)
@@ -242,6 +243,7 @@ function AIChecks({ sceneId, chapterId, chapterText }: { sceneId: string; chapte
     <section className="pl-cat">
       <div className="sk-label">{t('Ask Claude')}</div>
       <button type="button" className="sk-btn sk-btn-sm sk-btn-primary" disabled={!!busy || !chapterText.trim()} onClick={() => openEdit(chapterId)} title={t('Checks the whole chapter and fixes what you keep, as tracked changes')}><FileCheck2 size={13} /> {t('Edit this chapter…')}</button>
+      <button type="button" className="sk-btn sk-btn-sm" disabled={!!busy || !!running || !text.trim()} onClick={() => fixFlagged(fixIds)} title={t('Fixes what the scorecard flags ({scope}), as tracked changes to accept or reject. Takes a snapshot first.', { scope: scopeLabel })}><Wand2 size={13} /> {t('Fix what’s flagged…')}</button>
       <div className="pl-aichecks">
         <button type="button" className="sk-btn sk-btn-sm" disabled={!!busy} onClick={() => voiceCheck(sceneId)} title={cost(voiceCheckCost(sceneId))}><Sparkles size={13} /> {busy === 'voice' ? t('Reading…') : t('Voice check')}</button>
         <button type="button" className="sk-btn sk-btn-sm" disabled={!!busy} onClick={() => continuityCheck(sceneId)} title={cost(continuityCost(sceneId))}><Sparkles size={13} /> {busy === 'continuity' ? t('Reading…') : t('Continuity check')}</button>

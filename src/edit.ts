@@ -7,14 +7,19 @@ import { findScene, useStore } from './store'
 import { ask, effective, parseJSON } from './ai'
 import { buildMatcher, findMentions, renderEntry, systemPrompt } from './lib/context'
 import { chapterText } from './lib/outline'
-import { checkRules } from './lib/voice'
+import { checkRules, type Check } from './lib/voice'
 import { reviewChecks } from './lib/review'
+import { applyFixes, fixGuard, fixRequest, placeFixes, type FixEdit } from './lib/fixes'
+import { isLocked } from './lib/serial'
 import { newId } from './lib/text'
 import { makeSnap, saveSnap } from './lib/snapshots'
-import { assistantChoice } from './editor/actions'
+import { assistantChoice, useAI } from './editor/actions'
 import { checkWithLT } from './editor/Editor'
 import type { Change } from './editor/marks'
-import { t } from './i18n'
+import { canRun } from './llm'
+import { costText } from './cost'
+import { t, translate } from './i18n'
+import { ask as askDialog } from '@tauri-apps/plugin-dialog'
 import type { Book, Chapter } from './lib/types'
 
 export type Depth = 'polish' | 'deep'
@@ -93,9 +98,9 @@ export async function checkChapter(depth: Depth) {
         } catch { /* LanguageTool unreachable: Claude still reads the chapter */ }
       }
     }
-    // What Plume measures for free, given to Claude as hints.
+    // What Plume measures for free, given to Claude as hints, with the passages behind it.
     const all = scenesOf(c).map(s => s.text).join('\n\n')
-    const measured = [...checkRules(all, book), ...reviewChecks(all, book)].filter(x => !x.ok).map(x => `- ${x.label}: ${x.detail}`).join('\n')
+    const measured = flagged(all, book).map(x => `- ${x.fix}`).join('\n')
     // Deep: the bible as true at this chapter (with voice cards and what the POV knows) and the chapter's plan.
     const named = book.entries.filter(e => !['style', 'wordlist', 'excerpt'].includes(e.type) && e.include !== 'secret')
     const here = new Set(findMentions(all, buildMatcher(named)).map(m => m.slug))
@@ -111,7 +116,7 @@ export async function checkChapter(depth: Depth) {
 - plan : ce que <plan> demande et que le chapitre ne fait pas (but, étapes, fin sur un tournant) ;
 - rythme : passages qui traînent, tension qui retombe, scène sans enjeu ;
 - dialogue : plat, explicatif, tout le monde parle pareil ;
-- prose : dire au lieu de montrer, émotions nommées, verbes de perception inutiles, clichés, tics d’IA (contrastes « pas X mais Y », triades, comparaisons en série), répétitions, phrases lourdes ;
+- prose : dire au lieu de montrer, émotions nommées, verbes de perception inutiles, clichés, tics d’IA (contrastes « pas X mais Y », triades, comparaisons en série, « , et il… » à répétition, « comme on… »), répétitions, phrases lourdes ;
 - langue : fautes, accords, ponctuation.`
         : `Read this chapter as a demanding editor, at the level of the genre's best novels. List the real problems:
 - continuity: what contradicts <bible> (facts true at this chapter, names, magic rules, what the point-of-view character knows or doesn't);
@@ -121,7 +126,7 @@ export async function checkChapter(depth: Depth) {
 - dialogue: flat, expository, everyone sounding the same;
 - prose: telling instead of showing, named emotions, needless filter verbs, clichés, AI tells ("not X but Y" contrasts, triads, strings of similes), repetitions, clunky sentences;
 - language: errors, agreement, punctuation.`)
-      : (F ? `Relis ce chapitre comme un correcteur littéraire : fautes, répétitions, lourdeurs, clichés, verbes de perception inutiles, émotions nommées, tics d’IA (contrastes « pas X mais Y », triades, comparaisons en série), ponctuation. Pas de remarques sur l’intrigue ni le rythme.`
+      : (F ? `Relis ce chapitre comme un correcteur littéraire : fautes, répétitions, lourdeurs, clichés, verbes de perception inutiles, émotions nommées, tics d’IA (contrastes « pas X mais Y », triades, comparaisons en série, « , et il… » à répétition, « comme on… »), ponctuation. Pas de remarques sur l’intrigue ni le rythme.`
         : `Read this chapter as a line editor: errors, repetitions, clunky phrasing, clichés, needless filter verbs, named emotions, AI tells ("not X but Y" contrasts, triads, strings of similes), punctuation. No remarks on plot or pacing.`)
     const reply = await ask({
       model: 'sonnet', effort: depth === 'deep' ? 'high' : 'medium',
@@ -130,7 +135,7 @@ export async function checkChapter(depth: Depth) {
         bible ? `<bible chapter="${n}">\n${bible}\n</bible>` : '',
         plan ? `<plan>\n${plan}\n</plan>` : '',
         `<chapter n="${n}">\n${chapterBody(c)}\n</chapter>`,
-        measured ? `<measured>\n${F ? 'Mesuré par Plume (trouve les passages en cause) :' : 'Measured by Plume (find the passages behind it):'}\n${measured}\n</measured>` : '',
+        measured ? `<measured>\n${F ? 'Mesuré par Plume, passages à l’appui. Relèves-en les pires, sans qu’ils prennent la place des problèmes de fond :' : 'Measured by Plume, with the passages behind it. List the worst of them, without letting them crowd out the deeper problems:'}\n${measured}\n</measured>` : '',
         `<task>\n${what}\n${F
           ? `Au plus ${depth === 'deep' ? 30 : 25} problèmes, les plus importants d’abord. Pour chacun : "scene" (son numéro), "quote" (les mots exacts du texte, assez pour être uniques, une phrase au plus), "kind" (un mot), "severity" ("error" : faute ou contradiction ; "craft" : ce qui affaiblit le livre ; "polish" : finition), "problem" (court) et "fix" (la correction concrète). S’il n’y a rien sur un point, n’invente rien.`
           : `At most ${depth === 'deep' ? 30 : 25} problems, most important first. For each: "scene" (its number), "quote" (the exact words of the text, enough to be unique, one sentence at most), "kind" (one word), "severity" ("error": a mistake or contradiction; "craft": what weakens the book; "polish": finish), "problem" (short) and "fix" (the concrete correction). If there is nothing on a point, don't invent anything.`}\n</task>`,
@@ -229,6 +234,83 @@ export async function fixChapter() {
     useEdit.setState({ stage: 'list' })
     st.notify('error', (e as Error).message)
   }
+}
+
+/** What a text fails: your rules, then every report well over its target, explained in the book's language. */
+export const flagged = (text: string, book: Book): Check[] => [
+  ...checkRules(text, book),
+  ...reviewChecks(text, book, { every: true, say: s => translate(book.meta.language, s) }),
+].filter(c => !c.ok)
+
+/**
+ * Fixes what the scorecard flags in scenes already written, as tracked changes.
+ * Claude sends only its replacements, so the rest of the scene stays as it is; a
+ * snapshot is taken first, a scene whose fixes amount to a rewrite is left alone,
+ * and the summary says what would still be flagged with every fix accepted.
+ */
+export async function fixFlagged(sceneIds: string[]) {
+  const st = useStore.getState()
+  const book = st.book
+  if (!book || useAI.getState().running) return
+  if (!canRun()) return st.notify('error', t('The claude command line was not found. Set its path in Settings.'))
+  const lang = book.meta.language
+  const written = sceneIds.map(id => findScene(book, id)).filter(f => !!f && !!f.scene.text.trim())
+  const open = written.filter(f => !isLocked(f!.chapter, st.unlocked))
+  if (written.length && !open.length) return st.notify('warn', t('This chapter is published: press Edit anyway above it to change it.'))
+  const todo = open.map(f => ({ id: f!.scene.id, words: f!.scene.text.split(/\s+/).length, failed: flagged(f!.scene.text, book) })).filter(x => x.failed.length)
+  if (!todo.length) return st.notify('ok', t('Nothing flagged here: your rules and the reports are within their targets.'))
+  const points = [...new Set(todo.flatMap(x => x.failed.map(c => t(c.label))))].join(', ')
+  const tokens = todo.reduce((k, x) => k + Math.round(x.words * 1.8) + 1500, 0)
+  if (!(await askDialog(t('Claude will fix {n} scene(s): {points}. {cost}. A snapshot is taken first, and every fix shows in the text as a tracked change to accept or reject.', { n: todo.length, points, cost: costText(tokens) }), { title: t('Fix what’s flagged'), kind: 'info' }))) return
+  const title = findScene(book, todo[0].id)!.chapter.title || t('Chapter')
+  await saveSnap(book.root, makeSnap(book, t('Before fixing “{title}”', { title })))
+  useAI.setState({ running: 'chapter' })
+  let placed = 0, missed = 0, before = 0, after = 0
+  const still = new Set<string>()
+  const left: string[] = []
+  try {
+    for (const { id } of todo) {
+      const now = useStore.getState().book!
+      const f = findScene(now, id)
+      if (!f || useAI.getState().running !== 'chapter') break
+      const failed = flagged(f.scene.text, now)
+      if (!failed.length) continue
+      st.notify('ok', t('Fixing “{title}”…', { title: f.scene.title }))
+      const choice = assistantChoice('rewrite')
+      const e = effective(choice.model, choice.effort)
+      const reply = await ask({ model: e.model, effort: e.effort, orModel: choice.orModel, system: systemPrompt(now, 'rewrite', f.number), message: fixRequest(f.scene.text, failed, lang) })
+      if (useAI.getState().running !== 'chapter') break
+      const edits = parseJSON<FixEdit[]>(reply)
+      if (!Array.isArray(edits)) throw new Error(t('Claude’s reply could not be read. Try again.'))
+      // The text as it is now: you may have typed while Claude was reading.
+      const latest = useStore.getState().book!
+      const text = findScene(latest, id)?.scene.text ?? ''
+      const result = placeFixes(text, edits, lang)
+      missed += result.missed
+      if (!result.fixes.length) continue
+      if (!fixGuard(text, result.fixes).ok) { left.push(f.scene.title); continue }
+      const rest = flagged(applyFixes(text, result.fixes), latest)
+      before += failed.length
+      after += rest.length
+      rest.forEach(c => still.add(t(c.label)))
+      useEdit.setState(s => ({ pending: { ...s.pending, [id]: result.fixes.map(x => ({ id: newId(), ...x })) } }))
+      // The chapter on screen, so the changes show as they arrive.
+      if (!placed) { st.setView('manuscript'); st.setPrefs({ mode: 'review' }); st.selectScene(id) }
+      placed += result.fixes.length
+    }
+  } catch (err) {
+    st.notify('error', (err as Error).message)
+    return
+  } finally {
+    useAI.setState({ running: null })
+  }
+  const parts = [
+    placed ? t('{n} fix(es) in the text: ✓ to accept, ✕ to reject. Flagged points: {a} now, {b} once all are accepted.', { n: placed, a: before, b: after }) : left.length ? '' : t('Claude proposed no fix.'),
+    still.size ? t('Still flagged: {list}.', { list: [...still].join(', ') }) : '',
+    missed ? t('Not placed, the words were not found in the text: {k}.', { k: missed }) : '',
+    left.length ? t('Left as written, because the fixes amounted to a rewrite: {list}.', { list: left.join(', ') }) : '',
+  ]
+  st.notify(left.length || missed || !placed ? 'warn' : 'ok', parts.filter(Boolean).join(' '))
 }
 
 /** Hands a scene's waiting fixes to its editor, once. */

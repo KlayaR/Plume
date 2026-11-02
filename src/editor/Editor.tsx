@@ -318,7 +318,11 @@ export default function Editor({ scene }: { scene: Scene }) {
     const v = viewRef.current
     if (!v || !fixes) return
     const list = takePending(scene.id)
-    if (list) v.dispatch({ effects: setChanges.of([...v.state.field(changesField), ...list.filter(c => c.to <= v.state.doc.length)]) })
+    if (list) {
+      // Changes still waiting for you stay; a new one on the same words waits for them to be settled.
+      const have = v.state.field(changesField)
+      v.dispatch({ effects: setChanges.of([...have, ...list.filter(c => c.to <= v.state.doc.length && !have.some(h => c.from <= h.to && c.to >= h.from))]) })
+    }
   }, [fixes, scene.id])
 
   // Chosen in the tree, or just created: become the active editor, focused and in view.

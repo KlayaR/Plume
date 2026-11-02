@@ -1,6 +1,6 @@
 // The content of every right-click menu, one function per place. Screens call
 // these with what was clicked; the menu itself is drawn by ContextMenuHost.
-import { openEdit } from './edit'
+import { fixFlagged, openEdit } from './edit'
 import { ownShare } from './lib/context'
 import type { EditorView } from '@codemirror/view'
 import { ask as askDialog } from '@tauri-apps/plugin-dialog'
@@ -234,6 +234,7 @@ export function chapterMenu(chapterId: string): MenuItem[] {
   return [
     { label: t('New scene'), onClick: () => st.addScene(chapterId, `${t('Scene')} ${c.scenes.length + 1}`) },
     { label: t('Edit this chapter (Claude)…'), disabled: !c.scenes.some(s => s.text.trim()) || locked, onClick: () => openEdit(chapterId) },
+    { label: t('Fix what’s flagged (Claude)…'), disabled: !c.scenes.some(s => s.text.trim()) || locked, onClick: () => fixFlagged(c.scenes.map(s => s.id)) },
     ...(serial ? [
       { separator: true },
       c.published
