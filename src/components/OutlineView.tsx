@@ -6,14 +6,14 @@
 import { useEffect, useState } from 'react'
 import { create } from 'zustand'
 import { ask as askDialog } from '@tauri-apps/plugin-dialog'
-import { ArrowDown, ArrowUp, BookPlus, Check, CheckCheck, ChevronDown, ChevronRight, Combine, History, Lock, LockOpen, MessagesSquare, MoreHorizontal, PenLine, Plus, Scissors, SearchCheck, Sparkles, Wand2, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, BookPlus, Check, CheckCheck, ChevronDown, ChevronRight, Combine, History, Lock, LockOpen, MessagesSquare, MoreHorizontal, PenLine, PencilRuler, Plus, Scissors, SearchCheck, Sparkles, Wand2, X } from 'lucide-react'
 import { useStore } from '../store'
 import { FOUNDATION_KEYS, SERIES_KEYS, type Book, type Chapter, type Foundation, type Scene } from '../lib/types'
 import { TEMPLATES, templateBeats } from '../lib/structures'
 import { chapterLabels } from '../lib/chapters'
 import { countWords, foldText } from '../lib/text'
-import { FOUNDATION_HINTS, FOUNDATION_LABELS, SERIES_LABELS, chapterBeats, mergeCards, outlineMarkdown, type CardDraft } from '../lib/outline'
-import { acceptAll, acceptFoundation, createEntriesFromOutline, stopEntries, acceptOutline, acceptTurningPoints, checkOutline, cleanOutline, detailAll, fixIssue, interviewFoundation, issueChapter, loadVersions, planChapter, planScene, proposeFoundation, proposeTurningPoints, rejectOutline, restoreVersion, useOutline } from '../outline'
+import { FOUNDATION_HINTS, FOUNDATION_LABELS, SERIES_LABELS, chapterBeats, mergeCards, outlineMarkdown, revisionChanges, revisionOrder, sameCard, type CardDraft, type RevisionChapter } from '../lib/outline'
+import { acceptAll, acceptFoundation, applyRevision, createEntriesFromOutline, stopEntries, acceptOutline, acceptTurningPoints, checkOutline, cleanOutline, detailAll, fixIssue, interviewFoundation, issueChapter, loadVersions, planChapter, planScene, proposeFoundation, proposeTurningPoints, rejectOutline, restoreVersion, reviseOutline, useOutline } from '../outline'
 import { writeChapter, writeFromPlan } from '../editor/actions'
 import { askText, showMenu } from '../contextMenu'
 import { chapterMenu, sceneMenu } from '../menus'
@@ -38,6 +38,7 @@ export default function OutlineView() {
   const issues = useOutline(s => s.issues)
   const editing = useEditing(s => s.id)
   const pending = useOutline(s => Object.keys(s.proposals).length)
+  const revising = useOutline(s => s.revising)
   const t = useT()
   const [query, setQuery] = useState('')
   const [closed, setClosed] = useState<Set<string>>(new Set())
@@ -73,6 +74,7 @@ export default function OutlineView() {
       <div className="pl-ol-bar">
         <input className="sk-input pl-ol-search" placeholder={t('Search the outline')} value={query} onChange={e => setQuery(e.target.value)} />
         <button type="button" className="sk-btn sk-btn-sm" disabled={!!busy} onClick={() => useStore.setState({ dialog: 'outline' })}><Sparkles size={13} /> {t('Outline from a premise')}</button>
+        <button type="button" className="sk-btn sk-btn-sm" disabled={!book.chapters.length} onClick={() => useOutline.setState({ revising: true })} title={t('Tell Claude what to change in the whole outline: add, move, merge or remove chapters, change what happens. You tick the changes to keep.')}><PencilRuler size={13} /> {t('Revise the outline…')}</button>
         <button type="button" className="sk-btn sk-btn-sm" disabled={!!busy} onClick={detailAll} title={t('Claude details every chapter that has no beats yet, one after the other. Each comes back as a proposal.')}><Wand2 size={13} /> {t('Detail all')}</button>
         <button type="button" className="sk-btn sk-btn-sm" disabled={!!busy || !book.chapters.length} onClick={checkOutline} title={t('Claude reads the whole outline and lists gaps, dropped threads, contradictions with the bible and chapters with no turn.')}><SearchCheck size={13} /> {busy === 'check' ? t('Reading…') : t('Check the outline')}</button>
         {busy === 'entries'
@@ -84,6 +86,7 @@ export default function OutlineView() {
 
       {book.meta.series && <SeriesSection book={book} />}
       <StorySection book={book} />
+      {revising && <RevisePanel book={book} />}
 
       {issues && (
         <section className="pl-ol-issues">
@@ -338,6 +341,77 @@ function SceneForm({ book, c, s, k, update, lock, tools }: { book: Book; c: Chap
         <label><span className="sk-label">{t('Pace and tone')}</span><Grow value={s.pace ?? ''} placeholder={t('Fast and tense, slow and inward…')} onChange={v => update({ pace: v })} /></label>
       </div>
     </article>
+  )
+}
+
+/** One instruction for the whole outline; Claude's changes come back as a list to tick, applied together with one Undo. */
+function RevisePanel({ book }: { book: Book }) {
+  const t = useT()
+  const busy = useOutline(s => s.busy)
+  const rev = useOutline(s => s.revision)
+  const [text, setText] = useState('')
+  /** Changes the author unticked: a chapter's key, "rm:" + an id, "order". */
+  const [off, setOff] = useState<Set<string>>(new Set())
+  useEffect(() => setOff(new Set()), [rev])
+  const on = (k: string) => !off.has(k)
+  const toggle = (k: string) => setOff(prev => { const n = new Set(prev); if (n.has(k)) n.delete(k); else n.add(k); return n })
+  const names = labels(book)
+  const chapterName = (id: string) => { const i = book.chapters.findIndex(c => c.id === id); return i >= 0 ? book.chapters[i].title || names[i] : '' }
+  const sceneOf = (id: string | null) => { for (const c of book.chapters) { const s = c.scenes.find(x => x.id === id); if (s) return { s, c } } return null }
+  const changed = rev?.chapters.filter(revisionChanges) ?? []
+  const count = changed.filter(ch => on(ch.key)).length + (rev?.remove.filter(id => on(`rm:${id}`)).length ?? 0) + (rev?.reordered && on('order') ? 1 : 0)
+  const box = (k: string) => <input type="checkbox" className="sk-check" checked={on(k)} onChange={() => toggle(k)} />
+  const badge = (d: CardDraft, ch: RevisionChapter) => {
+    const was = sceneOf(d.id)
+    if (!was) return t('new scene')
+    if (was.c.id !== ch.id) return t('moved from “{title}”', { title: chapterName(was.c.id) })
+    return sameCard(d, was.s) ? '' : t('rewritten')
+  }
+  const name = (ch: RevisionChapter) => ch.id ? (ch.title ? `${chapterName(ch.id)} → ${ch.title}` : chapterName(ch.id)) : ch.title || t('New chapter')
+  return (
+    <section className="pl-ol-proposal pl-ol-revise">
+      <div className="pl-row"><b className="pl-grow">{t('Revise the outline')}</b><button type="button" className="sk-btn sk-btn-ghost sk-btn-sm sk-btn-icon" onClick={() => useOutline.setState({ revising: false, revision: null })} aria-label={t('Close')}><X size={13} /></button></div>
+      <textarea className="sk-input" rows={3} autoFocus value={text} placeholder={t('e.g. add a chapter at the start, at court before the ball; move the duel to chapter 8; Marc dies in chapter 12, not 15')} onChange={e => setText(e.target.value)} />
+      <div className="pl-row">
+        <span className="sk-hint pl-grow">{t('Claude changes only what you ask and what follows from it. Written scenes keep their text; locked cards and published chapters stay as they are.')}</span>
+        <button type="button" className="sk-btn sk-btn-sm" disabled={!!busy || text.trim().length < 5} onClick={() => reviseOutline(text)}><Sparkles size={13} /> {busy === 'revise' ? t('Thinking…') : rev ? t('Again') : t('Propose changes')}</button>
+      </div>
+      {rev && <>
+        {rev.note && <p>{rev.note}</p>}
+        {!changed.length && !rev.remove.length && !rev.reordered && <span className="sk-hint">{t('Claude changed nothing.')}</span>}
+        {rev.reordered && (
+          <div className="pl-ol-pcard">
+            <label className="pl-row pl-check-label">{box('order')}<b className="pl-grow">{t('New chapter order')}</b></label>
+            <span className="sk-hint">{revisionOrder(book, rev, k => k === 'order' || on(k)).map((k, i) => `${i + 1}. ${name(rev.chapters.find(ch => ch.key === k) ?? { key: k, id: k })}`).join(' · ')}</span>
+          </div>
+        )}
+        {changed.map(ch => (
+          <div key={ch.key} className="pl-ol-pcard">
+            <label className="pl-row pl-check-label">{box(ch.key)}<b className="pl-grow">{name(ch)}</b><span className="sk-badge">{ch.id ? t('changed') : t('new chapter')}</span></label>
+            {ch.goal && <span className="sk-hint"><b>{t('Chapter goal')}</b> · {ch.goal}</span>}
+            {ch.ending && <span className="sk-hint"><b>{t('How it ends')}</b> · {ch.ending}</span>}
+            {ch.scenes?.map((d, k) => (
+              <div key={k} className="pl-ol-small"><b>{d.title}</b>{badge(d, ch) && <> <span className="sk-badge">{badge(d, ch)}</span></>} {d.note}</div>
+            ))}
+          </div>
+        ))}
+        {rev.remove.map(id => {
+          const sc = sceneOf(id)
+          return (
+            <label key={id} className="pl-row pl-check-label pl-ol-pcard">{box(`rm:${id}`)}
+              <span className="pl-grow">{sc ? t('{scene} (in {chapter})', { scene: sc.s.title, chapter: chapterName(sc.c.id) }) : chapterName(id)}</span>
+              <span className="sk-badge">{t('to delete')}</span>
+            </label>
+          )
+        })}
+        {rev.refused.length > 0 && <span className="sk-hint">{t('Left as they are (written, locked or published): {list}', { list: rev.refused.join(', ') })}</span>}
+        <div className="pl-row">
+          <span className="pl-grow" />
+          <button type="button" className="sk-btn sk-btn-sm sk-btn-ghost" onClick={() => useOutline.setState({ revision: null })}>{t('Reject')}</button>
+          <button type="button" className="sk-btn sk-btn-sm sk-btn-primary" disabled={!count} onClick={() => applyRevision(on)}><Check size={13} /> {t('Apply ({n})', { n: count })}</button>
+        </div>
+      </>}
+    </section>
   )
 }
 

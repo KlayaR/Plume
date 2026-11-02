@@ -7,12 +7,13 @@ import { ask, parseJSON } from './ai'
 import { addDrafts, entryFormat, readDrafts } from './chat'
 import { useStore } from './store'
 import { t } from './i18n'
-import { ENTRY_TYPES, FOUNDATION_KEYS, WORLD_TYPES, type Book, type Entry, type EntryType, type Foundation, type Scene } from './lib/types'
+import { ENTRY_TYPES, FOUNDATION_KEYS, WORLD_TYPES, type Book, type Chapter, type Entry, type EntryType, type Foundation, type Scene } from './lib/types'
 import { templateBeats } from './lib/structures'
 import { foldText } from './lib/text'
 import {
   CHAPTER_JSON, SCENE_JSON, addVersion, findEntrySlug, cardOf, cardPatch, cardSpec, chapterText, foundationText, outlineRules, outlineText,
-  readCard, readChapterProposal, seriesText, turningPointsText, versionOf, versionProposal, type OutlineProposal, type OutlineVersion,
+  readCard, readChapterProposal, readRevision, revisionChanges, revisionOrder, revisionText, seriesText, turningPointsText, versionOf, versionProposal,
+  type CardDraft, type OutlineProposal, type OutlineRevision, type OutlineVersion,
 } from './lib/outline'
 
 export interface OutlineIssue { n?: number; chapter: string; issue: string; fix: string }
@@ -27,7 +28,10 @@ export const useOutline = create<{
   /** Earlier versions of each chapter's outline (.plume/outline-versions.json). */
   versions: Record<string, OutlineVersion[]>
   versionsOf: string | null
-}>(() => ({ proposals: {}, busy: null, issues: null, foundation: null, points: null, versions: {}, versionsOf: null }))
+  /** Revise the outline: the panel is open, and Claude's changes to tick. */
+  revising: boolean
+  revision: OutlineRevision | null
+}>(() => ({ proposals: {}, busy: null, issues: null, foundation: null, points: null, versions: {}, versionsOf: null, revising: false, revision: null }))
 
 const fr = (book: Book) => book.meta.language === 'fr'
 
@@ -225,6 +229,122 @@ export async function fixIssue(x: OutlineIssue) {
   await planChapter(c.id, 'regenerate', `${x.issue} → ${x.fix}`)
 }
 
+// --- Revise the whole outline with one instruction --------------------------------------
+
+/** Claude changes the whole outline as the author asks (chapters added, moved, changed, removed); the changes come back to tick. */
+export async function reviseOutline(instruction: string) {
+  const book = useStore.getState().book
+  if (!book || !instruction.trim() || useOutline.getState().busy) return
+  const F = fr(book)
+  const message = [
+    grounding(book),
+    `<outline>\n${revisionText(book)}\n</outline>`,
+    outlineRules(book.meta.language, book.meta.sceneMode ?? { kind: 'one' }),
+    cardSpec(book.meta.language, !!book.meta.series),
+    `<instruction>\n${instruction.trim()}\n</instruction>`,
+    `<task>\n${F ? `Change ce plan comme l’auteur le demande dans <instruction>, et rien d’autre.
+- "chapters" : tout le plan dans son nouvel ordre, chaque chapitre une fois. Un chapitre que tu ne changes pas : seulement {"id": "…"}. Un chapitre que tu changes garde son "id" et ne donne que ce qui change : "title", "goal", "ending", et "scenes" si ses scènes changent. Un nouveau chapitre a "id": null.
+- Les "scenes" d’un chapitre sont toutes ses scènes, dans l’ordre : l’"id" d’une scène existante pour la garder, la réécrire ou l’amener d’un autre chapitre ; "id": null pour une nouvelle scène. Une scène du chapitre que tu omets y reste, après les autres.
+- "remove" : les id des chapitres et des scènes à supprimer. Jamais une scène marquée [written] ou [locked], ni un chapitre qui en contient : une scène écrite peut seulement changer de place ou de fiche.
+- Les chapitres marqués [published] sont lus par des lecteurs : ne les change pas, ne les déplace pas, n’ajoute rien avant eux. Les scènes [locked] restent telles quelles.
+- Quand un changement a des conséquences plus loin (un personnage qui meurt plus tôt, un indice déplacé, un nouveau chapitre qui reprend des événements), corrige aussi les chapitres touchés ; laisse les autres tels quels.
+- Les nouvelles scènes et les scènes réécrites ont une fiche complète.
+- "note" : en deux ou trois phrases, ce que tu as changé, pour l’auteur.`
+      : `Change this outline as the author asks in <instruction>, and nothing more.
+- "chapters": the whole outline in its new order, every chapter once. A chapter you don't change: only {"id": "…"}. A chapter you change keeps its "id" and gives only what changes: "title", "goal", "ending", and "scenes" if its scenes change. A new chapter has "id": null.
+- A chapter's "scenes" are all its scenes, in order: an existing scene's "id" to keep it, rewrite it or bring it from another chapter; "id": null for a new scene. A scene of the chapter you leave out stays in it, after the others.
+- "remove": the ids of the chapters and scenes to delete. Never a scene marked [written] or [locked], nor a chapter that holds one: a written scene can only move or get a new card.
+- Chapters marked [published] are read by readers: don't change or move them, and add nothing before them. Scenes marked [locked] stay as they are.
+- When a change has consequences further on (a character who dies earlier, a clue moved, a new chapter that takes over events), fix the chapters it touches too; leave the others as they are.
+- New and rewritten scenes get a full card.
+- "note": two or three sentences on what you changed, for the author.`}\n</task>`,
+    `JSON: {"note": "…", "chapters": [{"id": "…"}, {"id": "…", "title": "…", "goal": "…", "ending": "…", "scenes": [${SCENE_JSON}]}, {"id": null, "title": "…", "goal": "…", "ending": "…", "scenes": [${SCENE_JSON}]}], "remove": ["…"]}`,
+  ].filter(Boolean).join('\n\n')
+  const raw = await run<unknown>('revise', message, book)
+  if (!raw) return
+  const rev = readRevision(useStore.getState().book!, raw)
+  if (!rev) return useStore.getState().notify('error', t('Claude’s reply could not be read. Try again.'))
+  useOutline.setState({ revision: rev })
+}
+
+/** The outline's shape and cards, to put back after a revision. */
+type OutlineState = { id: string; kind: Chapter['kind']; title: string; goal?: string; ending?: string; scenes: { id: string; card: ReturnType<typeof cardOf> }[] }[]
+const outlineState = (book: Book): OutlineState => book.chapters.map(c => ({ id: c.id, kind: c.kind, title: c.title, goal: c.goal, ending: c.ending, scenes: c.scenes.map(s => ({ id: s.id, card: cardOf(s) })) }))
+
+/** Puts a chapter's scenes in the draft's order, each with its card: new ones made, others moved here. A new chapter's first empty scene is reused. */
+async function placeScenes(chapterId: string, drafts: CardDraft[], fresh: boolean) {
+  const st = useStore.getState
+  let spare = fresh ? st().book!.chapters.find(c => c.id === chapterId)?.scenes[0]?.id : undefined
+  let anchor: string | null = null
+  for (const d of drafts) {
+    const old = d.id ? st().book!.chapters.flatMap(c => c.scenes).find(s => s.id === d.id) : undefined
+    let id = old?.id
+    if (!id) { if (spare) { id = spare; spare = undefined } else id = st().addScene(chapterId, d.title, { stay: true }) }
+    const others = st().book!.chapters.find(c => c.id === chapterId)!.scenes.filter(s => s.id !== id)
+    st().moveScene(id, chapterId, anchor ? others.findIndex(s => s.id === anchor) + 1 : 0)
+    st().updateScene(id, cardPatch(d, old))
+    anchor = id
+  }
+  if (spare && drafts.length) await st().removeScene(spare)
+}
+
+/** Applies the ticked changes of a revision. Changed chapters keep an earlier version; Undo puts the whole outline back. */
+export async function applyRevision(on: (key: string) => boolean) {
+  const rev = useOutline.getState().revision
+  const book = useStore.getState().book
+  if (!rev || !book) return
+  const st = useStore.getState
+  const before = outlineState(book)
+  const order = revisionOrder(book, rev, on)
+  useOutline.setState({ revision: null, revising: false })
+  for (const ch of rev.chapters) if (ch.id && on(ch.key) && revisionChanges(ch)) keepVersion(ch.id, t('Before Revise the outline'))
+  // New chapters first, so scenes can move into them.
+  const ids = new Map<string, string>()
+  for (const ch of rev.chapters) if (!ch.id && on(ch.key)) ids.set(ch.key, st().addChapter(ch.title ?? '', { stay: true }))
+  for (const ch of rev.chapters) {
+    const id = ch.id ?? ids.get(ch.key)
+    if (!id || !on(ch.key)) continue
+    const patch = { ...(ch.id && ch.title ? { title: ch.title } : {}), ...(ch.goal ? { goal: ch.goal } : {}), ...(ch.ending ? { ending: ch.ending } : {}) }
+    if (Object.keys(patch).length) st().updateChapter(id, patch)
+    if (ch.scenes) await placeScenes(id, ch.scenes, !ch.id)
+  }
+  for (const id of rev.remove) {
+    if (!on(`rm:${id}`)) continue
+    if (st().book!.chapters.some(c => c.id === id)) await st().removeChapter(id)
+    else await st().removeScene(id)
+  }
+  order.forEach((k, i) => { const id = ids.get(k) ?? k; if (st().book!.chapters.some(c => c.id === id)) st().moveChapter(id, i) })
+  st().notify('ok', t('Outline revised.'), { label: t('Undo'), run: () => restoreOutline(before) })
+}
+
+/** Puts the outline back as it was before a revision: its chapters, their scenes, order and cards. Nothing written since is removed. */
+async function restoreOutline(before: OutlineState) {
+  const st = useStore.getState
+  const all = () => st().book!.chapters.flatMap(c => c.scenes)
+  // Chapters the revision removed come back (only empty ones can be).
+  const ids = new Map<string, string>()
+  for (const c of before) if (!st().book!.chapters.some(x => x.id === c.id)) ids.set(c.id, st().addChapter(c.title, { stay: true }))
+  const keep = new Set<string>()
+  for (const c of before) {
+    const cid = ids.get(c.id) ?? c.id
+    let spare = ids.has(c.id) ? st().book!.chapters.find(x => x.id === cid)?.scenes[0]?.id : undefined
+    for (const [k, s] of c.scenes.entries()) {
+      let sid = s.id
+      if (!all().some(x => x.id === sid)) { if (spare) { sid = spare; spare = undefined } else sid = st().addScene(cid, s.card.title, { stay: true }) }
+      st().moveScene(sid, cid, k)
+      st().updateScene(sid, s.card as Partial<Scene>)
+      keep.add(sid)
+    }
+    st().updateChapter(cid, { kind: c.kind, title: c.title, goal: c.goal, ending: c.ending })
+  }
+  // What the revision added goes, unless something was written in it since.
+  for (const s of all()) if (!keep.has(s.id) && !s.text.trim()) await st().removeScene(s.id)
+  const kept = new Set(before.map(c => ids.get(c.id) ?? c.id))
+  for (const c of [...st().book!.chapters]) if (!kept.has(c.id) && c.scenes.every(s => !s.text.trim())) await st().removeChapter(c.id)
+  before.forEach((c, i) => st().moveChapter(ids.get(c.id) ?? c.id, i))
+  st().notify('ok', t('Outline put back as it was.'))
+}
+
 /** Accepts every proposal on screen. */
 export function acceptAll() {
   for (const id of Object.keys(useOutline.getState().proposals)) acceptOutline(id)
@@ -348,7 +468,7 @@ export async function cleanOutline() {
   }
   const b = useStore.getState().book!
   useStore.getState().updateMeta({ structure: { ...b.meta.structure, beats: b.meta.structure.beats.map(x => ({ ...x, note: '', sceneId: null })) } })
-  useOutline.setState({ proposals: {}, issues: null })
+  useOutline.setState({ proposals: {}, issues: null, revision: null })
   useStore.getState().notify('ok', t('Outline cleaned. Empty chapters and scenes are in the book’s trash; written scenes kept their text.'))
 }
 

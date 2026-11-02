@@ -7,6 +7,12 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.36.0
+**Plan: change the whole outline with one instruction**
+- **Revise the outline…** (Plan → Outline) takes one instruction for the whole book: "add a chapter at the start, at court before the ball; move the duel to chapter 8; Marc dies in chapter 12, not 15". Claude adds, moves, rewrites or removes chapters and scenes, and fixes what follows from the change further on.
+- What Claude proposes shows first as a list: the new chapter order, each new or changed chapter with its scenes (new, rewritten or moved from another chapter), and what it would delete. Untick what you don't want, then **Apply**. **Undo** puts the whole outline back as it was, and each changed chapter keeps an earlier version.
+- Nothing you wrote is lost: written scenes keep their text (they can move or get a new card, never be deleted), locked cards stay as they are, and in a web novel published chapters are never changed or moved.
+
 ## 0.35.0
 - **Bible: character ranks.** Give a character a rank (**Main, Secondary, Minor, Mentioned**) in its entry or by right-click, and the People list splits into those groups, with unranked characters last. The rank is only for you: it is never sent to the AI.
 

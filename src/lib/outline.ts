@@ -1,7 +1,7 @@
 // The outline, for Claude and back: the rules of a scene and a chapter, the
 // book's outline as compact text, and Claude's JSON turned into a proposal
 // that the Outline tab shows before anything changes. No screen, no calls.
-import { foldText } from './text'
+import { countWords, foldText } from './text'
 import { FOUNDATION_KEYS, SERIES_KEYS, type SeriesPlan, type Book, type Chapter, type EntryType, type Foundation, type Lang, type Scene, type SceneMode } from './types'
 
 /** How many scenes a chapter gets: mostly one (the default), as each chapter needs, or within a range. */
@@ -209,6 +209,136 @@ export function readChapterProposal(book: Book, chapter: Chapter, raw: unknown, 
   const seen = new Set<string>()
   for (const s of scenes) { if (s.id && seen.has(s.id)) s.id = null; if (s.id) seen.add(s.id) }
   return { chapterId: chapter.id, kind, goal: str(r.goal) || undefined, ending: str(r.ending) || undefined, scenes }
+}
+
+// --- One instruction for the whole outline ---------------------------------------------
+
+/** The whole outline with every id, and what Claude may not touch: written scenes, locked cards, published chapters. */
+export function revisionText(book: Book): string {
+  return book.chapters.map((c, i) => [
+    `## ${i + 1}. [${c.id}]${c.published ? ' [published]' : ''} ${c.title || '…'}${chapterBeats(book, c).map(b => ` [${b.name}]`).join('')}`,
+    c.goal ? `Goal: ${c.goal}` : '',
+    c.ending ? `Ending: ${c.ending}` : '',
+    ...c.scenes.map(s => sceneText(book, s, true).replace(`[${s.id}]`, `[${s.id}]${s.text.trim() ? ` [written, ${countWords(s.text)} words]` : ''}`)),
+  ].filter(Boolean).join('\n')).join('\n\n')
+}
+
+/** A chapter of Claude's revised outline: one already there (changed or not) or a new one. */
+export interface RevisionChapter {
+  /** The chapter's id, or "new:1", "new:2"… for a new one. */
+  key: string
+  id: string | null
+  /** Only what changes. */
+  title?: string
+  goal?: string
+  ending?: string
+  /** Its scenes in order when they change; a scene from another chapter moves here. */
+  scenes?: CardDraft[]
+}
+
+export interface OutlineRevision {
+  /** What Claude says it changed. */
+  note: string
+  /** Every chapter once, in Claude's order, with the new ones. */
+  chapters: RevisionChapter[]
+  /** Empty chapters and scenes to delete. */
+  remove: string[]
+  /** Whether the chapters already there come in another order. */
+  reordered: boolean
+  /** What Claude wanted to change or delete and can't: written, locked or published. */
+  refused: string[]
+}
+
+/** Whether a draft leaves a scene's card as it is. */
+export const sameCard = (d: CardDraft, s: Scene) => JSON.stringify(cardOf({ ...s, ...cardPatch(d, s) })) === JSON.stringify(cardOf(s))
+
+/** What a revision changes in a chapter (nothing for one Claude only named). */
+export const revisionChanges = (ch: RevisionChapter) => !ch.id || !!(ch.title || ch.goal || ch.ending || ch.scenes)
+
+/**
+ * Claude's revised outline as changes to tick. Locked cards and published
+ * chapters are never touched; only empty chapters and scenes can be deleted;
+ * a chapter Claude left out stays after the one before it.
+ */
+export function readRevision(book: Book, raw: unknown): OutlineRevision | null {
+  const r = raw as Record<string, unknown> | null
+  if (!r || typeof r !== 'object' || !Array.isArray(r.chapters)) return null
+  const scenes = book.chapters.flatMap(c => c.scenes.map(s => ({ s, c })))
+  const fixed = (id: unknown) => scenes.some(x => x.s.id === id && (x.s.locked || x.c.published))
+  // Scenes Claude may rewrite or move: everything but locked cards and published chapters.
+  const pool: Chapter = { id: '', folder: '', kind: 'chapter', title: '', notes: '', scenes: scenes.filter(x => !x.s.locked && !x.c.published).map(x => x.s) }
+  const refused: string[] = []
+  const placed = new Set<string>()
+  const chapters: RevisionChapter[] = []
+  let n = 0
+  for (const x of r.chapters) {
+    if (!x || typeof x !== 'object') continue
+    const o = x as Record<string, unknown>
+    const cur = book.chapters.find(c => c.id === o.id)
+    if (cur && chapters.some(ch => ch.id === cur.id)) continue
+    // A locked card or a published chapter's scene named here only says where it is.
+    const drafts = Array.isArray(o.scenes)
+      ? o.scenes.filter((y): y is Record<string, unknown> => !!y && typeof y === 'object' && !fixed(y.id)).map(y => readCard(book, pool, y))
+      : undefined
+    for (const d of drafts ?? []) { if (d.id && placed.has(d.id)) d.id = null; if (d.id) placed.add(d.id) }
+    const title = str(o.title), goal = str(o.goal), ending = str(o.ending)
+    if (!cur) {
+      if (title || drafts?.length) chapters.push({ key: `new:${++n}`, id: null, title, goal: goal || undefined, ending: ending || undefined, scenes: drafts?.length ? drafts : undefined })
+      continue
+    }
+    const ch: RevisionChapter = { key: cur.id, id: cur.id }
+    if (title && title !== cur.title) ch.title = title
+    if (goal && goal !== (cur.goal ?? '')) ch.goal = goal
+    if (ending && ending !== (cur.ending ?? '')) ch.ending = ending
+    const own = cur.scenes.filter(s => !s.locked)
+    if (drafts && !(drafts.length === own.length && drafts.every((d, i) => d.id === own[i].id && sameCard(d, own[i])))) ch.scenes = drafts
+    if (cur.published && revisionChanges(ch)) { refused.push(cur.title); chapters.push({ key: cur.id, id: cur.id }); continue }
+    chapters.push(ch)
+  }
+  // A chapter Claude left out stays where it was: after the one before it.
+  book.chapters.forEach((c, i) => {
+    if (chapters.some(ch => ch.id === c.id)) return
+    const prev = i > 0 ? chapters.findIndex(ch => ch.id === book.chapters[i - 1].id) : -1
+    chapters.splice(prev + 1, 0, { key: c.id, id: c.id })
+  })
+  const remove: string[] = []
+  for (const id of Array.isArray(r.remove) ? r.remove.map(String) : []) {
+    const c = book.chapters.find(x => x.id === id)
+    const sc = scenes.find(x => x.s.id === id)
+    if (remove.includes(id) || placed.has(id) || (!c && !sc)) continue
+    const edited = c && revisionChanges(chapters.find(ch => ch.id === c.id)!)
+    if (c ? edited || c.published || c.scenes.some(s => s.locked || s.text.trim() || placed.has(s.id)) : sc!.s.locked || sc!.c.published || sc!.s.text.trim()) {
+      refused.push(c ? c.title : sc!.s.title)
+      continue
+    }
+    remove.push(id)
+  }
+  const was = book.chapters.map(c => c.id).join('|')
+  const now = chapters.filter(ch => ch.id).map(ch => ch.id).join('|')
+  return { note: str(r.note), chapters, remove, reordered: was !== now, refused: [...new Set(refused.filter(Boolean))] }
+}
+
+/**
+ * The chapters in their order once the ticked changes are in: ids of those
+ * kept, keys of the new ones. Ticks: a chapter's key, "rm:" + an id, "order".
+ * Without the new order, a new chapter goes after the one before it in
+ * Claude's outline. Published chapters stay first, as they are.
+ */
+export function revisionOrder(book: Book, rev: OutlineRevision, on: (key: string) => boolean): string[] {
+  const removed = new Set(rev.remove.filter(id => on(`rm:${id}`)))
+  let list: string[]
+  if (on('order')) list = rev.chapters.filter(ch => (ch.id ? !removed.has(ch.id) : on(ch.key))).map(ch => ch.key)
+  else {
+    list = book.chapters.filter(c => !removed.has(c.id)).map(c => c.id)
+    rev.chapters.forEach((ch, i) => {
+      if (ch.id || !on(ch.key)) return
+      const before = rev.chapters.slice(0, i).reverse().find(x => list.includes(x.key))
+      list.splice(before ? list.indexOf(before.key) + 1 : 0, 0, ch.key)
+    })
+  }
+  const last = book.chapters.map(c => !!c.published).lastIndexOf(true)
+  const frozen = book.chapters.slice(0, last + 1).map(c => c.id)
+  return [...frozen, ...list.filter(k => !frozen.includes(k))]
 }
 
 /** The outline fields of a scene, to compare, apply or put back. */

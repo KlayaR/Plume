@@ -9,7 +9,7 @@ import { checkBible } from './bibleCheck'
 import { jumpItems, rankJump } from './quickjump'
 import { aiBlocks, joinBlocks, parseBlocks, toBlocks } from './blocks'
 import { tidy } from '../contextMenu'
-import { addVersion, cardPatch, cardSpec, foundationText, seriesText, mergeCards, outlineRules, readChapterProposal, turningPointsText, versionOf, versionProposal } from './outline'
+import { addVersion, cardPatch, cardSpec, foundationText, seriesText, mergeCards, outlineRules, readChapterProposal, readRevision, revisionChanges, revisionOrder, revisionText, turningPointsText, versionOf, versionProposal } from './outline'
 import { sessionOf, worthShowing } from './session'
 import { addDirection, ordered, togglePin, type Direction } from './directions'
 import { EMPTY_RATE, learnCall, learnWindow, shareOf } from './windowCost'
@@ -981,6 +981,45 @@ describe('outline', () => {
     expect(lines).toContain('Chapter goal : Get in.')
     expect(lines).toContain('1. He waits.')
     expect(lines).toContain('Chapter ending : The door was open all along.')
+  })
+  const ch = (id: string, scenes: Scene[], over: Partial<Chapter> = {}): Chapter => ({ id, folder: id, kind: 'chapter', title: id.toUpperCase(), notes: '', scenes, ...over })
+  it('reads a revision of the whole outline: new chapters, changes, moves, and what it may not touch', () => {
+    const book = { ...bookOf([]), chapters: [ch('c1', [scene('a', 'Written text.')]), ch('c2', [scene('b', ''), scene('x', '')]), ch('c3', [{ ...scene('d', ''), locked: true }, scene('e', '')])] }
+    const rev = readRevision(book, {
+      note: 'A chapter at court first.',
+      chapters: [
+        { id: null, title: 'Before', goal: 'Set the stage.', scenes: [{ id: null, title: 'Court', summary: 'At court.' }, { id: 'e', title: 'E moved' }] },
+        { id: 'c1' },
+        { id: 'c2', goal: 'New goal.', scenes: [{ id: 'b', title: 'b' }, { id: 'd', title: 'Locked' }] },
+        { id: 'zz', title: '' },
+      ],
+      remove: ['a', 'x', 'c3', 'e'],
+    })!
+    expect(rev.note).toBe('A chapter at court first.')
+    expect(rev.chapters.map(c => c.key)).toEqual(['new:1', 'c1', 'c2', 'c3'])
+    expect(rev.chapters[0].scenes!.map(s => s.id)).toEqual([null, 'e'])
+    expect(revisionChanges(rev.chapters[1])).toBe(false)
+    expect(rev.chapters[2]).toMatchObject({ goal: 'New goal.' })
+    expect(rev.chapters[2].scenes!.map(s => s.id)).toEqual(['b'])
+    expect(rev.remove).toEqual(['x'])
+    expect(rev.refused).toEqual(['a', 'C3'])
+    expect(rev.reordered).toBe(false)
+    expect(revisionOrder(book, rev, () => true)).toEqual(['new:1', 'c1', 'c2', 'c3'])
+    expect(revisionOrder(book, rev, k => k !== 'new:1' && k !== 'rm:x')).toEqual(['c1', 'c2', 'c3'])
+    expect(readRevision(book, { note: 'x' })).toBeNull()
+  })
+  it('keeps published chapters first and as they are when the outline is revised', () => {
+    const book = { ...bookOf([]), chapters: [ch('c1', [scene('a', 'Out.')], { published: '2026-10-01' }), ch('c2', [scene('b', '')]), ch('c3', [scene('c', '')])] }
+    const rev = readRevision(book, { chapters: [{ id: 'c3' }, { id: 'c1', title: 'Renamed' }, { id: null, title: 'New' }, { id: 'c2' }] })!
+    expect(rev.reordered).toBe(true)
+    expect(rev.refused).toEqual(['C1'])
+    expect(revisionChanges(rev.chapters.find(c => c.id === 'c1')!)).toBe(false)
+    expect(revisionOrder(book, rev, () => true)).toEqual(['c1', 'c3', 'new:1', 'c2'])
+    expect(revisionOrder(book, rev, k => k !== 'order')).toEqual(['c1', 'new:1', 'c2', 'c3'])
+    const text = revisionText({ ...book, chapters: [book.chapters[0], ch('c2', [{ ...scene('b', ''), locked: true }])] })
+    expect(text).toContain('## 1. [c1] [published] C1')
+    expect(text).toContain('- [a] [written, 1 words] a')
+    expect(text).toContain('- [b] [locked] b')
   })
 })
 
