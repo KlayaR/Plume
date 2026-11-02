@@ -930,6 +930,16 @@ describe('scorecard from the review', () => {
     expect(aiTells(t, 'en').map(x => x.kind)).toContain('similes')
     expect(aiTells('It went the way a stone goes. Then he left.', 'en').map(x => x.kind)).not.toContain('similes')
   })
+  it('flags the French habits of ", et il" and "comme on", never a single use', () => {
+    const kinds = (t: string) => aiTells(t, 'fr').map(x => x.kind)
+    const link = 'Hester prit la feuille, et elle la déchira. Marlowe se leva, et il sortit. Priya posa la fiole, et elle se tut.'
+    expect(kinds(link)).toContain('pronouns')
+    expect(aiTells(link, 'fr').find(x => x.kind === 'pronouns')?.quote).toContain('et elle la')
+    expect(kinds('Hester prit la feuille, et il sortit.')).not.toContain('pronouns')
+    expect(aiTells(link.replace(/et elle/g, 'and she').replace(/et il/g, 'and he'), 'en').map(x => x.kind)).not.toContain('pronouns')
+    expect(kinds('Elle lut comme on lit un acte. Il attendit comme on attend un train.')).toContain('comparisons')
+    expect(kinds('Elle lut comme on lit un acte. Il attendit.')).not.toContain('comparisons')
+  })
   it('turns the reports furthest from target into fixes with quotes, for long enough passages', () => {
     const book = bookOf([], [])
     expect(reviewChecks('Too short.', book)).toEqual([])

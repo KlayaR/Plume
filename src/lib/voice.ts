@@ -161,13 +161,15 @@ export function checkRules(text: string, book: Book): Check[] {
 // Constructions that make prose read as machine-written. Each is fine once in a
 // while in a human text; it's the habit that gives it away, hence the thresholds.
 
-type Tell = 'contrast' | 'dashes' | 'openers' | 'triads' | 'similes'
+type Tell = 'contrast' | 'dashes' | 'openers' | 'triads' | 'similes' | 'pronouns' | 'comparisons'
 const TELL_FIX: Record<Tell, Record<Lang, string>> = {
   contrast: { en: 'the "not X, but Y" / "It wasn\'t X. It was Y." contrast, used more than once: say the thing directly', fr: 'l\'opposition « ce n\'est pas X, c\'est Y » / « non pas X, mais Y », plus d\'une fois : dis la chose directement' },
   dashes: { en: 'too many em dashes inside sentences: use commas, full stops or nothing', fr: 'trop de tirets au milieu des phrases : mets des virgules, des points, ou rien' },
   openers: { en: 'three sentences in a row start with the same word: vary the openings', fr: 'trois phrases de suite commencent par le même mot : varie les débuts' },
   triads: { en: 'lists of three ("X, Y and Z") again and again: keep one, cut or merge the others', fr: 'des énumérations par trois (« X, Y et Z ») à répétition : garde-en une, coupe ou fonds les autres' },
   similes: { en: 'comparisons built the same way again and again ("the way…"): keep the best, say the others plainly or build them differently', fr: 'des comparaisons construites toujours pareil (« de la façon dont… », « comme si… ») : garde la meilleure, dis les autres simplement ou autrement' },
+  pronouns: { en: 'the ", and he…" link again and again: when the subject stays the same, drop the comma and the pronoun', fr: 'la tournure « …, et il / et elle… » à répétition, calquée sur l\'anglais : quand le sujet ne change pas, enlève la virgule et le pronom (« Elle prit la feuille et la déchira »)' },
+  comparisons: { en: 'comparisons built with "as one does" again and again: keep the best, say the others plainly', fr: 'des comparaisons en « comme on… » à répétition : garde la meilleure, dis les autres simplement' },
 }
 
 const CONTRAST: Record<Lang, RegExp[]> = {
@@ -180,6 +182,11 @@ const SIMILE: Record<Lang, RegExp> = {
   en: /\bthe way (?:a|an|the|you|one|he|she|they|it|I|we|his|her|their|my)\b/gi,
   fr: /\b(?:de la (?:même )?(?:façon|manière) dont|comme si)\b/gi,
 }
+
+/** French only: a comma, "et" and the pronoun again, where French would simply go on with the verb. */
+const COMMA_PRONOUN = /[^,.;!?\n]{0,30},\s+et\s+(?:il|elle)s?\s+[\p{L}'’-]+/giu
+/** French only: "comme on…", a comparison a model falls back on. */
+const COMME_ON = /\bcomme\s+(?:quand\s+)?on\b/gi
 
 /** AI tells in a passage, at most one of each kind, with a short quote. Zero tokens. */
 export function aiTells(text: string, lang: Lang): { kind: Tell; quote: string }[] {
@@ -198,6 +205,13 @@ export function aiTells(text: string, lang: Lang): { kind: Tell; quote: string }
   if (triads.length >= 3) out.push({ kind: 'triads', quote: triads[0].slice(0, 60) })
   const similes = [...text.matchAll(SIMILE[lang])].map(m => m[0])
   if (similes.length > Math.max(2, n / 300)) out.push({ kind: 'similes', quote: similes[0] })
+  if (lang === 'fr') {
+    // A changed subject makes ", et il" correct, so only the habit counts.
+    const linked = [...text.matchAll(COMMA_PRONOUN)].map(m => m[0].trim())
+    if (linked.length > Math.max(2, n / 400)) out.push({ kind: 'pronouns', quote: linked[0].slice(-60) })
+    const comparisons = [...text.matchAll(COMME_ON)].map(m => m[0])
+    if (comparisons.length > Math.max(1, n / 1500)) out.push({ kind: 'comparisons', quote: comparisons[0] })
+  }
   return out
 }
 

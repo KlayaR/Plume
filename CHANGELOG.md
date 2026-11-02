@@ -7,6 +7,9 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.37.0
+- **Scorecard: two more French habits.** The "AI tells" check now catches ", et il / et elle…" used again and again, a link copied from English, and comparisons in "comme on…" that keep coming back. A single use is never flagged, and "Retry fixing" tells Claude how to rewrite them.
+
 ## 0.36.0
 **Plan: change the whole outline with one instruction**
 - **Revise the outline…** (Plan → Outline) takes one instruction for the whole book: "add a chapter at the start, at court before the ball; move the duel to chapter 8; Marc dies in chapter 12, not 15". Claude adds, moves, rewrites or removes chapters and scenes, and fixes what follows from the change further on.
