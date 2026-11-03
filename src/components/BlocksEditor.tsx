@@ -9,6 +9,7 @@ import { typeInfo, type Entry } from '../lib/types'
 import { useStore } from '../store'
 import { useT } from '../i18n'
 import { showMenu } from '../contextMenu'
+import LinkArea from './LinkArea'
 
 const SENDS: [Send, string][] = [['always', 'Always sent'], ['full', 'With the full entry'], ['never', 'Never sent']]
 
@@ -53,7 +54,7 @@ export default function BlocksEditor({ entry, update }: { entry: Entry; update: 
   if (raw) {
     return (
       <>
-        <textarea className="sk-input pl-full" rows={14} value={entry.full} onChange={e => update({ full: e.target.value })} />
+        <LinkArea entry={entry} className="sk-input pl-full" rows={14} value={entry.full} onText={full => update({ full })} />
         <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm" onClick={() => setRaw(false)}>{t('Back to blocks')}</button>
       </>
     )
@@ -84,7 +85,7 @@ export default function BlocksEditor({ entry, update }: { entry: Entry; update: 
             <button type="button" className="pl-quiet" aria-label={t('Move down')} disabled={i === blocks.length - 1} onClick={() => move(i, 1)}><ArrowDown size={13} /></button>
             <button type="button" className="pl-quiet" aria-label={t('Delete')} onClick={() => save(blocks.filter((_, j) => j !== i))}><Trash2 size={13} /></button>
           </div>
-          <textarea className="sk-input" rows={Math.max(2, Math.min(10, b.text.split('\n').length + 1))} value={b.text} onChange={e => patch(i, { text: e.target.value })} />
+          <LinkArea entry={entry} className="sk-input" rows={Math.max(2, Math.min(10, b.text.split('\n').length + 1))} value={b.text} onText={text => patch(i, { text })} />
         </div>
       ))}
       <div className="pl-row">

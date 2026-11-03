@@ -64,7 +64,7 @@ function reviewHighlights(text: string, report: string | null, ai: { quote: stri
 let matcherCache: { entries: Entry[] | null; matcher: ReturnType<typeof buildMatcher> } = { entries: null, matcher: buildMatcher([]) }
 const currentMatcher = () => {
   const entries = useStore.getState().book?.entries ?? []
-  if (matcherCache.entries !== entries) matcherCache = { entries, matcher: buildMatcher(entries) }
+  if (matcherCache.entries !== entries) matcherCache = { entries, matcher: buildMatcher(entries, true) }
   return matcherCache.matcher
 }
 
@@ -110,7 +110,7 @@ export async function checkWithLT(text: string) {
   if (!book) return []
   const dict = new Set((book.meta.dictionary ?? []).map(w => w.toLowerCase()))
   const all = await ltCheck(text, ltLanguage(book.meta.language, prefs.ltEnglish), { server: prefs.ltServer, user: prefs.ltUser, key: prefs.ltKey }, book.meta.ltIgnored ?? [])
-  const names = findMentions(text, buildMatcher(book.entries))
+  const names = findMentions(text, buildMatcher(book.entries, true))
   return all.filter(m => !(m.kind === 'spell' && (dict.has(text.slice(m.from, m.to).toLowerCase()) || names.some(n => n.from < m.to && n.to > m.from))))
 }
 

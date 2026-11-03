@@ -126,6 +126,8 @@ export interface Entry {
   notes?: string
   /** What the AI may read of each block (### Heading) of the full text; unlisted blocks go with the full version. */
   sends?: Record<string, 'always' | 'full' | 'never'>
+  /** False for a name that is also an ordinary word: not looked for in the text (no underline, not picked for Claude by mention). */
+  detect?: boolean
   /** Free labels to filter the bible by ("act 2", "villains"). */
   tags?: string[]
   /** A picture in the book folder (bible/images/...). */

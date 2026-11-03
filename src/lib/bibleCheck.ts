@@ -33,6 +33,7 @@ const firstPara = (e: Entry) => (e.short.trim() || e.full.trim().split('\n\n')[0
 export function checkBible(book: Book): { issues: Issue[]; stats: BibleStats } {
   const entries = book.entries.filter(e => !PLAIN.has(e.type) && e.include !== 'secret')
   const matcher = buildMatcher(entries)
+  const known = buildMatcher(entries, true)
   const scenes = book.chapters.flatMap(c => c.scenes)
   const ignored = new Set((book.meta.ignored ?? []).map(foldText))
 
@@ -47,7 +48,7 @@ export function checkBible(book: Book): { issues: Issue[]; stats: BibleStats } {
       const k = [slugs[i], slugs[j]].sort().join('|')
       pairs.set(k, (pairs.get(k) ?? 0) + 1)
     }
-    for (const line of s.text.split('\n')) for (const u of unknownNames(line, matcher, ignored)) unknown.set(u.name, (unknown.get(u.name) ?? 0) + 1)
+    for (const line of s.text.split('\n')) for (const u of unknownNames(line, known, ignored)) unknown.set(u.name, (unknown.get(u.name) ?? 0) + 1)
   }
   const povScenes = new Map<string, number>()
   for (const s of scenes) if (s.pov) povScenes.set(s.pov, (povScenes.get(s.pov) ?? 0) + 1)
@@ -67,12 +68,12 @@ export function checkBible(book: Book): { issues: Issue[]; stats: BibleStats } {
       if ((povScenes.get(e.slug) ?? 0) > 0 && !e.knows?.trim() && !e.unaware?.trim()) issues.push({ kind: 'no-knows', severity: 'warn', slug: e.slug, n: povScenes.get(e.slug) })
     }
     // A short, lower-case alias matches ordinary words in the text and drags the entry in.
-    for (const a of e.aliases) {
+    for (const a of e.detect === false ? [] : e.aliases) {
       if (a.endsWith('!')) continue
       const f = foldText(a)
       if (f.length <= 3 && f === a.toLowerCase()) issues.push({ kind: 'common-alias', severity: 'warn', slug: e.slug, name: a })
     }
-    if (!used && book.chapters.length && e.include === 'auto' && !entries.some(o => o.links.includes(e.slug))) issues.push({ kind: 'unused', severity: 'info', slug: e.slug })
+    if (!used && e.detect !== false && book.chapters.length && e.include === 'auto' && !entries.some(o => o.links.includes(e.slug))) issues.push({ kind: 'unused', severity: 'info', slug: e.slug })
   }
 
   // Two entries answering to one name: the context engine takes the first, the other is never found.

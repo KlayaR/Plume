@@ -49,6 +49,9 @@ import { speakerStats } from './speakers'
 import { nextToDo, progress, togglePass } from './revision'
 import { compareSnap, makeSnap } from './snapshots'
 import { referenceTargets, type Reference } from './references'
+import { applyLink, isKnownName, linkMatches, linkQuery } from './links'
+import { keysOf, keysOwner, keysProblem } from './shortcuts'
+import { actionItems } from './quickjump'
 
 const entry = (over: Partial<Entry>): Entry => ({
   slug: 'x', type: 'character', path: 'bible/characters/x.md', name: 'X', aliases: [], include: 'auto',
@@ -1267,5 +1270,76 @@ describe('web novels', () => {
     const ids = (b: Book) => review(wall, b).results.map(r => r.def.id)
     expect(ids(bookOf([]))).not.toContain('walls')
     expect(ids(serialBook([]))).toContain('walls')
+  })
+})
+
+describe('detection switch', () => {
+  const flower = entry({ slug: 'rose-flower', type: 'lore', name: 'rose', detect: false, short: 'A motif.' })
+  it('stops looking for the name in the text, but @-mentions still work', () => {
+    expect(findMentions('une rose rouge', buildMatcher([flower]))).toEqual([])
+    expect(findMentions('une rose rouge', buildMatcher([flower], true)).length).toBe(1)
+    const base = { book: bookOf([], [flower]), chapter: 1, pov: null, action: 'continue' as const, instruction: '', before: 'une rose rouge', selection: '', after: '', overrides: {} }
+    expect(buildContext(base).picked.map(p => p.slug)).not.toContain('rose-flower')
+    expect(buildContext({ ...base, instruction: 'Use @rose here' }).picked.find(p => p.slug === 'rose-flower')?.mode).toBe('full')
+  })
+  it('is kept in the file only when off', () => {
+    const path = 'bible/lore/rose-flower.md'
+    expect(parseEntry(path, serializeEntry({ ...flower, path })).detect).toBe(false)
+    expect(serializeEntry({ ...flower, path, detect: undefined })).not.toContain('detect')
+  })
+  it('is not reported as an unused entry', () => {
+    const issues = checkBible(bookOf([scene('a', 'Une rose rouge.')], [flower])).issues
+    expect(issues.some(i => i.kind === 'unused')).toBe(false)
+  })
+})
+
+describe('[[ links in entries', () => {
+  const list = [entry({ slug: 'elise', name: 'Élise', aliases: ['Lise'] }), entry({ slug: 'aube', type: 'object', name: 'Aube' }), entry({ slug: 'guide', type: 'style', name: 'Style guide' })]
+  it('sees the [[ being typed, not one already closed or on another line', () => {
+    expect(linkQuery('Ami de [[Eli', 12)).toEqual({ from: 7, query: 'Eli' })
+    expect(linkQuery('Ami de [[Eli]] et', 17)).toBeNull()
+    expect(linkQuery('[[Eli\nsuite', 11)).toBeNull()
+    expect(linkQuery('pas de lien', 5)).toBeNull()
+  })
+  it('finds entries by name and alias, without accents, never itself or the voice materials', () => {
+    expect(linkMatches(list, 'eli', 'aube').map(e => e.slug)).toEqual(['elise'])
+    expect(linkMatches(list, 'lise', 'aube').map(e => e.slug)).toEqual(['elise'])
+    expect(linkMatches(list, '', 'aube').map(e => e.slug)).toEqual(['elise'])
+    expect(linkMatches(list, 'style', 'aube')).toEqual([])
+  })
+  it('leaves the plain name in the text', () => {
+    expect(applyLink('Ami de [[Eli et', 7, 12, 'Élise')).toEqual({ text: 'Ami de Élise et', caret: 12 })
+    expect(applyLink('Ami de [[Eli]] et', 7, 12, 'Élise').text).toBe('Ami de Élise et')
+    expect(isKnownName(list, 'lise')).toBe(true)
+    expect(isKnownName(list, 'Marc')).toBe(false)
+  })
+})
+
+describe('your own shortcuts', () => {
+  const key = (k: string, m: Partial<{ ctrlKey: boolean; shiftKey: boolean; altKey: boolean; metaKey: boolean }> = {}) => ({ key: k, ctrlKey: false, shiftKey: false, altKey: false, metaKey: false, ...m })
+  it('reads a key press as text', () => {
+    expect(keysOf(key('e', { ctrlKey: true }))).toBe('Ctrl+E')
+    expect(keysOf(key('E', { ctrlKey: true, shiftKey: true }))).toBe('Ctrl+Shift+E')
+    expect(keysOf(key('ArrowUp', { altKey: true }))).toBe('Alt+Up')
+    expect(keysOf(key('Control', { ctrlKey: true }))).toBe('')
+  })
+  it('refuses keys that type or that Plume already uses', () => {
+    expect(keysProblem('E')).toBe('types')
+    expect(keysProblem('Shift+E')).toBe('types')
+    expect(keysProblem('Ctrl+Alt+E')).toBe('altgr')
+    expect(keysProblem('Ctrl+K')).toBe('fixed')
+    expect(keysProblem('Ctrl+E')).toBeNull()
+    expect(keysProblem('Alt+E')).toBeNull()
+    expect(keysProblem('F7')).toBeNull()
+    expect(keysOwner('Ctrl+E', { export: 'Ctrl+E' }, 'zen')).toBe('export')
+    expect(keysOwner('Ctrl+E', { export: 'Ctrl+E' }, 'export')).toBeNull()
+  })
+  it('ranks your short name first, and what belongs where you are', () => {
+    const items = actionItems([{ id: 'export', label: 'Export…' }, { id: 'expand', label: 'Expand the text', where: ['manuscript'] }, { id: 'zen', label: 'Distraction-free', where: ['manuscript'] }], { zen: 'ex' })
+    expect(rankJump(items, 'ex')[0].id).toBe('zen')
+    expect(rankJump(items, 'exp')[0].id).toBe('export')
+    expect(rankJump(items, 'exp', 30, 'manuscript')[0].id).toBe('expand')
+    expect(rankJump(items, '', 30, 'manuscript').map(i => i.id)).toEqual(['expand', 'zen'])
+    expect(rankJump(items, '')).toEqual([])
   })
 })

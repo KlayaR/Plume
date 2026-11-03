@@ -22,11 +22,15 @@ export interface Matcher { re: RegExp | null; aliases: Alias[] }
 
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
-/** Every name and alias of every entry, longest first so "Maison Varenne" wins over "Varenne". */
-export function buildMatcher(entries: Entry[]): Matcher {
+/**
+ * Every name and alias of every entry, longest first so "Maison Varenne" wins over "Varenne".
+ * Entries with detection off are left out, unless `all`: @-mentions and the checks
+ * that must know the name exists (unknown names, spelling) still see them.
+ */
+export function buildMatcher(entries: Entry[], all = false): Matcher {
   const aliases: Alias[] = []
   for (const e of entries) {
-    if (UNNAMED.has(e.type)) continue
+    if (UNNAMED.has(e.type) || (e.detect === false && !all)) continue
     const mine: Alias[] = []
     for (const raw of [e.name, ...e.aliases]) {
       const exact = raw.endsWith('!') ? raw.slice(0, -1).trim() : null
@@ -329,7 +333,8 @@ export function buildContext(input: ContextInput): Built {
   const scan = [input.instruction, story.selection, story.before].join('\n')
   const counts = new Map<string, number>()
   for (const m of findMentions(scan, matcher)) counts.set(m.slug, (counts.get(m.slug) ?? 0) + 1)
-  const atFull = new Set(findMentions(input.instruction, matcher).filter(m => input.instruction[m.from - 1] === '@').map(m => m.slug))
+  const atFull = new Set(findMentions(input.instruction, buildMatcher(book.entries, true)).filter(m => input.instruction[m.from - 1] === '@').map(m => m.slug))
+  for (const slug of atFull) if (!counts.has(slug)) counts.set(slug, 1)
 
   const picked = new Map<string, Picked>()
   const add = (e: Entry, mode: Mode, reason: string, linked = false) => {

@@ -1301,6 +1301,26 @@ const FR: Record<string, string> = {
   'Walls of text (phone)': 'Pavés de texte (téléphone)',
   'The system did not allow writing to the clipboard.': 'Le système n’a pas permis d’écrire dans le presse-papiers.',
   'Paragraphs over 80 words fill a phone screen, and web novel readers skim them. Split them where the thought turns.': 'Les paragraphes de plus de 80 mots remplissent un écran de téléphone, et les lecteurs de web novels les survolent. Coupez-les là où la pensée tourne.',
+  // 0.39.0: names, links and your own shortcuts
+  'Detect the name in the text': 'Repérer le nom dans le texte',
+  'Turn off for a name that is also an ordinary word: no underline, and Claude only gets the entry when it is @-mentioned, always sent, the POV or linked.': 'À couper pour un nom qui est aussi un mot courant : plus de soulignement, et Claude ne reçoit la fiche que si elle est @-mentionnée, toujours envoyée, le point de vue ou liée.',
+  'not detected': 'non repéré', 'Not looked for in the text': 'N’est pas cherché dans le texte',
+  'Beside the text': 'À côté du texte', 'or Ctrl+click the name': 'ou Ctrl+clic sur le nom',
+  'Find them all': 'Tout chercher', 'Detection is off, so some of these may be the ordinary word.': 'Le repérage est coupé : certaines de ces occurrences sont peut-être le mot courant.',
+  'Goes to the name in this scene; click again for the next one.': 'Va au nom dans cette scène ; cliquez encore pour le suivant.',
+  'Linked from': 'Liée depuis', 'Linked to {name}.': 'Liée à {name}.', 'New: “{name}”': 'Nouvelle : « {name} »', 'Type [[ to link another entry.': 'Tapez [[ pour lier une autre fiche.',
+  'Actions in Ctrl+K': 'Actions de Ctrl+K', 'Search the actions…': 'Chercher une action…', 'Short name': 'Nom court', 'Shortcut': 'Raccourci', 'Clear the shortcut': 'Effacer le raccourci',
+  'A short name finds the action in Ctrl+K as soon as you type it. Click a shortcut box and press the keys; Backspace clears it.': 'Un nom court retrouve l’action dans Ctrl+K dès que vous le tapez. Cliquez une case de raccourci et appuyez sur les touches ; Retour arrière l’efface.',
+  '{keys} would type a character: use Ctrl, Alt or a function key.': '{keys} taperait un caractère : utilisez Ctrl, Alt ou une touche de fonction.',
+  'Ctrl+Alt types characters on many keyboards: choose another.': 'Ctrl+Alt tape des caractères sur beaucoup de claviers : choisissez-en un autre.',
+  '{keys} is already used by Plume.': '{keys} est déjà utilisé par Plume.', '{keys} is already set for “{name}”.': '{keys} est déjà attribué à « {name} ».',
+  'Ctrl+. on an action: give it a short name or a shortcut.': 'Ctrl+. sur une action : donnez-lui un nom court ou un raccourci.',
+  'On a bible name: open its entry': 'Sur un nom de la bible : ouvrir sa fiche',
+  'At the start of a line, then Enter: send the line to the scratch pad or the margin': 'En début de ligne, puis Entrée : envoie la ligne au bloc-notes ou dans la marge',
+  'Scratch pad: notes, tasks and the inbox': 'Bloc-notes : notes, tâches et boîte d’arrivée',
+  'Outside a text box: undo or redo the last change': 'Hors d’une zone de texte : annuler ou rétablir le dernier changement',
+  'Outline list': 'Plan en liste', 'A new row after this one': 'Une nouvelle ligne après celle-ci', 'One level down / up: chapter, scene, beat': 'Un niveau plus bas / plus haut : chapitre, scène, étape',
+  'Move the row': 'Déplacer la ligne', 'Previous / next row': 'Ligne précédente / suivante', 'Open the row’s note': 'Ouvrir la note de la ligne', 'On an empty row: remove it': 'Sur une ligne vide : la retirer',
 }
 
 const SHELL = {

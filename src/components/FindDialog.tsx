@@ -21,8 +21,12 @@ export default function FindDialog({ onClose }: { onClose: () => void }) {
     // The selected words, if any, start the search.
     const v = getEditorView()
     const sel = v && !v.state.selection.main.empty ? v.state.doc.sliceString(v.state.selection.main.from, v.state.selection.main.to) : ''
+    // Opened on a bible name: that name, as a whole word.
+    const named = useStore.getState().dialogArg
+    if (named) return { ...last, query: named, whole: true, regex: false }
     return { ...last, query: sel.length > 0 && sel.length <= 80 && !sel.includes('\n') ? sel : last.query }
   })
+  useEffect(() => { useStore.setState({ dialogArg: null }) }, [])
   const [replacement, setReplacement] = useState(last.replacement)
   useEffect(() => { last = { ...o, replacement } }, [o, replacement])
 

@@ -139,6 +139,9 @@ export interface Prefs {
   /** A second view shown beside the main one (Bible, Plan or Manuscript), and its width in px. */
   dual: View | null
   dualW: number
+  /** Ctrl+K: your own short names and shortcuts for its actions, by action id. */
+  commandNames: Record<string, string>
+  commandKeys: Record<string, string>
   /** Version of the saved prefs, for one-time upgrades. */
   v?: number
 }
@@ -192,6 +195,8 @@ export const DEFAULT_PREFS: Prefs = {
   advOpen: [],
   dual: null,
   dualW: 520,
+  commandNames: {},
+  commandKeys: {},
   v: 2,
 }
 
@@ -256,6 +261,8 @@ interface State {
   jump: { sceneId: string; from: number; to: number } | null
   /** The book's big dialogs, and the PDF print view. */
   dialog: 'export' | 'agents' | 'tour' | 'find' | 'snapshots' | 'outline' | 'synonyms' | 'entry' | 'shortcuts' | 'jump' | 'help' | null
+  /** What a dialog opens on, when something asks for it (the words to find, the action to set a shortcut for). */
+  dialogArg: string | null
   printing: boolean
 
   open: (root: string) => Promise<void>
@@ -287,7 +294,8 @@ interface State {
   removeScene: (id: string) => Promise<void>
   /** Moves a chapter and all its scenes to the book's trash folder. */
   removeChapter: (id: string) => Promise<void>
-  addEntry: (type: EntryType, name: string) => Entry
+  /** Adds an entry and opens it; `stay` keeps the entry you are on. */
+  addEntry: (type: EntryType, name: string, opts?: { stay?: boolean }) => Entry
   updateEntry: (slug: string, patch: Partial<Entry>) => void
   removeEntry: (slug: string) => Promise<void>
   updateMeta: (patch: Partial<Book['meta']>) => void
@@ -409,6 +417,7 @@ export const useStore = create<State>((set, get) => {
     bibleTab: 'entry',
     planTab: 'outline',
     dialog: null,
+    dialogArg: null,
     jump: null,
     printing: false,
 
@@ -645,10 +654,10 @@ export const useStore = create<State>((set, get) => {
       } })
     },
 
-    addEntry: (type, name) => {
+    addEntry: (type, name, opts) => {
       const b = get().book!
       const e = makeEntry(b, type, name)
-      set({ book: { ...b, entries: [...b.entries, e] }, entrySlug: e.slug })
+      set({ book: { ...b, entries: [...b.entries, e] }, ...(opts?.stay ? {} : { entrySlug: e.slug }) })
       saveEntry(b.root, e).catch(fail)
       return e
     },

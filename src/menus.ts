@@ -81,7 +81,7 @@ export function editorMenu(view: EditorView, pos: number): MenuItem[] {
   }
 
   // A bible name under the pointer.
-  const matcher = buildMatcher(book.entries)
+  const matcher = buildMatcher(book.entries, true)
   const mention = findMentions(line.text, matcher).find(m => pos >= line.from + m.from && pos <= line.from + m.to)
   const entry = mention && book.entries.find(e => e.slug === mention.slug)
   if (entry) {
@@ -284,6 +284,7 @@ export function entryMenu(slug: string): MenuItem[] {
     !plain && { separator: true },
     !plain && { label: t('Sent to the AI'), sub: INCLUDES.map(([id, label]) => ({ label: t(label), checked: e.include === id, onClick: () => st.updateEntry(slug, { include: id }) })) },
     e.type === 'character' && { label: t('Rank'), sub: [...RANKS.map(([id, label]) => ({ label: t(label), checked: e.rank === id, onClick: () => st.updateEntry(slug, { rank: id }) })), { label: t('No rank'), checked: !e.rank, onClick: () => st.updateEntry(slug, { rank: undefined }) }] },
+    !plain && { label: t('Detect the name in the text'), checked: e.detect !== false, onClick: () => st.updateEntry(slug, { detect: e.detect === false ? undefined : false }) },
     !plain && { label: t('Add a tag…'), onClick: async () => { const v = await askText(t('Tag'), '', t('villains, act 2, magic users')); const tag = v?.trim(); if (tag && !e.tags?.includes(tag)) st.updateEntry(slug, { tags: [...(e.tags ?? []), tag] }) } },
     !plain && !!e.tags?.length && { label: t('Remove a tag'), sub: e.tags.map(tag => ({ label: tag, onClick: () => st.updateEntry(slug, { tags: e.tags!.filter(x => x !== tag) }) })) },
     !!book.meta.series && e.type !== 'style' && { label: t('Shared with every book of the series'), checked: !!e.shared, onClick: () => st.shareEntry(slug, !e.shared) },
@@ -297,7 +298,7 @@ export function entryMenu(slug: string): MenuItem[] {
 export function duplicateEntry(e: Entry) {
   const st = useStore.getState()
   const copy = st.addEntry(e.type, `${e.name} (${t('copy')})`)
-  st.updateEntry(copy.slug, { short: e.short, full: e.full, facts: e.facts, links: e.links, sends: e.sends, tags: e.tags, rank: e.rank, voice: e.voice, knows: e.knows, unaware: e.unaware, include: e.include, notes: e.notes })
+  st.updateEntry(copy.slug, { short: e.short, full: e.full, facts: e.facts, links: e.links, sends: e.sends, tags: e.tags, rank: e.rank, voice: e.voice, knows: e.knows, unaware: e.unaware, include: e.include, notes: e.notes, detect: e.detect })
 }
 
 // --- Chat --------------------------------------------------------------------------------------

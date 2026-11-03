@@ -13,6 +13,7 @@ import { writeShort } from '../bibleAI'
 import { useT } from '../i18n'
 import { ChatDock } from './ChatPanel'
 import BlocksEditor from './BlocksEditor'
+import LinkArea from './LinkArea'
 import { showMenu } from '../contextMenu'
 import { entryMenu } from '../menus'
 import { Contradictions, MapView, Relations, ReviewList, Tracker } from './BibleTools'
@@ -118,6 +119,7 @@ export default function BibleView() {
                         {e.include === 'always' && <span className="sk-badge sk-badge-accent">{t('always')}</span>}
                         {e.include === 'never' && <span className="sk-badge">{t('never')}</span>}
                         {e.include === 'secret' && <span className="sk-badge">{t('secret')}</span>}
+                        {e.detect === false && <span className="sk-badge" title={t('Not looked for in the text')}>{t('not detected')}</span>}
                         {e.shared && <span className="sk-badge" title={t('Shared with every book of the series')}>{t('series')}</span>}
                       </button>
                     ))}
@@ -167,6 +169,9 @@ export default function BibleView() {
   )
 }
 
+/** Which mention of a name each scene's row goes to next, for this run of the app. */
+const nextMention = new Map<string, number>()
+
 export function EntryEditor({ entry }: { entry: Entry }) {
   const book = useStore(s => s.book)!
   const update = (patch: Partial<Entry>) => useStore.getState().updateEntry(entry.slug, patch)
@@ -186,7 +191,7 @@ export function EntryEditor({ entry }: { entry: Entry }) {
   const others = book.entries.filter(e => e.slug !== entry.slug && e.type !== 'style')
   const mentions = useMemo(() => {
     if (plain) return []
-    const m = buildMatcher([entry])
+    const m = buildMatcher([entry], true)
     const out: { id: string; label: string; count: number; ci: number }[] = []
     book.chapters.forEach((c, ci) => c.scenes.forEach(s => {
       const count = findMentions(s.text, m).length
@@ -198,6 +203,21 @@ export function EntryEditor({ entry }: { entry: Entry }) {
   const remove = async () => {
     if (await ask(t('Move "{title}" to the book\'s trash folder?', { title: entry.name }), { title: t('Remove entry'), kind: 'warning' })) useStore.getState().removeEntry(entry.slug)
   }
+  // A row of Mentions lands on the name in that scene; clicking it again goes to the next one.
+  const landOn = (sceneId: string) => {
+    const scene = book.chapters.flatMap(c => c.scenes).find(s => s.id === sceneId)
+    const hits = scene ? findMentions(scene.text, buildMatcher([entry], true)) : []
+    if (!hits.length) return
+    const key = `${entry.slug}|${sceneId}`
+    const n = nextMention.get(key) ?? 0
+    nextMention.set(key, n + 1)
+    const hit = hits[n % hits.length]
+    const st = useStore.getState()
+    st.setPrefs({ page: false })
+    useStore.setState({ jump: { sceneId, from: hit.from, to: hit.to } })
+    st.selectScene(sceneId)
+  }
+  const linkedFrom = book.entries.filter(e => e.links.includes(entry.slug))
 
   return (
     <div className="pl-entryedit">
@@ -244,6 +264,13 @@ export function EntryEditor({ entry }: { entry: Entry }) {
               <span className="sk-hint">{t('Splits People in the list. Not sent to the AI.')}</span>
             </div>
           )}
+          <div className="sk-field">
+            <label className="pl-row pl-check-label">
+              <input type="checkbox" className="sk-check" checked={entry.detect !== false} onChange={e => update({ detect: e.target.checked ? undefined : false })} />
+              {t('Detect the name in the text')}
+            </label>
+            <span className="sk-hint">{t('Turn off for a name that is also an ordinary word: no underline, and Claude only gets the entry when it is @-mentioned, always sent, the POV or linked.')}</span>
+          </div>
         </div>
       )}
 
@@ -257,8 +284,8 @@ export function EntryEditor({ entry }: { entry: Entry }) {
               <Sparkles size={13} /> {writing ? t('Thinking…') : t('Write it')}
             </button>
           </div>
-          <textarea id="ee-short" className="sk-input" rows={2} value={entry.short} onChange={e => update({ short: e.target.value })} placeholder={t('One or two lines, sent by default.')} />
-          <span className="sk-hint">{t('Sent every time the name appears in the passage, so keep it to what helps write the entry right.')}</span>
+          <LinkArea entry={entry} id="ee-short" className="sk-input" rows={2} value={entry.short} onText={short => update({ short })} placeholder={t('One or two lines, sent by default.')} />
+          <span className="sk-hint">{t('Sent every time the name appears in the passage, so keep it to what helps write the entry right.')} {t('Type [[ to link another entry.')}</span>
         </div>
       )}
 
@@ -326,7 +353,11 @@ export function EntryEditor({ entry }: { entry: Entry }) {
 
       {!plain && (
         <div className="sk-field">
-          <label>{t('Mentions')}</label>
+          <div className="pl-row">
+            <label className="pl-grow">{t('Mentions')}</label>
+            {mentions.length > 0 && <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm" onClick={() => useStore.setState({ dialog: 'find', dialogArg: entry.name.replace(/!$/, '') })}><Search size={13} /> {t('Find them all')}</button>}
+          </div>
+          {entry.detect === false && mentions.length > 0 && <span className="sk-hint">{t('Detection is off, so some of these may be the ordinary word.')}</span>}
           {mentions.length > 0 && (() => {
             const written = book.chapters.reduce((n, c, i) => (c.scenes.some(s => s.text.trim()) ? i : n), -1)
             const gap = written - mentions[mentions.length - 1].ci
@@ -339,12 +370,21 @@ export function EntryEditor({ entry }: { entry: Entry }) {
           {mentions.length === 0 ? <span className="sk-hint">{t('Not mentioned in any scene yet.')}</span> : (
             <div className="sk-list">
               {mentions.map(m => (
-                <button key={m.id} type="button" className="sk-list-row pl-recent" onClick={() => useStore.getState().selectScene(m.id)}>
+                <button key={m.id} type="button" className="sk-list-row pl-recent" title={t('Goes to the name in this scene; click again for the next one.')} onClick={() => landOn(m.id)}>
                   <span className="sk-grow">{m.label}</span><span className="sk-num">{m.count}×</span>
                 </button>
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {!plain && linkedFrom.length > 0 && (
+        <div className="sk-field">
+          <label>{t('Linked from')}</label>
+          <div className="pl-chips">
+            {linkedFrom.map(e => <button key={e.slug} type="button" className="pl-chip pl-chip-link" onClick={() => useStore.getState().selectEntry(e.slug)}>{e.name}</button>)}
+          </div>
         </div>
       )}
     </div>

@@ -5,6 +5,8 @@ import { getCurrentWindow } from '@tauri-apps/api/window'
 import { CircleAlert, CircleCheck, TriangleAlert, X } from 'lucide-react'
 import { setShellStrings } from './studio-kit/shell.js'
 import { DEFAULT_PREFS, keepSession, useStore } from './store'
+import { commands } from './commands'
+import { keysOf } from './lib/shortcuts'
 import { useAppVersion } from './lib/useAppVersion'
 import { applyPrefs } from './lib/fonts'
 import { setClaudeTranslator } from './lib/claude'
@@ -63,9 +65,28 @@ export default function App() {
     return () => window.removeEventListener('mousemove', show)
   }, [])
 
+  // While Ctrl is down, bible names in the text show they can be clicked.
+  useEffect(() => {
+    const mark = (e: KeyboardEvent) => document.body.classList.toggle('pl-ctrl', e.ctrlKey || e.metaKey)
+    const off = () => document.body.classList.remove('pl-ctrl')
+    window.addEventListener('keydown', mark)
+    window.addEventListener('keyup', mark)
+    window.addEventListener('blur', off)
+    return () => { window.removeEventListener('keydown', mark); window.removeEventListener('keyup', mark); window.removeEventListener('blur', off) }
+  }, [])
+
   // Ctrl+, opens Settings from anywhere.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // A shortcut box is listening for the keys themselves.
+      if ((e.target as HTMLElement | null)?.dataset?.keycap !== undefined) return
+      // Your own shortcuts come first.
+      const mine = useStore.getState().prefs.commandKeys
+      if (useStore.getState().book && Object.keys(mine).length) {
+        const combo = keysOf(e)
+        const id = combo && Object.keys(mine).find(k => mine[k] === combo)
+        if (id) { e.preventDefault(); e.stopPropagation(); commands().find(c => c.id === id)?.run(); return }
+      }
       if ((e.ctrlKey || e.metaKey) && e.key === ',') { e.preventDefault(); useStore.setState({ showSettings: true }) }
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'k' && useStore.getState().book) { e.preventDefault(); useStore.setState({ dialog: 'jump' }) }
       // Previous / next scene, and back / forward through what you opened.

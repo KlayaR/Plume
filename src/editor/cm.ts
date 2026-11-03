@@ -65,10 +65,38 @@ const nameCard = hoverTooltip((view, pos) => {
       const body = dom.appendChild(document.createElement('div'))
       body.className = 'cm-namecard-body'
       body.textContent = e.short.trim() || t('No short version yet.')
+      const row = dom.appendChild(document.createElement('div'))
+      row.className = 'cm-card-row'
+      const btn = (label: string, run: () => void) => {
+        const b = row.appendChild(document.createElement('button'))
+        b.className = 'sk-btn sk-btn-sm'
+        b.textContent = label
+        b.onmousedown = ev => { ev.preventDefault(); run() }
+      }
+      btn(t('Open'), () => useStore.getState().showEntry(e.slug))
+      if (useStore.getState().view === 'manuscript') btn(t('Beside the text'), () => { const st = useStore.getState(); st.setPrefs({ dual: 'bible' }); st.showEntry(e.slug) })
+      const hint = row.appendChild(document.createElement('span'))
+      hint.className = 'sk-hint cm-card-hint'
+      hint.textContent = t('or Ctrl+click the name')
       return { dom }
     },
   }
 }, { hoverTime: 350 })
+
+/** Ctrl+click on a name opens its entry. A plain click only places the cursor, as in any text. */
+const openOnCtrlClick = EditorView.domEventHandlers({
+  mousedown(e, view) {
+    if (!(e.ctrlKey || e.metaKey) || e.button !== 0) return false
+    const pos = view.posAtCoords({ x: e.clientX, y: e.clientY })
+    if (pos === null) return false
+    const line = view.state.doc.lineAt(pos)
+    const hit = findMentions(line.text, view.state.field(namesField).matcher).find(m => line.from + m.from <= pos && pos <= line.from + m.to)
+    if (!hit) return false
+    e.preventDefault()
+    useStore.getState().showEntry(hit.slug)
+    return true
+  },
+})
 
 // --- Drop cap -----------------------------------------------------------
 // The first letter of the text, alone (an apostrophe or quote after it stays
@@ -263,6 +291,7 @@ export function sceneExtensions(lang: Lang, keys: { accept: () => boolean; escap
     dropcapMeasure,
     mentionsPlugin,
     nameCard,
+    openOnCtrlClick,
     proposalField,
     acceptedField,
     lockWhileProposing,
