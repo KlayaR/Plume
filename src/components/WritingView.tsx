@@ -11,6 +11,7 @@ import { countWords } from '../lib/text'
 import { allowedKinds, chapterLabels } from '../lib/chapters'
 import Editor from '../editor/Editor'
 import { accept, discard, retry, useAI } from '../editor/actions'
+import { leaveDraft, useDraft } from '../editor/draft'
 import ContextPanel from './ContextPanel'
 import ReviewPanel from './ReviewPanel'
 import BookView, { Inline } from './BookView'
@@ -42,6 +43,7 @@ export default function WritingView() {
   const prefs = useStore(s => s.prefs)
   const hasProposal = useAI(s => s.hasProposal)
   const running = useAI(s => s.running)
+  const drafting = useDraft(s => s.on)
   const chatting = useChat(s => s.streaming !== null)
   // A new proposal opens the Assistant tab, where its buttons are.
   useEffect(() => { if (hasProposal && useStore.getState().prefs.rightTab !== 'write') useStore.getState().setPrefs({ rightTab: 'write' }) }, [hasProposal])
@@ -68,6 +70,12 @@ export default function WritingView() {
           <button type="button" className="sk-btn sk-btn-sm sk-btn-primary" disabled={!!running} onClick={() => accept()}>{t('Accept')} <kbd>Tab</kbd></button>
           <button type="button" className="sk-btn sk-btn-sm" disabled={!!running} onClick={() => retry()}>{t('Retry')}</button>
           <button type="button" className="sk-btn sk-btn-sm sk-btn-ghost" onClick={() => discard()}>{t('Discard')} <kbd>Esc</kbd></button>
+        </div>
+      )}
+      {drafting && !hasProposal && (
+        <div className="pl-propbar pl-draftbar" role="group" aria-label={t('Draft mode')}>
+          <span>{t('Draft mode: the text only goes forward.')}</span>
+          <button type="button" className="sk-btn sk-btn-sm sk-btn-ghost" onClick={leaveDraft}>{t('Leave')} <kbd>Esc</kbd></button>
         </div>
       )}
       <div className="pl-scroll">

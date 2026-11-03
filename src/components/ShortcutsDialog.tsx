@@ -19,6 +19,7 @@ const GROUPS: [string, [string, string][]][] = [
     ['Ctrl+Shift+D', 'Cut the selection into the darlings drawer'],
     ['Ctrl+click', 'On a bible name: open its entry'],
     ['::idea, ::todo, ::bible, ::comment', 'At the start of a line, then Enter: send the line to the scratch pad or the margin'],
+    ['Esc', 'In draft mode: leave it'],
   ]],
   ['AI', [
     ['Ctrl+Enter', 'Continue the scene'],

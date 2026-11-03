@@ -1389,6 +1389,17 @@ const FR: Record<string, string> = {
   'Comments, level with their passages': 'Commentaires, à hauteur de leurs passages',
   'Their passage is no longer in the text:': 'Leur passage n’est plus dans le texte :',
   'Not written yet': 'Pas encore écrite',
+  'Draft mode': 'Mode premier jet',
+  'Draft mode: the text only goes forward.': 'Mode premier jet : le texte ne fait qu’avancer.',
+  'Draft mode: write forward only, no going back': 'Mode premier jet : écrire sans revenir en arrière',
+  'Leave draft mode': 'Quitter le mode premier jet',
+  'In draft mode: leave it': 'En mode premier jet : le quitter',
+  'In draft mode, the text only goes forward': 'En mode premier jet, le texte ne fait qu’avancer',
+  'Within the word': 'Dans le mot',
+  'Typewriter sounds': 'Sons de machine à écrire',
+  'A key sound, and a bell at each new line': 'Un bruit de touche, et une clochette à chaque nouvelle ligne',
+  'Leave': 'Quitter',
+  'Backspace': 'Retour arrière',
 }
 
 const SHELL = {

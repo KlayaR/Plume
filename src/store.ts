@@ -13,6 +13,7 @@ import { sessionOf, worthShowing, type Session } from './lib/session'
 import type { Direction } from './lib/directions'
 import { EMPTY_RATE, learnCall, learnWindow, weigh, type Rate } from './lib/windowCost'
 import { CHAPTER_PLAN_KEYS, changedKeys, META_PLAN_KEYS, SCENE_PLAN_KEYS, undoStack } from './lib/undo'
+import type { DraftBack } from './lib/draft'
 
 const steps = undoStack()
 
@@ -58,6 +59,10 @@ export type PageSize = 'auto' | 'fr' | 'us' | 'a5'
 
 /** How the manuscript looks and behaves; personal, so kept per computer. */
 export interface Prefs {
+  /** Draft mode: what Backspace can still erase. */
+  draftBack: DraftBack
+  /** Draft mode: a key sound and a bell at each new line. */
+  draftSound: boolean
   /** Margin comments beside the text, when the window has room. */
   commentColumn: boolean
   /** Plan → Outline as a list you type, rather than cards. */
@@ -157,6 +162,8 @@ export type Paper = 'auto' | 'ivory' | 'white' | 'sepia' | 'candle' | 'night'
 export type Scope = 'scene' | 'chapter' | 'book'
 
 export const DEFAULT_PREFS: Prefs = {
+  draftBack: 'word',
+  draftSound: false,
   commentColumn: true,
   outlineList: false,
   bibleLayout: 'table',

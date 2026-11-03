@@ -4,11 +4,12 @@
 // The manuscript's own controls (Write / Review, Sheet / Page, Scene / Chapter /
 // Book, split, Aa) live in a toolbar above the page: ManuscriptToolbar.
 import { useEffect, useRef, useState } from 'react'
-import { Bot, BookPlus, Camera, CircleHelp, Keyboard, PanelRight, ChevronLeft, Columns2, Compass, Ellipsis, FileOutput, NotebookPen, Replace, Search, Settings } from 'lucide-react'
+import { Bot, BookPlus, Camera, ChevronsRight, CircleHelp, Keyboard, PanelRight, ChevronLeft, Columns2, Compass, Ellipsis, FileOutput, NotebookPen, Replace, Search, Settings } from 'lucide-react'
 import ManuscriptOptions from './ManuscriptOptions'
 import GoalsPanel from './GoalsPanel'
 import { findScene, useStore, type Scope, type View } from '../store'
 import { useAI } from '../editor/actions'
+import { toggleDraft, useDraft } from '../editor/draft'
 import { toggleScratch, useScratch } from '../scratch'
 import { bookCounts, feuillets, sceneCounts } from '../lib/stats'
 import { numLocale, useT } from '../i18n'
@@ -209,6 +210,7 @@ function Crumbs() {
 
 export function ManuscriptToolbar() {
   const prefs = useStore(s => s.prefs)
+  const drafting = useDraft(s => s.on)
   const st = useStore.getState
   const t = useT()
   return (
@@ -227,6 +229,7 @@ export function ManuscriptToolbar() {
           <button key={id} type="button" aria-pressed={prefs.scope === id} onClick={() => st().setPrefs({ scope: id })} title={t(tip)}>{t(label)}</button>
         ))}
       </span>
+      <button type="button" className="pl-quiet pl-splitbtn" aria-pressed={drafting} onMouseDown={e => e.preventDefault()} onClick={toggleDraft} title={t('Draft mode: write forward only, no going back')}><ChevronsRight size={15} /></button>
       <button type="button" className="pl-quiet pl-splitbtn" aria-pressed={prefs.dual === 'bible'} onClick={() => st().setPrefs({ dual: prefs.dual === 'bible' ? null : 'bible' })} title={t('The bible beside the text')}><Columns2 size={15} /></button>
       <button type="button" className="pl-quiet" onClick={() => useStore.setState({ dialog: 'find' })} title={t('Find and replace in the book') + ' (Ctrl+Shift+F)'}><Search size={15} /></button>
       <button type="button" className="pl-quiet" onMouseDown={e => e.preventDefault()} onClick={() => useStore.setState({ dialog: 'synonyms' })} title={t('Synonyms for the selected word') + ' (Ctrl+Shift+Y)'}><Replace size={15} /></button>

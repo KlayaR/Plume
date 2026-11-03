@@ -52,6 +52,7 @@ import { changedKeys, undoStack } from './undo'
 import { addField, entryNamed, fieldLines, hasField, removeField, renamedValues, renameField, setFieldSend, sortEntries } from './fields'
 import { renderEntry } from './context'
 import { placeComments, stackCards } from './comments'
+import { forwardOnly, wordStart, type DraftBack } from './draft'
 import { beatMove, chapterAsBeats, outlineRows, pastedLines, plainChapter, plainScene, stockSceneTitle } from './outliner'
 import { referenceTargets, type Reference } from './references'
 import { applyLink, isKnownName, linkMatches, linkQuery } from './links'
@@ -1640,5 +1641,43 @@ describe('unwritten scenes', () => {
   })
   it('puts them before the first page when no page says where', () => {
     expect(ids(unwrittenPlaces([{ id: 'c1', scenes: [d, f] }], [{ opening: null, blocks: [] }]))).toEqual([[-1, ['d', 'f']]])
+  })
+})
+
+describe('draft mode', () => {
+  const start = (doc: string, back: DraftBack = 'word') => EditorState.create({ doc, selection: { anchor: doc.length }, extensions: EditorState.transactionFilter.of(tr => forwardOnly(tr, back)) })
+  const after = (s: EditorState, from: number, to: number, insert: string, userEvent?: string) => s.update({ changes: { from, to, insert }, userEvent }).state
+  it('knows where the word being written starts', () => {
+    expect([wordStart('Un chat'), wordStart('Un chat '), wordStart('Un\nchat'), wordStart('chat'), wordStart('')]).toEqual([3, 8, 3, 0, 0])
+  })
+  it('adds what is typed at the end, wherever the caret was', () => {
+    expect(after(start('Un chat'), 7, 7, ' noir', 'input.type').doc.toString()).toBe('Un chat noir')
+    const moved = after(start('Un chat'), 2, 2, 'x', 'input.type')
+    expect(moved.doc.toString()).toBe('Un chatx')
+    expect(moved.selection.main.head).toBe(8)
+    expect(after(start('Un chat'), 0, 2, 'x', 'input.lt').doc.toString()).toBe('Un chat')
+  })
+  it('keeps the caret at the end', () => {
+    const s = start('Un chat')
+    expect(s.update({ selection: { anchor: 2 }, userEvent: 'select.pointer' }).state.selection.main.head).toBe(7)
+    const all = s.update({ selection: { anchor: 0, head: 7 }, userEvent: 'select' }).state.selection.main
+    expect([all.empty, all.head]).toEqual([true, 7])
+  })
+  it('lets Backspace erase the word being written and nothing before it', () => {
+    expect(after(start('Un chat'), 6, 7, '', 'delete.backward').doc.toString()).toBe('Un cha')
+    expect(after(start('Un chat'), 3, 7, '', 'delete.backward').doc.toString()).toBe('Un ')
+    expect(after(start('Un chat'), 1, 7, '', 'delete.backward').doc.toString()).toBe('Un chat')
+    expect(after(start('Un chat '), 7, 8, '', 'delete.backward').doc.toString()).toBe('Un chat ')
+    expect(after(start('Un\n'), 2, 3, '', 'delete.backward').doc.toString()).toBe('Un\n')
+    expect(after(start('Un chat', 'none'), 6, 7, '', 'delete.backward').doc.toString()).toBe('Un chat')
+  })
+  it('refuses moving lines', () => {
+    expect(after(start('Un\nchat'), 0, 3, '', 'move.line').doc.toString()).toBe('Un\nchat')
+  })
+  it('lets typography, Claude, capture lines and other changes through', () => {
+    expect(after(start('Un chat '), 7, 8, '\u00a0?', 'input.type').doc.toString()).toBe('Un chat\u00a0?')
+    expect(after(start('Un chat'), 7, 7, ' noir', 'input.ai').doc.toString()).toBe('Un chat noir')
+    expect(after(start('::idea\nUn chat'), 0, 7, '', 'delete.capture').doc.toString()).toBe('Un chat')
+    expect(after(start('Un chat'), 0, 2, 'Le').doc.toString()).toBe('Le chat')
   })
 })

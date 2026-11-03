@@ -82,6 +82,16 @@ export default function ManuscriptOptions({ full = false }: { full?: boolean }) 
           <SettingRow label={t('Page zoom')} description={`${Math.round(prefs.pageZoom * 100)} %`}>
             <Slider value={prefs.pageZoom} min={0.8} max={2} step={0.05} onChange={v => set({ pageZoom: v })} />
           </SettingRow>
+          <div className="pl-opt-group">{t('Draft mode')}</div>
+          <SettingRow label={t('Backspace')} description={t('In draft mode, the text only goes forward')}>
+            <div className="sk-segmented" role="group" aria-label={t('Backspace')}>
+              <button type="button" aria-pressed={prefs.draftBack === 'word'} onClick={() => set({ draftBack: 'word' })}>{t('Within the word')}</button>
+              <button type="button" aria-pressed={prefs.draftBack === 'none'} onClick={() => set({ draftBack: 'none' })}>{t('Never')}</button>
+            </div>
+          </SettingRow>
+          <SettingRow label={t('Typewriter sounds')} description={t('A key sound, and a bell at each new line')}>
+            <Switch checked={prefs.draftSound} onChange={v => set({ draftSound: v })} label={t('Typewriter sounds')} />
+          </SettingRow>
           <div className="pl-row pl-end">
             <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm"
               onClick={() => set({ ...DEFAULT_PREFS, mode: prefs.mode, page: prefs.page, ui: prefs.ui, pinLeft: prefs.pinLeft, pinRight: prefs.pinRight, paneL: prefs.paneL, paneR: prefs.paneR, spell: prefs.spell, ltServer: prefs.ltServer, ltUser: prefs.ltUser, ltKey: prefs.ltKey, ltEnglish: prefs.ltEnglish, readVoice: prefs.readVoice, focus: prefs.focus, enterBreaks: prefs.enterBreaks })}>

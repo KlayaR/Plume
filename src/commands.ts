@@ -7,6 +7,7 @@ import { newThingsMenu } from './menus'
 import { writeChapter, writeFromPlan } from './editor/actions'
 import { fixFlagged, openEdit } from './edit'
 import { toggleScratch } from './scratch'
+import { toggleDraft, useDraft } from './editor/draft'
 
 export interface Command { id: string; label: string; keys?: string; where?: View[]; run: () => void }
 
@@ -44,6 +45,7 @@ export function commands(): Command[] {
     { id: 'find', label: t('Find and replace'), keys: 'Ctrl+Shift+F', run: () => set({ dialog: 'find' }) },
     { id: 'outline', label: t('Propose an outline'), where: ['plan'], run: () => set({ dialog: 'outline' }) },
     { id: 'zen', label: t('Distraction-free mode'), keys: 'F11', where: ['manuscript'], run: () => st.setPrefs({ zen: !st.prefs.zen }) },
+    { id: 'draft', label: useDraft.getState().on ? t('Leave draft mode') : t('Draft mode'), where: ['manuscript'], run: toggleDraft },
     { id: 'dual', label: t('Bible beside the text'), where: ['manuscript'], run: () => st.setPrefs({ dual: st.prefs.dual === 'bible' ? null : 'bible' }) },
     { id: 'scratch', label: t('Scratch pad'), keys: 'Ctrl+J', run: toggleScratch },
     { id: 'settings', label: t('Settings'), keys: 'Ctrl+,', run: () => set({ showSettings: true }) },

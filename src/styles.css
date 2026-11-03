@@ -1063,3 +1063,8 @@ body.pl-zen .pl-cc { display: none !important; }
 .pl-unwritten .sk-btn { color: inherit; font-weight: 600; }
 .pl-unwritten-page { box-sizing: border-box; flex: none; width: calc(var(--pl-page-w, 13cm) * var(--pl-zoom, 1.35)); margin: 0; border-color: var(--border-strong); color: var(--text-muted); user-select: none; }
 body.pl-zen .pl-unwritten { display: none; }
+
+/* Draft mode */
+.pl-draftbar { top: 44px; padding: 3px 8px; opacity: 0.8; color: var(--text-muted); box-shadow: none; transition: opacity 0.5s ease; }
+.pl-draftbar:hover { opacity: 1; }
+body.pl-typing .pl-draftbar { opacity: 0.08; }

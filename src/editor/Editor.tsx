@@ -16,6 +16,7 @@ import { editorMenu } from '../menus'
 import { enterStartsScene } from '../lib/chapters'
 import { proposalField, sceneExtensions, setNames } from './cm'
 import { captureExt } from './captures'
+import { draftExt, useDraft } from './draft'
 import CommentColumn, { commentColumnExt } from './CommentColumn'
 import { accept, discard, fillPlaceholder, getEditorView, runAction, setEditorView, syncProposalState, useAI } from './actions'
 import { changesField, inlineExt, marksExt, placeholderExt, setChanges, setHighlights, trackedChangesExt, unknownNamesExt, type Highlight } from './marks'
@@ -194,6 +195,7 @@ function makeState(s: Scene, lang: Lang, locked: boolean) {
         accept: () => accept(),
         escape: () => { if (useAI.getState().hasProposal) { discard(); return true } return false },
       }),
+      draftExt,
       keymap.of([
         { key: 'Enter', run: breakKey(s.id) },
         { key: 'Mod-Enter', run: () => { runAction('continue', '', {}); return true } },
@@ -215,6 +217,7 @@ function makeState(s: Scene, lang: Lang, locked: boolean) {
       EditorView.domEventHandlers({
         // Plume's own menu; in Review with the Windows spellchecker the system menu stays, for its suggestions.
         contextmenu: (e, view) => {
+          if (useDraft.getState().on) return true
           if (windowsSpell()) return false
           const at = view.posAtCoords({ x: e.clientX, y: e.clientY })
           if (at === null) return false
@@ -248,7 +251,7 @@ function makeState(s: Scene, lang: Lang, locked: boolean) {
         if (u.selectionSet) useStore.getState().noteSpot(s.id, u.state.selection.main.head)
         if (u.transactions.some(tr => tr.effects.length)) syncProposalState()
         // Typewriter scrolling: typing keeps the line in the middle of the screen.
-        if ((u.docChanged || u.selectionSet) && u.view.hasFocus && useStore.getState().prefs.typewriter && !u.transactions.some(tr => tr.scrollIntoView)) {
+        if ((u.docChanged || u.selectionSet) && u.view.hasFocus && (useStore.getState().prefs.typewriter || useDraft.getState().on) && !u.transactions.some(tr => tr.scrollIntoView)) {
           const head = u.state.selection.main.head
           requestAnimationFrame(() => { if (u.view.dom.isConnected) u.view.dispatch({ effects: EditorView.scrollIntoView(head, { y: 'center' }) }) })
         }
@@ -343,6 +346,7 @@ export default function Editor({ scene }: { scene: Scene }) {
       v.focus()
       host.current?.scrollIntoView({ block: 'nearest' })
     }
+    if (useDraft.getState().on) v.dispatch({ selection: { anchor: v.state.doc.length }, scrollIntoView: true })
   }, [active])
 
   return <>
