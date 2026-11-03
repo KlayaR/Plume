@@ -12,11 +12,12 @@ import { allowedKinds, chapterLabels } from './lib/chapters'
 import { stripInline } from './lib/inline'
 import { pasteText } from './lib/paste'
 import { countWords, foldText, locateQuote } from './lib/text'
-import { ENTRY_TYPES, RANKS, typeInfo, VOICE_TYPES, type ActionId, type Entry, type EntryType, type Include, type Scene, type SceneStatus } from './lib/types'
+import { ENTRY_TYPES, RANKS, typeInfo, VOICE_TYPES, type ActionId, type Entry, type EntryType, type FieldDef, type Include, type Scene, type SceneStatus } from './lib/types'
 import { accept, discard, getEditorView, retry, runAction, writeChapter, writeFromPlan } from './editor/actions'
 import { proposalField } from './editor/cm'
 import { insertPlaceholder, toggleInline, unknownNames } from './editor/marks'
 import { cutToDarlings, removeComment } from './writing'
+import { addField, hasField, removeField, renamedValues, renameField, setFieldSend } from './lib/fields'
 import { removeItem, sendToCard, sendToEntry, sendToLoose, sendToNewEntry, sendToScene, updateItem, type ScratchItem } from './scratch'
 import { boxOwner, dayOf, isLitRPG, isLocked, isSerial, mergeStats, readBox, systemBoxes } from './lib/serial'
 import { chapterTitleFor, royalRoadHtml, royalRoadText } from './lib/export'
@@ -338,7 +339,41 @@ export function entryMenu(slug: string): MenuItem[] {
 export function duplicateEntry(e: Entry) {
   const st = useStore.getState()
   const copy = st.addEntry(e.type, `${e.name} (${t('copy')})`)
-  st.updateEntry(copy.slug, { short: e.short, full: e.full, facts: e.facts, links: e.links, sends: e.sends, tags: e.tags, rank: e.rank, voice: e.voice, knows: e.knows, unaware: e.unaware, include: e.include, notes: e.notes, detect: e.detect })
+  st.updateEntry(copy.slug, { short: e.short, full: e.full, facts: e.facts, links: e.links, sends: e.sends, tags: e.tags, rank: e.rank, voice: e.voice, knows: e.knows, unaware: e.unaware, include: e.include, notes: e.notes, detect: e.detect, fields: e.fields })
+}
+
+/** Asks for a field's name and sets it up for every entry of the type. */
+export async function newField(type: EntryType) {
+  const name = (await askText(t('New field for every {type}', { type: t(typeInfo(type).label).toLowerCase() }), '', t('Age, Role, Home…')))?.trim()
+  if (!name) return
+  const st = useStore.getState()
+  if (hasField(st.book!.meta.fields, type, name)) return st.notify('warn', t('There is already a field called {name}.', { name }))
+  st.updateMeta({ fields: addField(st.book!.meta.fields, type, name) })
+}
+
+/** One field of a type of entry: its name, when Claude reads it, taking it away. */
+export function fieldMenu(type: EntryType, def: FieldDef): MenuItem[] {
+  const st = useStore.getState()
+  const all = () => useStore.getState().book!.meta.fields
+  const rename = async () => {
+    const to = (await askText(t('Rename the field'), def.name))?.trim()
+    if (!to || to === def.name) return
+    if (all()?.[type]?.some(d => d.name !== def.name && foldText(d.name) === foldText(to))) return st.notify('warn', t('There is already a field called {name}.', { name: to }))
+    st.groupChanges(to, () => {
+      st.updateMeta({ fields: renameField(all(), type, def.name, to) })
+      for (const { slug, fields } of renamedValues(useStore.getState().book!.entries, type, def.name, to)) st.updateEntry(slug, { fields })
+    })
+  }
+  return [
+    { label: t('Rename…'), onClick: rename },
+    { label: t('Sent to the AI'), sub: [
+      { label: t('With the full version'), checked: !def.send, onClick: () => st.updateMeta({ fields: setFieldSend(all(), type, def.name, undefined) }) },
+      { label: t('Always'), checked: def.send === 'always', onClick: () => st.updateMeta({ fields: setFieldSend(all(), type, def.name, 'always') }) },
+      { label: t('Never'), checked: def.send === 'never', onClick: () => st.updateMeta({ fields: setFieldSend(all(), type, def.name, 'never') }) },
+    ] },
+    { separator: true },
+    { label: t('Remove the field'), danger: true, onClick: () => { st.updateMeta({ fields: removeField(all(), type, def.name) }); st.notify('ok', t('Field removed. The values stay in the files, and come back if you add it again.')) } },
+  ]
 }
 
 // --- Chat --------------------------------------------------------------------------------------

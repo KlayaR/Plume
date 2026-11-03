@@ -17,9 +17,9 @@ import { CHAPTER_PLAN_KEYS, changedKeys, META_PLAN_KEYS, SCENE_PLAN_KEYS, undoSt
 const steps = undoStack()
 
 export type View = 'bible' | 'plan' | 'manuscript'
-export type BibleTab = 'entry' | 'review' | 'aicheck' | 'tracker' | 'map' | 'relations' | 'contradictions'
+export type BibleTab = 'entry' | 'review' | 'aicheck' | 'table' | 'tracker' | 'map' | 'relations' | 'contradictions'
 /** Bible tabs grouped under "More". */
-export const MORE_TABS: BibleTab[] = ['tracker', 'map', 'relations', 'contradictions']
+export const MORE_TABS: BibleTab[] = ['table', 'tracker', 'map', 'relations', 'contradictions']
 export type PlanTab = 'outline' | 'board' | 'structure' | 'timeline' | 'lines' | 'dashboard' | 'revision' | 'arcs' | 'release' | 'threads'
 /** What the right pane of the Manuscript shows in Write mode. */
 export type RightTab = 'write' | 'chat' | 'notes'
@@ -58,6 +58,8 @@ export type PageSize = 'auto' | 'fr' | 'us' | 'a5'
 
 /** How the manuscript looks and behaves; personal, so kept per computer. */
 export interface Prefs {
+  /** Bible → Table: rows or portraits. */
+  bibleLayout: 'table' | 'gallery'
   font: FontId
   size: number
   leading: number
@@ -151,6 +153,7 @@ export type Paper = 'auto' | 'ivory' | 'white' | 'sepia' | 'candle' | 'night'
 export type Scope = 'scene' | 'chapter' | 'book'
 
 export const DEFAULT_PREFS: Prefs = {
+  bibleLayout: 'table',
   font: 'system', size: 19, leading: 1.7, width: 38, page: false, scope: 'chapter', pageSize: 'auto', pageZoom: 1.35,
   mode: 'write', focus: true, enterBreaks: true,
   ui: typeof navigator !== 'undefined' && navigator.language?.toLowerCase().startsWith('fr') ? 'fr' : 'en',
@@ -286,6 +289,8 @@ interface State {
   /** Plan and Bible: takes back the last change, or does it again. False when there is none. */
   undoChange: () => boolean
   redoChange: () => boolean
+  /** Everything `run` changes is one step for undo. */
+  groupChanges: (name: string, run: () => void) => void
   addChapter: (title: string, opts?: { stay?: boolean }) => string
   /** Adds a scene at the end of a chapter; `stay` keeps the current view (the Plan board). */
   addScene: (chapterId: string, title: string, opts?: { stay?: boolean; note?: string }) => string
@@ -610,6 +615,7 @@ export const useStore = create<State>((set, get) => {
       if (step) get().notify('ok', step.name ? t('Redone: {name}.', { name: step.name }) : t('Redone.'))
       return !!step
     },
+    groupChanges: (name, run) => steps.group(name, run),
     moveChapter: (id, toIndex) => {
       const b = get().book!
       const was = b.chapters.findIndex(c => c.id === id)

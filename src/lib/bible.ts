@@ -94,6 +94,7 @@ export function parseEntry(path: string, text: string): Entry {
     stats: Array.isArray(data.stats)
       ? (data.stats as Record<string, unknown>[]).filter(x => x && typeof x === 'object' && x.name).map(x => ({ name: String(x.name), value: String(x.value ?? ''), from: Math.max(1, Number(x.from) || 1) }))
       : undefined,
+    fields: data.fields && typeof data.fields === 'object' ? Object.fromEntries(Object.entries(data.fields as object).map(([k, v]) => [k, String(v ?? '')])) : undefined,
     extra: rest(data, ENTRY_KEYS),
     slug,
     type,
@@ -109,17 +110,18 @@ export function parseEntry(path: string, text: string): Entry {
   }
 }
 
-const ENTRY_KEYS = ['type', 'name', 'aliases', 'include', 'links', 'rank', 'voice', 'knows', 'unaware', 'later', 'notes', 'sends', 'detect', 'tags', 'image', 'kind', 'resolved', 'stats']
+const ENTRY_KEYS = ['type', 'name', 'aliases', 'include', 'links', 'rank', 'voice', 'knows', 'unaware', 'later', 'notes', 'sends', 'detect', 'tags', 'image', 'kind', 'resolved', 'stats', 'fields']
 const SCENE_KEYS = ['id', 'title', 'pov', 'status', 'note', 'time', 'place', 'lines', 'summary', 'summaryOf', 'comments', 'tension', 'passes', 'beats', 'reveals', 'seeds', 'arc', 'pace', 'cast', 'locked']
 const rest = (data: Record<string, unknown>, known: string[]) => Object.fromEntries(Object.entries(data).filter(([k]) => !known.includes(k)))
 const filled = (v: VoiceCard | undefined) => (v && Object.values(v).some(x => x.trim()) ? v : undefined)
+const filledFields = (f: Entry['fields']) => { const kept = Object.entries(f ?? {}).filter(([, v]) => v.trim()); return kept.length ? Object.fromEntries(kept) : undefined }
 
 export function serializeEntry(e: Entry): string {
   const data: Record<string, unknown> = { type: e.type, name: e.name }
   if (e.aliases.length) data.aliases = e.aliases
   data.include = e.include
   if (e.links.length) data.links = e.links
-  Object.assign(data, { rank: e.rank, voice: filled(e.voice), knows: e.knows, unaware: e.unaware, later: e.later || undefined, notes: e.notes || undefined, sends: e.sends && Object.keys(e.sends).length ? e.sends : undefined, detect: e.detect === false ? false : undefined, tags: e.tags?.length ? e.tags : undefined, image: e.image, kind: e.kind, resolved: e.resolved, stats: e.stats?.length ? e.stats : undefined }, e.extra)
+  Object.assign(data, { rank: e.rank, voice: filled(e.voice), knows: e.knows, unaware: e.unaware, later: e.later || undefined, notes: e.notes || undefined, sends: e.sends && Object.keys(e.sends).length ? e.sends : undefined, detect: e.detect === false ? false : undefined, tags: e.tags?.length ? e.tags : undefined, image: e.image, kind: e.kind, resolved: e.resolved, stats: e.stats?.length ? e.stats : undefined, fields: filledFields(e.fields) }, e.extra)
   const body = [
     `## Short\n${e.short.trim()}`,
     `## Full\n${e.full.trim()}`,

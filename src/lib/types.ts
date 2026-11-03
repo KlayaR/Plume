@@ -140,11 +140,16 @@ export interface Entry {
   shared?: boolean
   /** LitRPG: a character's stats, each value true from a chapter on (Level 12 from chapter 80). */
   stats?: Stat[]
+  /** The values of the fields set up for this type of entry, by field name. */
+  fields?: Record<string, string>
   /** Frontmatter keys Plume doesn't know, kept as they were. */
   extra: Record<string, unknown>
 }
 
 export interface Stat { name: string; value: string; from: number }
+
+/** A field set up for a type of entry (Age, Role): Claude reads it with the full version, unless it says always or never. */
+export interface FieldDef { name: string; send?: 'always' | 'never' }
 
 export type SceneStatus = 'draft' | 'revised' | 'done'
 
@@ -343,6 +348,8 @@ export interface BookMeta {
   serial?: Serial
   arcs?: Record<string, ArcPlan>
   threads?: Thread[]
+  /** Fields set up once per type of entry (Bible → Table). */
+  fields?: Partial<Record<EntryType, FieldDef[]>>
   order: { folder: string; scenes: string[] }[]
   ai: {
     actions: Record<ActionId, ActionSettings>

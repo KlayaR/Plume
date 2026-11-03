@@ -8,6 +8,7 @@ export function undoStack(limit = 60, burst = 30_000) {
   const done: Step[] = []
   const undone: Step[] = []
   let replaying = false
+  let collecting: Step[] | null = null
   const run = (f: () => unknown) => {
     replaying = true
     try { f() } finally { replaying = false }
@@ -26,6 +27,7 @@ export function undoStack(limit = 60, burst = 30_000) {
     /** Remembers a change, unless it is one being undone or redone. An empty key never joins a burst. */
     push(key: string, name: string, undo: Step['undo'], redo: Step['redo'], now = Date.now()): Step | null {
       if (replaying) return null
+      if (collecting) { const step = { key: '', name, at: now, undo, redo }; collecting.push(step); return step }
       undone.length = 0
       const last = done[done.length - 1]
       if (key && last?.key === key && now - last.at < burst) { last.redo = redo; last.at = now; return last }
@@ -33,6 +35,14 @@ export function undoStack(limit = 60, burst = 30_000) {
       done.push(step)
       if (done.length > limit) done.shift()
       return step
+    },
+    /** Everything `f` changes counts as one step, undone in reverse. */
+    group(name: string, f: () => void) {
+      if (collecting) return f()
+      const parts: Step[] = []
+      collecting = parts
+      try { f() } finally { collecting = null }
+      if (parts.length) this.push('', name, () => [...parts].reverse().forEach(p => p.undo()), () => parts.forEach(p => p.redo()))
     },
     undo: () => replay(done, undone, 'undo'),
     redo: () => replay(undone, done, 'redo'),
@@ -56,4 +66,4 @@ export function changedKeys<T extends object>(obj: T, patch: Partial<T>, only?: 
 // text (the editor has its own undo) nor what Plume works out by itself.
 export const SCENE_PLAN_KEYS: readonly (keyof Scene)[] = ['title', 'pov', 'status', 'note', 'time', 'place', 'lines', 'tension', 'beats', 'reveals', 'seeds', 'arc', 'pace', 'cast', 'locked']
 export const CHAPTER_PLAN_KEYS: readonly (keyof Chapter)[] = ['title', 'kind', 'part', 'notes', 'goal', 'ending', 'hook', 'promise', 'arc']
-export const META_PLAN_KEYS: readonly (keyof BookMeta)[] = ['structure', 'foundation', 'loose', 'arcs', 'threads', 'map']
+export const META_PLAN_KEYS: readonly (keyof BookMeta)[] = ['structure', 'foundation', 'loose', 'arcs', 'threads', 'map', 'fields']

@@ -1356,6 +1356,23 @@ const FR: Record<string, string> = {
   'Restore this entry': 'Restaurer cette fiche', 'Put it back': 'Rétablir', 'Entry restored.': 'Fiche restaurée.',
   'Put back as it was in the snapshot.': 'Rétabli tel que dans l’instantané.',
   'This snapshot is older than version 0.39: it holds the text of the scenes only.': 'Cet instantané date d’avant la version 0.39 : il ne contient que le texte des scènes.',
+  'Bible → Table': 'Bible → Tableau',
+  'Fields': 'Champs',
+  'Set it up once: every entry of this type gets the row.': 'Une seule fois : chaque fiche de ce type reçoit la ligne.',
+  'Add a field': 'Ajouter un champ',
+  'Rename, remove, sent to the AI…': 'Renommer, retirer, envoi à l’IA…',
+  'Type of entry': 'Type de fiche',
+  'Table': 'Tableau',
+  'Gallery': 'Galerie',
+  'Nothing of this type yet.': 'Rien de ce type pour l’instant.',
+  'Add a field such as Age, Role or Home: every entry of this type gets it, and you can compare them here.': 'Ajoutez un champ comme Âge, Rôle ou Lieu de vie : chaque fiche de ce type le reçoit, et vous pouvez les comparer ici.',
+  'New field for every {type}': 'Nouveau champ pour chaque {type}',
+  'Age, Role, Home…': 'Âge, rôle, lieu de vie…',
+  'There is already a field called {name}.': 'Il y a déjà un champ appelé {name}.',
+  'Rename the field': 'Renommer le champ',
+  'With the full version': 'Avec la version complète',
+  'Remove the field': 'Retirer le champ',
+  'Field removed. The values stay in the files, and come back if you add it again.': 'Champ retiré. Les valeurs restent dans les fichiers et reviennent si vous le rajoutez.',
 }
 
 const SHELL = {

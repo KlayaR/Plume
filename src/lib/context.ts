@@ -3,7 +3,8 @@
 // stays the same from one request to the next (rules, your prompt, your voice,
 // samples of your prose), so the CLI's cache serves it again and again; the
 // bible entries, the story and the task change and go in the message.
-import { isRewrite, type ActionId, type Book, type Entry, type Lang, type Scene } from './types'
+import { isRewrite, type ActionId, type Book, type Entry, type FieldDef, type Lang, type Scene } from './types'
+import { fieldLines } from './fields'
 import { factApplies } from './bible'
 import { estimateTokens, fold, lastWords, firstWords } from './text'
 import { taskMessage, systemRules } from './prompts'
@@ -117,7 +118,7 @@ function voiceBlock(e: Entry, lang: Lang): string {
   return rows.length ? `<voice>\n${rows.join('\n')}\n</voice>` : ''
 }
 
-export function renderEntry(e: Entry, mode: Mode, chapter: number, lang: Lang, bookIndex = 1, pov = false): string {
+export function renderEntry(e: Entry, mode: Mode, chapter: number, lang: Lang, bookIndex = 1, pov = false, defs?: FieldDef[]): string {
   const aka = e.aliases.filter(a => a !== e.name).map(a => a.replace(/!$/, ''))
   const head = `<entry type="${e.type}" name="${e.name}"${aka.length ? ` aka="${aka.join(', ')}"` : ''}${pov ? ' pov="true"' : ''}>`
   // Blocks marked never are not sent; blocks marked always travel with the short version.
@@ -131,7 +132,7 @@ export function renderEntry(e: Entry, mode: Mode, chapter: number, lang: Lang, b
   // LitRPG: the numbers as they stand at this chapter, so status screens stay consistent.
   const now = statsAt(e.stats, chapter)
   const stats = now.length ? `${lang === 'fr' ? 'Statistiques à ce stade' : 'Stats at this point'} : ${now.map(s => `${s.name} ${s.value}`).join(', ')}` : ''
-  return [head, body?.trim(), facts.length ? `${label}\n${facts.join('\n')}` : '', stats, knows, unaware, voiceBlock(e, lang), '</entry>'].filter(Boolean).join('\n')
+  return [head, ...fieldLines(e, defs, mode), body?.trim(), facts.length ? `${label}\n${facts.join('\n')}` : '', stats, knows, unaware, voiceBlock(e, lang), '</entry>'].filter(Boolean).join('\n')
 }
 
 /** Samples of the author's prose, at most this many words in all (cached, so cheap after the first call). */
@@ -369,7 +370,7 @@ export function buildContext(input: ContextInput): Built {
   // Budget: drop linked entries first, then switch full versions to short, least-mentioned first.
   const list = [...picked.values()]
   const bookIndex = book.meta.series?.index ?? 1
-  const render = (p: Picked) => renderEntry(bySlug.get(p.slug)!, p.mode, chapter, lang, bookIndex, p.slug === input.pov)
+  const render = (p: Picked) => { const e = bySlug.get(p.slug)!; return renderEntry(e, p.mode, chapter, lang, bookIndex, p.slug === input.pov, book.meta.fields?.[e.type]) }
   const size = (p: Picked) => estimateTokens(render(p))
   const forced = (p: Picked) => p.slug in overrides
   for (const p of list) {

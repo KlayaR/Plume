@@ -14,6 +14,7 @@ import { useT } from '../i18n'
 import { ChatDock } from './ChatPanel'
 import BlocksEditor from './BlocksEditor'
 import LinkArea from './LinkArea'
+import BibleTable, { EntryFields } from './BibleTable'
 import { showMenu } from '../contextMenu'
 import { entryMenu } from '../menus'
 import { Contradictions, MapView, Relations, ReviewList, Tracker } from './BibleTools'
@@ -22,7 +23,7 @@ import { startInterview, useChat } from '../chat'
 import { pickImage, useImage } from '../lib/images'
 
 const TABS: [BibleTab, string][] = [['entry', 'Entries'], ['review', 'To review'], ['aicheck', 'AI check']]
-const MORE: [BibleTab, string][] = [['tracker', 'Presence'], ['map', 'Map'], ['relations', 'Relations'], ['contradictions', 'Contradictions']]
+const MORE: [BibleTab, string][] = [['table', 'Table'], ['tracker', 'Presence'], ['map', 'Map'], ['relations', 'Relations'], ['contradictions', 'Contradictions']]
 
 /** A family's entries split by character rank, once any has one; unranked ones last. A '' label means no heading. */
 function byRank(items: Entry[]): [string, Entry[]][] {
@@ -139,7 +140,7 @@ export default function BibleView() {
                 {t(label)}{id === 'review' && drafts > 0 ? ` (${drafts})` : ''}
               </button>
             ))}
-            {simple ? <ShowEverything /> : <button type="button" aria-pressed={MORE_TABS.includes(tab)} onClick={() => !MORE_TABS.includes(tab) && useStore.setState({ bibleTab: 'tracker' })}>{t('More')}</button>}
+            {simple ? <ShowEverything /> : <button type="button" aria-pressed={MORE_TABS.includes(tab)} onClick={() => !MORE_TABS.includes(tab) && useStore.setState({ bibleTab: 'table' })}>{t('More')}</button>}
           </nav>
           {MORE_TABS.includes(tab) && (
             <nav className="pl-switch pl-bible-more" aria-label={t('More')}>
@@ -158,6 +159,7 @@ export default function BibleView() {
           ))}
           {tab === 'review' && <ReviewList />}
           {tab === 'aicheck' && <AICheck />}
+          {tab === 'table' && <BibleTable />}
           {tab === 'tracker' && <Tracker />}
           {tab === 'map' && <MapView />}
           {tab === 'relations' && <Relations />}
@@ -274,6 +276,8 @@ export function EntryEditor({ entry }: { entry: Entry }) {
           </div>
         </div>
       )}
+
+      {!plain && <EntryFields entry={entry} />}
 
       {!plain && (
         <div className="sk-field">

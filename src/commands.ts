@@ -37,7 +37,7 @@ export function commands(): Command[] {
     { id: 'entry-history', label: t('Earlier versions of this entry…'), where: ['bible'], run: () => { const slug = useStore.getState().entrySlug; if (slug) set({ dialog: 'history', dialogArg: slug }) } },
     bibleTab('review', t('Bible → To review')),
     bibleTab('aicheck', t('Bible → AI check')),
-    ...(st.prefs.simple ? [] : [bibleTab('tracker', t('Bible → Presence')), bibleTab('map', t('Bible → Map')), bibleTab('relations', t('Bible → Relations')), bibleTab('contradictions', t('Bible → Contradictions'))]),
+    ...(st.prefs.simple ? [] : [bibleTab('table', t('Bible → Table')), bibleTab('tracker', t('Bible → Presence')), bibleTab('map', t('Bible → Map')), bibleTab('relations', t('Bible → Relations')), bibleTab('contradictions', t('Bible → Contradictions'))]),
     { id: 'export', label: t('Export…'), run: () => set({ dialog: 'export' }) },
     { id: 'snapshots', label: t('Snapshots'), run: () => set({ dialog: 'snapshots' }) },
     { id: 'find', label: t('Find and replace'), keys: 'Ctrl+Shift+F', run: () => set({ dialog: 'find' }) },

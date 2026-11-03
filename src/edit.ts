@@ -106,7 +106,7 @@ export async function checkChapter(depth: Depth) {
     const here = new Set(findMentions(all, buildMatcher(named)).map(m => m.slug))
     const pov = scenesOf(c)[0]?.pov
     const bible = depth === 'deep'
-      ? named.filter(e => here.has(e.slug) || e.include === 'always').map(e => renderEntry(e, 'full', n, book.meta.language, book.meta.series?.index ?? 1, e.slug === pov)).join('\n\n')
+      ? named.filter(e => here.has(e.slug) || e.include === 'always').map(e => renderEntry(e, 'full', n, book.meta.language, book.meta.series?.index ?? 1, e.slug === pov, book.meta.fields?.[e.type])).join('\n\n')
       : ''
     const plan = depth === 'deep' && c.scenes.some(s => s.note?.trim() || s.beats?.length) ? chapterText(book, c, n) : ''
     const what = depth === 'deep'

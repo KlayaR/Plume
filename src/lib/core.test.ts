@@ -49,6 +49,8 @@ import { speakerStats } from './speakers'
 import { nextToDo, progress, togglePass } from './revision'
 import { compareEntries, comparePlan, compareSnap, makeSnap, planText } from './snapshots'
 import { changedKeys, undoStack } from './undo'
+import { addField, entryNamed, fieldLines, hasField, removeField, renamedValues, renameField, setFieldSend, sortEntries } from './fields'
+import { renderEntry } from './context'
 import { referenceTargets, type Reference } from './references'
 import { applyLink, isKnownName, linkMatches, linkQuery } from './links'
 import { keysOf, keysOwner, keysProblem } from './shortcuts'
@@ -139,6 +141,13 @@ describe('context', () => {
     const b = buildContext({ ...base, book: later, pov: 'elise' })
     expect(b.message).not.toContain('queen’s daughter')
     expect(b.system).not.toContain('queen’s daughter')
+  })
+  it('sends the fields set up for the type of the entry', () => {
+    const fielded = { ...book, meta: { ...book.meta, fields: { character: [{ name: 'Âge' }, { name: 'Rôle', send: 'always' as const }] } }, entries: book.entries.map(e => (e.slug === 'elise' ? { ...e, fields: { Âge: '27', Rôle: 'duchesse' } } : e)) }
+    const short = buildContext({ ...base, book: fielded, before: 'Élise drew her blade.' }).message
+    expect(short).toContain('Rôle : duchesse')
+    expect(short).not.toContain('Âge : 27')
+    expect(buildContext({ ...base, book: fielded, pov: 'elise' }).message).toContain('Âge : 27')
   })
   it('sends the full version for the POV and for @-mentions', () => {
     expect(buildContext({ ...base, pov: 'elise' }).picked.find(p => p.slug === 'elise')!.mode).toBe('full')
@@ -1474,5 +1483,68 @@ describe('snapshots of the bible and the plan', () => {
     expect(compareEntries(book, old)).toEqual([])
     expect(comparePlan(book, old)).toEqual([])
     expect(compareSnap(book, old)).toEqual([])
+  })
+})
+
+describe('fields per type of entry', () => {
+  it('sets a field up once per type, whatever its capitals', () => {
+    const one = addField(undefined, 'character', 'Âge')
+    expect(hasField(one, 'character', 'age')).toBe(true)
+    expect(hasField(one, 'place', 'âge')).toBe(false)
+    expect(addField(one, 'character', 'AGE').character).toEqual([{ name: 'Âge' }])
+    expect(addField(one, 'character', ' Rôle ').character?.map(d => d.name)).toEqual(['Âge', 'Rôle'])
+    expect(removeField(one, 'character', 'Âge').character).toEqual([])
+    expect(setFieldSend(one, 'character', 'Âge', 'never').character).toEqual([{ name: 'Âge', send: 'never' }])
+    expect(setFieldSend(setFieldSend(one, 'character', 'Âge', 'never'), 'character', 'Âge', undefined).character).toEqual([{ name: 'Âge' }])
+  })
+  it('keeps the values when a field is renamed', () => {
+    const list = [entry({ slug: 'a', fields: { Age: '30', Role: 'x' } }), entry({ slug: 'b' }), entry({ slug: 'c', type: 'place', fields: { Age: 'vieux' } })]
+    expect(renameField(addField(undefined, 'character', 'Age'), 'character', 'Age', 'Âge').character).toEqual([{ name: 'Âge' }])
+    expect(renamedValues(list, 'character', 'Age', 'Âge')).toEqual([{ slug: 'a', fields: { Role: 'x', Âge: '30' } }])
+  })
+  it('lives in the entry file, empty values left out', () => {
+    const path = 'bible/characters/a.md'
+    const e = entry({ slug: 'a', path, fields: { Âge: '32', Rôle: '' } })
+    expect(parseEntry(path, serializeEntry(e)).fields).toEqual({ Âge: '32' })
+    expect(serializeEntry({ ...e, fields: { Rôle: ' ' } })).not.toContain('fields')
+    expect(parseEntry(path, serializeEntry({ ...e, fields: undefined })).extra).toEqual({})
+  })
+  it('reaches Claude with the full version unless the field says otherwise', () => {
+    const e = entry({ short: 'Courte.', fields: { Age: '30', Role: 'duc', Secret: 'traître', Vide: ' ' } })
+    const defs = [{ name: 'Age' }, { name: 'Role', send: 'always' as const }, { name: 'Secret', send: 'never' as const }, { name: 'Vide' }, { name: 'Absent' }]
+    expect(fieldLines(e, defs, 'full')).toEqual(['Age : 30', 'Role : duc'])
+    expect(fieldLines(e, defs, 'short')).toEqual(['Role : duc'])
+    expect(renderEntry(e, 'full', 1, 'fr', 1, false, defs)).toContain('Age : 30')
+    expect(renderEntry(e, 'short', 1, 'fr', 1, false, defs)).not.toContain('Age : 30')
+    expect(renderEntry(e, 'full', 1, 'fr')).toBe(renderEntry({ ...e, fields: undefined }, 'full', 1, 'fr'))
+  })
+  it('finds the entry a value names, never itself', () => {
+    const list = [entry({ slug: 'v', type: 'place', name: 'Valombre', aliases: ['La Vallée'] }), entry({ slug: 'm', name: 'Marc' })]
+    expect(entryNamed(list, 'valombre')?.slug).toBe('v')
+    expect(entryNamed(list, 'la vallee')?.slug).toBe('v')
+    expect(entryNamed(list, 'Marc', 'm')).toBeUndefined()
+    expect(entryNamed(list, '')).toBeUndefined()
+  })
+  it('sorts a column, numbers as numbers and empty cells last', () => {
+    const list = [entry({ slug: 'a', name: 'B', fields: { Age: '9' } }), entry({ slug: 'b', name: 'A', fields: { Age: '30' } }), entry({ slug: 'c', name: 'C' })]
+    expect(sortEntries(list, 'name').map(e => e.slug)).toEqual(['b', 'a', 'c'])
+    expect(sortEntries(list, 'Age').map(e => e.slug)).toEqual(['a', 'b', 'c'])
+    expect(sortEntries(list, 'Age', true).map(e => e.slug)).toEqual(['b', 'a', 'c'])
+  })
+})
+
+describe('grouped undo', () => {
+  it('counts a group as one step, undone in reverse', () => {
+    const s = undoStack()
+    const seen: string[] = []
+    s.group('rename', () => {
+      s.push('k', '1', () => seen.push('undo1'), () => seen.push('redo1'))
+      s.push('k', '2', () => seen.push('undo2'), () => seen.push('redo2'))
+    })
+    expect(s.undo()?.name).toBe('rename')
+    expect(seen).toEqual(['undo2', 'undo1'])
+    expect(s.undo()).toBeNull()
+    s.redo()
+    expect(seen).toEqual(['undo2', 'undo1', 'redo1', 'redo2'])
   })
 })

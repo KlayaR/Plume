@@ -97,6 +97,7 @@ function normalizeMeta(raw: Partial<BookMeta>): BookMeta {
     serial: raw.kind === 'serial' || raw.serial ? { ...DEFAULT_SERIAL, ...(raw.serial ?? {}) } : undefined,
     arcs: raw.arcs && typeof raw.arcs === 'object' ? raw.arcs : undefined,
     threads: Array.isArray(raw.threads) ? raw.threads : undefined,
+    fields: raw.fields && typeof raw.fields === 'object' ? raw.fields : undefined,
   }
 }
 
