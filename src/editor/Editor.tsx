@@ -15,6 +15,7 @@ import { showMenu } from '../contextMenu'
 import { editorMenu } from '../menus'
 import { enterStartsScene } from '../lib/chapters'
 import { proposalField, sceneExtensions, setNames } from './cm'
+import { captureExt } from './captures'
 import { accept, discard, fillPlaceholder, getEditorView, runAction, setEditorView, syncProposalState, useAI } from './actions'
 import { changesField, inlineExt, marksExt, placeholderExt, setChanges, setHighlights, trackedChangesExt, unknownNamesExt, type Highlight } from './marks'
 import { takePending, useEdit } from '../edit'
@@ -178,6 +179,7 @@ function makeState(s: Scene, lang: Lang, locked: boolean) {
       history(),
       lockC.of(lockExt(locked)),
       systemLinesExt,
+      captureExt(s.id),
       spelling.of(spellingExt(windowsSpell())),
       languageToolExt({
         // Review mode, LanguageTool chosen, and this is the scene you are in.

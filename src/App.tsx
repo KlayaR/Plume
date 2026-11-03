@@ -23,6 +23,8 @@ import SynonymDialog from './components/SynonymDialog'
 import EntryFromText from './components/EntryFromText'
 import ShortcutsDialog from './components/ShortcutsDialog'
 import QuickJump from './components/QuickJump'
+import ScratchPad from './components/ScratchPad'
+import { toggleScratch, useScratch } from './scratch'
 import DualView, { ViewBody } from './components/DualView'
 import ContextMenuHost from './components/ContextMenuHost'
 import LTFields from './components/LTFields'
@@ -38,6 +40,7 @@ export default function App() {
   const view = useStore(s => s.view)
   const showSettings = useStore(s => s.showSettings)
   const dialog = useStore(s => s.dialog)
+  const scratchOpen = useScratch(s => s.open)
   const printing = useStore(s => s.printing)
   const prefs = useStore(s => s.prefs)
   const t = useT()
@@ -109,6 +112,7 @@ export default function App() {
         useStore.getState().setPrefs({ size: e.key === '0' ? DEFAULT_PREFS.size : Math.max(14, Math.min(26, size + (e.key === '-' ? -1 : 1))) })
       }
       if (e.key === 'F11' && useStore.getState().book) { e.preventDefault(); const p = useStore.getState().prefs; useStore.getState().setPrefs({ zen: !p.zen }) }
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'j' && useStore.getState().book) { e.preventDefault(); toggleScratch() }
       if ((e.ctrlKey || e.metaKey) && e.key === '/' && useStore.getState().book) { e.preventDefault(); useStore.setState({ dialog: 'shortcuts' }) }
       // Ctrl+Z in the Plan, outside any text field: take back the last card or chapter move.
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z' && useStore.getState().view === 'plan' && !(e.target as HTMLElement | null)?.closest?.('input, textarea, select, [contenteditable]')) {
@@ -183,6 +187,7 @@ export default function App() {
       {book && dialog === 'agents' && <AgentDialog onClose={() => useStore.setState({ dialog: null })} />}
       {book && printing && <PrintView />}
       {book && !prefs.seen?.includes('basics') && <TipCard />}
+      {book && scratchOpen && <ScratchPad />}
       {book && <EditChapterDialog />}
       <ContextMenuHost />
       <LTFields />

@@ -171,6 +171,8 @@ const typography = (lang: Lang): Extension => [
     if (text.length !== 1 || view.state.field(proposalField)) return false
     const line = view.state.doc.lineAt(from)
     const before = view.state.doc.sliceString(line.from, from)
+    // A capture line (::idea …) stays as typed.
+    if (/^\s*:/.test(before) || (text === ':' && !before.trim())) return false
     const capital = useStore.getState().prefs.autoCapital
     let rule = typingRule(lang, before, text) ?? (capital ? autoCapitalRule(lang, before, text) : null)
     if (capital && (!rule || rule.remove === 0) && loneI(lang, before, text)) rule = { remove: 1, insert: 'I' + (rule ? rule.insert : text) }

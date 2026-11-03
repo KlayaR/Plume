@@ -313,11 +313,11 @@ interface State {
 }
 
 // Pending writes, one timer per file.
-const pending = new Map<string, { timer: ReturnType<typeof setTimeout>; run: () => Promise<void> }>()
+const pending = new Map<string, { timer: ReturnType<typeof setTimeout>; run: () => Promise<unknown> }>()
 // Writes that failed, kept to try again, and the status shown in the bottom bar.
-const failed = new Map<string, () => Promise<void>>()
+const failed = new Map<string, () => Promise<unknown>>()
 const syncSave = () => useStore.setState({ saving: pending.size ? 'saving' : failed.size ? 'error' : 'saved' })
-function later(key: string, run: () => Promise<void>, ms = 700) {
+export function later(key: string, run: () => Promise<unknown>, ms = 700) {
   const p = pending.get(key)
   if (p) clearTimeout(p.timer)
   const timer = setTimeout(() => {
@@ -437,6 +437,7 @@ export const useStore = create<State>((set, get) => {
       set({ book, recent, view: 'manuscript', sceneId, unlocked: [], jump: back ? { sceneId: back.sceneId, from: back.pos, to: back.pos } : null, entrySlug: null, freshSceneId: null, bibleTab: 'entry', planTab: 'outline' })
       import('./chat').then(m => m.loadChat(book))
       import('./writing').then(m => m.loadNotes(book))
+      import('./scratch').then(m => m.loadScratch(book))
       import('./agents').then(m => m.loadAgents())
       // Library and safety: the lock for synced folders, today's backup, progress, the shelf card.
       import('./library').then(m => { m.takeLock(book); m.autoBackup(book); m.recordProgress(get().book!); m.noteOnShelf(get().book!); m.refreshSnapshots(get().book!); m.applyFantasyDefaults(get().book!) })

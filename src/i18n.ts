@@ -1321,6 +1321,26 @@ const FR: Record<string, string> = {
   'Outside a text box: undo or redo the last change': 'Hors d’une zone de texte : annuler ou rétablir le dernier changement',
   'Outline list': 'Plan en liste', 'A new row after this one': 'Une nouvelle ligne après celle-ci', 'One level down / up: chapter, scene, beat': 'Un niveau plus bas / plus haut : chapitre, scène, étape',
   'Move the row': 'Déplacer la ligne', 'Previous / next row': 'Ligne précédente / suivante', 'Open the row’s note': 'Ouvrir la note de la ligne', 'On an empty row: remove it': 'Sur une ligne vide : la retirer',
+  // 0.39.0: scratch pad and capture lines
+  'Scratch pad': 'Bloc-notes', 'Inbox': 'À trier', 'Tasks': 'Tâches',
+  'Keep it, send it…': 'Garder, envoyer…', 'For {name}': 'Pour {name}',
+  'A new task. Enter adds it.': 'Une nouvelle tâche. Entrée pour l’ajouter.',
+  'A thought to sort later. Enter adds it.': 'Une pensée à trier plus tard. Entrée pour l’ajouter.',
+  'A new note. Enter adds it.': 'Une nouvelle note. Entrée pour l’ajouter.',
+  'While drafting, start a line with ::idea, ::todo, ::bible Name: or ::comment and press Enter: it leaves the text and lands here, in your tasks or in the margin.': 'En écrivant, commencez une ligne par ::idee, ::tache, ::fiche Nom : ou ::commentaire, puis Entrée : elle quitte le texte et arrive ici, dans vos tâches ou dans la marge.',
+  'Nothing to do yet.': 'Rien à faire pour l’instant.',
+  'Nothing here yet. The pad stays with the book and is never sent to Claude.': 'Rien ici pour l’instant. Le bloc-notes reste avec le livre et n’est jamais envoyé à Claude.',
+  'Comment added in the margin.': 'Commentaire ajouté dans la marge.', 'Added to your tasks.': 'Ajouté à vos tâches.',
+  'In the inbox, for {name}.': 'À trier, pour {name}.', 'In the inbox.': 'À trier.',
+  'Name of the new entry': 'Nom de la nouvelle fiche', 'New: {type}': 'Nouveau : {type}', 'Add to {name}': 'Ajouter à {name}',
+  'Keep as a note': 'Garder comme note', 'Keep as a task': 'Garder comme tâche',
+  'Turn into a task': 'Transformer en tâche', 'Turn into a note': 'Transformer en note',
+  'Pin to the top': 'Épingler en haut', 'Send to': 'Envoyer vers',
+  'The scene, at the cursor': 'La scène, au curseur', 'A new card in this chapter': 'Une nouvelle carte dans ce chapitre',
+  'The loose ideas (Plan)': 'Les idées en vrac (Plan)', 'A bible entry': 'Une fiche de la bible',
+  'Removed from the scratch pad.': 'Retiré du bloc-notes.', 'Sent to the scene.': 'Envoyé dans la scène.',
+  'The book has no chapter yet.': 'Le livre n’a pas encore de chapitre.', 'New card in {chapter}.': 'Nouvelle carte dans {chapter}.',
+  'Added to the loose ideas.': 'Ajouté aux idées en vrac.', 'Added to {name}.': 'Ajouté à {name}.',
 }
 
 const SHELL = {

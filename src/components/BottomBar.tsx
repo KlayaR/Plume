@@ -4,11 +4,12 @@
 // The manuscript's own controls (Write / Review, Sheet / Page, Scene / Chapter /
 // Book, split, Aa) live in a toolbar above the page: ManuscriptToolbar.
 import { useEffect, useRef, useState } from 'react'
-import { Bot, BookPlus, Camera, CircleHelp, Keyboard, PanelRight, ChevronLeft, Columns2, Compass, Ellipsis, FileOutput, Replace, Search, Settings } from 'lucide-react'
+import { Bot, BookPlus, Camera, CircleHelp, Keyboard, PanelRight, ChevronLeft, Columns2, Compass, Ellipsis, FileOutput, NotebookPen, Replace, Search, Settings } from 'lucide-react'
 import ManuscriptOptions from './ManuscriptOptions'
 import GoalsPanel from './GoalsPanel'
 import { findScene, useStore, type Scope, type View } from '../store'
 import { useAI } from '../editor/actions'
+import { toggleScratch, useScratch } from '../scratch'
 import { bookCounts, feuillets, sceneCounts } from '../lib/stats'
 import { numLocale, useT } from '../i18n'
 import { bufferOf, isSerial, serialOf } from '../lib/serial'
@@ -18,6 +19,18 @@ const scopes: [Scope, string, string][] = [
   ['chapter', 'Chapter', 'Show the whole chapter'],
   ['book', 'Book', 'Show the whole book, chapter after chapter'],
 ]
+/** The scratch pad, and how many captured lines wait in its inbox. */
+function ScratchButton() {
+  const t = useT()
+  const open = useScratch(s => s.open)
+  const waiting = useScratch(s => s.items.filter(i => i.inbox).length)
+  return (
+    <button type="button" className={`pl-quiet pl-row ${open ? 'pl-on' : ''}`} aria-pressed={open} title={`${t('Scratch pad')} (Ctrl+J)`} aria-label={t('Scratch pad')} onClick={toggleScratch}>
+      <NotebookPen size={15} />{waiting > 0 && <b className="pl-scratch-waiting">{waiting}</b>}
+    </button>
+  )
+}
+
 const pct = (x: number) => `${Math.round(x * 100)} %`
 const resets = (at: number) => new Date(at * 1000).toLocaleString(undefined, { weekday: 'short', hour: '2-digit', minute: '2-digit' })
 
@@ -86,6 +99,7 @@ export default function BottomBar() {
           : <span className={`pl-saved pl-saved-${saving}`} title={t('Every change is written to your book folder as you type')}>{saving === 'saving' ? t('Saving…') : t('Saved')}</span>}
         {lastBackend?.kind === 'openrouter' && <span className="pl-count" title={t('Answered by {name} on OpenRouter', { name: lastBackend.name })}>OpenRouter</span>}
         <span className={`pl-dot ${exe === null ? 'pl-dot-off' : running ? 'pl-dot-busy' : ''}`} title={usageTip} aria-label={t(claude)} />
+        <ScratchButton />
         <DualMenu />
         <MoreMenu />
         <button type="button" className="pl-quiet" onClick={() => useStore.setState({ showSettings: true })} title={t('Settings') + ' (Ctrl+,)'}><Settings size={15} /></button>

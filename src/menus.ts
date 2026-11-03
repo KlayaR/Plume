@@ -5,18 +5,19 @@ import { ownShare } from './lib/context'
 import type { EditorView } from '@codemirror/view'
 import { ask as askDialog } from '@tauri-apps/plugin-dialog'
 import { findScene, useStore } from './store'
-import { askText, type MenuItem } from './contextMenu'
+import { askText, tidy, type MenuItem } from './contextMenu'
 import { t } from './i18n'
 import { buildMatcher, findMentions } from './lib/context'
 import { allowedKinds, chapterLabels } from './lib/chapters'
 import { stripInline } from './lib/inline'
 import { pasteText } from './lib/paste'
 import { countWords, foldText, locateQuote } from './lib/text'
-import { ENTRY_TYPES, RANKS, typeInfo, type ActionId, type Entry, type EntryType, type Include, type Scene, type SceneStatus } from './lib/types'
+import { ENTRY_TYPES, RANKS, typeInfo, VOICE_TYPES, type ActionId, type Entry, type EntryType, type Include, type Scene, type SceneStatus } from './lib/types'
 import { accept, discard, getEditorView, retry, runAction, writeChapter, writeFromPlan } from './editor/actions'
 import { proposalField } from './editor/cm'
 import { insertPlaceholder, toggleInline, unknownNames } from './editor/marks'
 import { cutToDarlings, removeComment } from './writing'
+import { removeItem, sendToCard, sendToEntry, sendToLoose, sendToNewEntry, sendToScene, updateItem, type ScratchItem } from './scratch'
 import { boxOwner, dayOf, isLitRPG, isLocked, isSerial, mergeStats, readBox, systemBoxes } from './lib/serial'
 import { chapterTitleFor, royalRoadHtml, royalRoadText } from './lib/export'
 
@@ -266,6 +267,44 @@ export function newThingsMenu(): MenuItem[] {
   const st = useStore.getState()
   const fr = st.book!.meta.language === 'fr'
   return [{ label: t('New chapter'), onClick: () => st.addChapter(`${fr ? 'Chapitre' : 'Chapter'} ${st.book!.chapters.filter(c => c.kind === 'chapter').length + 1}`, { stay: true }) }]
+}
+
+// --- Scratch pad -------------------------------------------------------------------------------
+
+const NEW_AS: EntryType[] = ['character', 'place', 'object', 'lore']
+
+/** One item of the pad: keep it, pin it, send it where it belongs. */
+export function scratchMenu(item: ScratchItem): MenuItem[] {
+  const st = useStore.getState()
+  const book = st.book!
+  const entries = book.entries.filter(e => !VOICE_TYPES.includes(e.type))
+  // The entries the note talks about come first.
+  const named = new Set(findMentions(item.text, buildMatcher(entries, true)).map(m => m.slug))
+  const first = [...entries].sort((a, b) => Number(named.has(b.slug)) - Number(named.has(a.slug)) || a.name.localeCompare(b.name)).slice(0, 12)
+  const target = item.name ? entries.find(e => [e.name, ...e.aliases].some(n => foldText(n) === foldText(item.name!))) : undefined
+  const fresh = async (type: EntryType) => {
+    const name = item.name ?? (await askText(t('Name of the new entry')))?.trim()
+    if (name) sendToNewEntry(item, type, name)
+  }
+  const newRows = NEW_AS.map(ty => ({ label: t('New: {type}', { type: t(typeInfo(ty).label) }), onClick: () => fresh(ty) }))
+  return tidy([
+    item.name ? (target
+      ? { label: t('Add to {name}', { name: target.name }), onClick: () => sendToEntry(item, target.slug) }
+      : { label: t('New: “{name}”', { name: item.name }), sub: NEW_AS.map(ty => ({ label: t(typeInfo(ty).label), onClick: () => fresh(ty) })) }) : null,
+    !!item.name && { separator: true },
+    item.inbox && { label: t('Keep as a note'), onClick: () => updateItem(item.id, { inbox: undefined, kind: 'note' }) },
+    item.inbox && { label: t('Keep as a task'), onClick: () => updateItem(item.id, { inbox: undefined, kind: 'task' }) },
+    !item.inbox && { label: item.kind === 'note' ? t('Turn into a task') : t('Turn into a note'), onClick: () => updateItem(item.id, { kind: item.kind === 'note' ? 'task' : 'note', done: undefined }) },
+    { label: item.pinned ? t('Unpin') : t('Pin to the top'), onClick: () => updateItem(item.id, { pinned: item.pinned ? undefined : true }) },
+    { separator: true },
+    { header: t('Send to') },
+    { label: t('The scene, at the cursor'), disabled: !getEditorView(), onClick: () => sendToScene(item) },
+    { label: t('A new card in this chapter'), disabled: !book.chapters.length, onClick: () => sendToCard(item) },
+    { label: t('The loose ideas (Plan)'), onClick: () => sendToLoose(item) },
+    { label: t('A bible entry'), sub: [...first.map(e => ({ label: e.name, onClick: () => sendToEntry(item, e.slug) })), { separator: true }, ...newRows] },
+    { separator: true },
+    { label: t('Delete'), danger: true, onClick: () => removeItem(item.id) },
+  ])
 }
 
 // --- Bible -------------------------------------------------------------------------------------

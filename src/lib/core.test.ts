@@ -52,6 +52,7 @@ import { referenceTargets, type Reference } from './references'
 import { applyLink, isKnownName, linkMatches, linkQuery } from './links'
 import { keysOf, keysOwner, keysProblem } from './shortcuts'
 import { actionItems } from './quickjump'
+import { captureKind, captureQuote, parseCapture } from './captures'
 
 const entry = (over: Partial<Entry>): Entry => ({
   slug: 'x', type: 'character', path: 'bible/characters/x.md', name: 'X', aliases: [], include: 'auto',
@@ -1341,5 +1342,40 @@ describe('your own shortcuts', () => {
     expect(rankJump(items, 'exp', 30, 'manuscript')[0].id).toBe('expand')
     expect(rankJump(items, '', 30, 'manuscript').map(i => i.id)).toEqual(['expand', 'zen'])
     expect(rankJump(items, '')).toEqual([])
+  })
+})
+
+describe('capture lines', () => {
+  it('reads the four words, in English and in French', () => {
+    expect(parseCapture('::idea un duel au matin')).toEqual({ kind: 'idea', text: 'un duel au matin' })
+    expect(parseCapture('::Idée un duel')).toEqual({ kind: 'idea', text: 'un duel' })
+    expect(parseCapture('::todo vérifier la date')?.kind).toBe('todo')
+    expect(parseCapture('::tâche vérifier la date')?.kind).toBe('todo')
+    expect(parseCapture('::comment trop long')?.kind).toBe('comment')
+    expect(parseCapture('  ::commentaire : trop long')).toEqual({ kind: 'comment', text: 'trop long' })
+  })
+  it('splits ::bible at the first colon', () => {
+    expect(parseCapture('::bible Élise : a peur du feu')).toEqual({ kind: 'bible', name: 'Élise', text: 'a peur du feu' })
+    expect(parseCapture('::fiche Marc: né à Valombre: 1802')).toEqual({ kind: 'bible', name: 'Marc', text: 'né à Valombre: 1802' })
+    expect(parseCapture('::bible Marc')).toEqual({ kind: 'bible', name: 'Marc', text: '' })
+  })
+  it('accepts the no-break spaces French typography adds', () => {
+    expect(parseCapture('\u00a0:\u202f:idea un duel')?.kind).toBe('idea')
+  })
+  it('leaves everything else in the text', () => {
+    expect(parseCapture('Il dit : idea')).toBeNull()
+    expect(parseCapture('::idea')).toBeNull()
+    expect(parseCapture('::constructor un duel')).toBeNull()
+    expect(parseCapture('::recette un duel')).toBeNull()
+    expect(captureKind('::idea')).toBe('idea')
+    expect(captureKind('::constructor')).toBeNull()
+  })
+  it('pins a comment to the last sentence above, and finds it again', () => {
+    const text = 'Le premier paragraphe.\n\nElle entra. Il pleuvait sur Valombre.\n::comment trop vague'
+    const c = captureQuote(text, text.indexOf('::comment'))!
+    expect(c.quote).toBe('Il pleuvait sur Valombre.')
+    expect(text.slice(c.at, c.at + c.quote.length)).toBe(c.quote)
+    expect(captureQuote('« Non ! » dit-il.\n::comment x', 18)?.quote).toBe('« Non ! » dit-il.')
+    expect(captureQuote('::comment x', 0)).toBeNull()
   })
 })

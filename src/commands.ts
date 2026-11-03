@@ -5,6 +5,7 @@ import { t } from './i18n'
 import { newThingsMenu } from './menus'
 import { writeChapter, writeFromPlan } from './editor/actions'
 import { fixFlagged, openEdit } from './edit'
+import { toggleScratch } from './scratch'
 
 export interface Command { id: string; label: string; keys?: string; where?: View[]; run: () => void }
 
@@ -28,6 +29,7 @@ export function commands(): Command[] {
     { id: 'outline', label: t('Propose an outline'), where: ['plan'], run: () => set({ dialog: 'outline' }) },
     { id: 'zen', label: t('Distraction-free mode'), keys: 'F11', where: ['manuscript'], run: () => st.setPrefs({ zen: !st.prefs.zen }) },
     { id: 'dual', label: t('Bible beside the text'), where: ['manuscript'], run: () => st.setPrefs({ dual: st.prefs.dual === 'bible' ? null : 'bible' }) },
+    { id: 'scratch', label: t('Scratch pad'), keys: 'Ctrl+J', run: toggleScratch },
     { id: 'settings', label: t('Settings'), keys: 'Ctrl+,', run: () => set({ showSettings: true }) },
     { id: 'voice', label: t('Settings → Voice'), run: () => set({ showSettings: true, settingsTab: 'voice' }) },
     { id: 'claude', label: t('Settings → Claude'), run: () => set({ showSettings: true, settingsTab: 'claude' }) },

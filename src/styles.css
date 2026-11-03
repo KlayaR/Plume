@@ -978,3 +978,24 @@ body.pl-ctrl .cm-mention { cursor: pointer; text-decoration-color: var(--accent)
 .pl-keycap { cursor: pointer; text-align: center; caret-color: transparent; }
 .pl-keycap:focus { border-color: var(--accent); }
 .pl-cmdkey-problem { grid-column: 1 / -1; }
+
+/* Scratch pad and capture lines */
+.pl-scratch { position: fixed; right: 24px; bottom: calc(var(--pl-bar-h) + 16px); width: 24rem; max-width: calc(100vw - 48px); max-height: 70vh; z-index: 85; display: flex; flex-direction: column; gap: 8px; padding: 10px 12px 12px; border-radius: 10px; background: var(--surface-1); border: 1px solid var(--border-strong); box-shadow: var(--shadow); }
+body.pl-zen .pl-scratch { bottom: 16px; }
+.pl-scratch .pl-switch button { display: inline-flex; align-items: center; gap: 4px; }
+.pl-scratch-add { flex: none; resize: none; font-size: 13px; }
+.pl-scratch-list { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+.pl-scratch-item { padding: 4px 6px; border-radius: 6px; }
+.pl-scratch-item:hover, .pl-scratch-item:focus-within { background: var(--surface-2); }
+.pl-scratch-main { align-items: flex-start; gap: 6px; }
+.pl-scratch-main .sk-check { margin-top: 3px; flex: none; }
+.pl-scratch-text { min-width: 0; padding: 0; border: 0; outline: 0; resize: none; overflow: hidden; background: none; color: var(--text); font: inherit; font-size: 13px; line-height: 1.45; }
+.pl-scratch-done { color: var(--text-muted); text-decoration: line-through; }
+.pl-scratch-tool { flex: none; opacity: 0; }
+.pl-scratch-item:hover .pl-scratch-tool, .pl-scratch-item:focus-within .pl-scratch-tool, .pl-scratch-tool.pl-on { opacity: 1; }
+.pl-scratch-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 11px; color: var(--text-muted); }
+.pl-scratch-meta .pl-quiet { padding: 0; font-size: 11px; text-decoration: underline; }
+.pl-scratch-name { color: var(--accent); }
+.pl-scratch-waiting { font-size: 11px; color: var(--accent); }
+.cm-capture { background: var(--surface-2); color: var(--accent); }
+body.pl-printing .pl-scratch { display: none; }
