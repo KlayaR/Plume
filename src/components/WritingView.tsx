@@ -14,6 +14,8 @@ import { accept, discard, retry, useAI } from '../editor/actions'
 import ContextPanel from './ContextPanel'
 import ReviewPanel from './ReviewPanel'
 import BookView, { Inline } from './BookView'
+import Unwritten from './Unwritten'
+import { hasPlan } from '../lib/outline'
 import ChatPanel, { ResizeHandle } from './ChatPanel'
 import { ManuscriptToolbar } from './BottomBar'
 import NotesPanel from './NotesPanel'
@@ -166,6 +168,10 @@ function SheetScene({ scene, first, solo, active, characters, update, t }: {
 }) {
   const prefs = useStore(s => s.prefs)
   const places = useStore(s => s.book!.entries.filter(e => e.type === 'place'))
+  // What the plan says stays in sight while the first words go in, until you leave the scene.
+  const started = useRef(false)
+  if (!scene.text.trim()) started.current = true
+  else if (!active) started.current = false
   return (
           <section className={`pl-scene-block ${first ? 'pl-dropcap' : ''} ${active ? 'pl-scene-active' : ''}`}>
             {!first && !solo && <div className="pl-break" aria-label={t('Scene break')}>* * *</div>}
@@ -200,6 +206,7 @@ function SheetScene({ scene, first, solo, active, characters, update, t }: {
             )}
             {/* The plan card's note, in grey, above a scene that already has text (an empty scene shows it in place of the text). */}
             {scene.note?.trim() && scene.text.trim() && <div className="pl-scene-note" title={t('Card note (Plan)')}>{scene.note.trim()}</div>}
+            {started.current && hasPlan(scene) && <Unwritten scene={scene} named={!prefs.showSceneTitle} />}
             <LazyEditor scene={scene} active={active} />
           </section>
   )

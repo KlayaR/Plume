@@ -177,6 +177,7 @@ export async function writeFromPlan(sceneId: string) {
   const found = findScene(st.book, sceneId)
   if (!found) return
   if (!found.scene.note?.trim() && !found.scene.beats?.length) return st.notify('warn', t('Give this scene a note in the Plan first: Claude writes it from that note.'))
+  if (st.prefs.page) st.setPrefs({ page: false })
   st.selectScene(sceneId)
   // The scene's editor becomes the active one a frame or two after it opens.
   for (let i = 0; i < 40 && !(view?.dom.isConnected && useStore.getState().sceneId === sceneId); i++) await frame()

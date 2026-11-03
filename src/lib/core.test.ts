@@ -9,7 +9,7 @@ import { checkBible } from './bibleCheck'
 import { jumpItems, rankJump } from './quickjump'
 import { aiBlocks, joinBlocks, parseBlocks, toBlocks } from './blocks'
 import { tidy } from '../contextMenu'
-import { addVersion, cardPatch, cardSpec, foundationText, seriesText, mergeCards, outlineRules, readChapterProposal, readRevision, revisionChanges, revisionOrder, revisionText, turningPointsText, versionOf, versionProposal } from './outline'
+import { addVersion, cardPatch, cardSpec, foundationText, hasPlan, seriesText, unwrittenPlaces, mergeCards, outlineRules, readChapterProposal, readRevision, revisionChanges, revisionOrder, revisionText, turningPointsText, versionOf, versionProposal } from './outline'
 import { sessionOf, worthShowing } from './session'
 import { addDirection, ordered, togglePin, type Direction } from './directions'
 import { EMPTY_RATE, learnCall, learnWindow, shareOf } from './windowCost'
@@ -1621,5 +1621,24 @@ describe('comments beside the text', () => {
   it('keeps each card level with its passage unless the one above is in the way', () => {
     expect(stackCards([{ y: 10, height: 30 }, { y: 100, height: 20 }])).toEqual([10, 100])
     expect(stackCards([{ y: 10, height: 30 }, { y: 20, height: 20 }, { y: 40, height: 10 }], 6)).toEqual([10, 46, 72])
+  })
+})
+
+describe('unwritten scenes', () => {
+  const b = scene('b', ' ', { beats: ['Un'] }), a = scene('a', 'Texte'), c = scene('c', 'Texte'), d = scene('d', '', { note: 'Note' }), e = scene('e', ''), f = scene('f', '', { beats: ['Deux'] })
+  const ids = (places: Map<number, Scene[]>) => [...places].map(([at, list]) => [at, list.map(s => s.id)])
+  it('knows which scenes have a plan', () => {
+    expect([b, d, e, scene('x', '', { note: '  ', beats: [] })].map(hasPlan)).toEqual([true, true, false, false])
+  })
+  it('puts each one after the page where the text before it stops', () => {
+    const pages = [
+      { opening: { chapter: 'c1' }, blocks: [{ sceneId: 'a' }] },
+      { opening: null, blocks: [{ sceneId: 'a' }, { sceneId: 'c' }] },
+      { opening: { chapter: 'c2' }, blocks: [] },
+    ]
+    expect(ids(unwrittenPlaces([{ id: 'c1', scenes: [b, a, c, d, e] }, { id: 'c2', scenes: [f] }], pages))).toEqual([[0, ['b']], [1, ['d']], [2, ['f']]])
+  })
+  it('puts them before the first page when no page says where', () => {
+    expect(ids(unwrittenPlaces([{ id: 'c1', scenes: [d, f] }], [{ opening: null, blocks: [] }]))).toEqual([[-1, ['d', 'f']]])
   })
 })

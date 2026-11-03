@@ -12,6 +12,8 @@ import { BACK, FRONT, matterPages } from '../lib/matter'
 import { chapterLabels } from '../lib/chapters'
 import type { Chapter, Scene } from '../lib/types'
 import { balanceSplit, parseInline } from '../lib/inline'
+import { unwrittenPlaces } from '../lib/outline'
+import Unwritten from './Unwritten'
 import { useT } from '../i18n'
 import { showMenu } from '../contextMenu'
 import { paragraphMenu } from '../menus'
@@ -26,14 +28,14 @@ interface Block {
   split?: boolean // goes on to the next page: last line justified
   center?: boolean // front matter: centred, no indent
 }
-interface Head { label: string; title: string }
+interface Head { label: string; title: string; chapter?: string }
 interface Page { blocks: Block[]; opening: Head | null }
 /** A run of text that starts on a new page: a chapter, or one scene of it. */
 interface Part { head: Head | null; blocks: Block[] }
 
 function partBlocks(scenes: Scene[], dropFirst: boolean): Block[] {
   const out: Block[] = []
-  scenes.forEach((s, si) => {
+  scenes.filter(s => s.text.trim()).forEach((s, si) => {
     if (si > 0) out.push({ kind: 'break', text: '* * *', sceneId: s.id })
     s.text.split('\n').map(p => p.trim()).filter(Boolean).forEach((p, pi) => {
       out.push({ kind: 'para', text: p, sceneId: s.id, first: pi === 0, drop: dropFirst && si === 0 && pi === 0 })
@@ -42,7 +44,7 @@ function partBlocks(scenes: Scene[], dropFirst: boolean): Block[] {
   return out
 }
 
-const headOf = (c: Chapter, label: string): Head => ({ label, title: c.title && c.title !== label ? c.title : '' })
+const headOf = (c: Chapter, label: string): Head => ({ label, title: c.title && c.title !== label ? c.title : '', chapter: c.id })
 
 const dropAt = (b: Block) => (b.drop && !b.cont && /^\p{L}/u.test(b.text) ? 1 : 0)
 const paraClass = (b: Block) => `pl-bk-p${b.first || b.cont ? ' pl-bk-noindent' : ''}${b.split ? ' pl-bk-split' : ''}${b.center ? ' pl-bk-center' : ''}`
@@ -201,7 +203,9 @@ export default function BookView({ scopeOverride }: { scopeOverride?: 'book' } =
     if (!pages.length || shownFor.current === sceneId) return
     shownFor.current = sceneId
     const i = pages.findIndex(pg => pg.blocks.some(b => b.sceneId === sceneId))
-    document.querySelectorAll('.pl-bookpage-slot')[Math.max(0, i)]?.scrollIntoView({ block: 'start' })
+    const spot = i < 0 ? document.querySelector(`[data-unwritten="${sceneId}"]`) : null
+    const target = spot ?? document.querySelectorAll('.pl-bookpage-slot')[Math.max(0, i)]
+    target?.scrollIntoView({ block: 'start' })
   }, [pages, sceneId])
 
   const edit = (id: string) => {
@@ -210,11 +214,16 @@ export default function BookView({ scopeOverride }: { scopeOverride?: 'book' } =
     useStore.getState().selectScene(id)
   }
 
+  // Scenes the plan knows and the text doesn't yet, between the pages. Never on paper: printing passes scopeOverride.
+  const unwritten = scopeOverride ? new Map<number, Scene[]>() : unwrittenPlaces(scope === 'book' ? book.chapters : [{ id: chapter.id, scenes: scope === 'scene' ? [scene] : chapter.scenes }], pages)
+  const strips = (at: number) => unwritten.get(at)?.map(s => <Unwritten key={s.id} scene={s} page named onOpen={() => edit(s.id)} />)
+
   return (
     <div className={`pl-desk pl-paper-${prefs.paper}`}>
       <div className="pl-sheet-meta">{t(size.label)} · {pages.length} {t(pages.length > 1 ? 'pages' : 'page')} · {t('Double-click a paragraph to edit it')}</div>
       <div className="pl-bookpages" lang={book.meta.language}>
-        {pages.map((pg, i) => (
+        {strips(-1)}
+        {pages.map((pg, i) => [
           <div key={i} className="pl-bookpage-slot">
             <div className="pl-bookpage">
               <div className={`pl-bk-body${pg.opening ? ' pl-bk-opening' : ''}`}>
@@ -234,8 +243,9 @@ export default function BookView({ scopeOverride }: { scopeOverride?: 'book' } =
               </div>
               {prefs.pageNumbers && !pg.opening && !pg.blocks[0]?.center && <div className="pl-bk-folio">{i + 1}</div>}
             </div>
-          </div>
-        ))}
+          </div>,
+          strips(i),
+        ])}
       </div>
       <div className="pl-bk-measure" ref={measure} lang={book.meta.language} aria-hidden="true" />
     </div>

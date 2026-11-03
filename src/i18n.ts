@@ -1388,6 +1388,7 @@ const FR: Record<string, string> = {
   'Claude’s proposals are waiting in the cards: see them': 'Les propositions de Claude attendent dans les fiches : les voir',
   'Comments, level with their passages': 'Commentaires, à hauteur de leurs passages',
   'Their passage is no longer in the text:': 'Leur passage n’est plus dans le texte :',
+  'Not written yet': 'Pas encore écrite',
 }
 
 const SHELL = {

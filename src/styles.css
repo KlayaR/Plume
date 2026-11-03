@@ -1053,3 +1053,13 @@ body.pl-printing .pl-scratch { display: none; }
 .pl-cc-text { width: 100%; padding: 0; border: 0; outline: 0; background: none; color: inherit; font: inherit; resize: none; overflow: hidden; display: block; }
 body.pl-zen .pl-cc { display: none !important; }
 .pl-comment-gone { border-left-color: var(--text-muted); }
+
+/* A scene the plan knows and the text doesn't, yet */
+.pl-unwritten { display: flex; align-items: flex-start; gap: 14px; margin: 0 0 14px; padding: 8px 12px; border: 1px dashed color-mix(in srgb, var(--pl-ink-soft) 45%, transparent); border-radius: 8px; font-family: var(--font); font-size: 12.5px; line-height: 1.5; color: var(--pl-ink-soft); text-align: left; }
+.pl-unwritten ul { margin: 0; padding-left: 16px; }
+.pl-unwritten-title { font-weight: 600; }
+.pl-unwritten-note { font-style: italic; white-space: pre-wrap; }
+.pl-unwritten-side { margin-left: auto; flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.pl-unwritten .sk-btn { color: inherit; font-weight: 600; }
+.pl-unwritten-page { box-sizing: border-box; flex: none; width: calc(var(--pl-page-w, 13cm) * var(--pl-zoom, 1.35)); margin: 0; border-color: var(--border-strong); color: var(--text-muted); user-select: none; }
+body.pl-zen .pl-unwritten { display: none; }

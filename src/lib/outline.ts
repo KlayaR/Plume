@@ -418,3 +418,28 @@ export function outlineMarkdown(book: Book): string {
     ].filter(Boolean).join('\n\n')),
   ].filter(Boolean).join('\n\n'))].join('\n\n')
 }
+
+/** The plan has something to say about this scene: Claude can write it. */
+export const hasPlan = (s: Scene) => !!s.note?.trim() || !!s.beats?.length
+
+/**
+ * Page view: which page each planned scene with no text yet comes after (-1: before the
+ * first). Pages only hold text, so it's the page where the text before it stops.
+ */
+export function unwrittenPlaces(chapters: { id: string; scenes: Scene[] }[], pages: { opening: { chapter?: string } | null; blocks: { sceneId: string }[] }[]): Map<number, Scene[]> {
+  const last = new Map<string, number>()
+  pages.forEach((p, i) => {
+    if (p.opening?.chapter) last.set(p.opening.chapter, i)
+    for (const b of p.blocks) last.set(b.sceneId, i)
+  })
+  const out = new Map<number, Scene[]>()
+  let at = -1
+  for (const c of chapters) {
+    at = last.get(c.id) ?? at
+    for (const s of c.scenes) {
+      at = last.get(s.id) ?? at
+      if (!s.text.trim() && hasPlan(s)) out.set(at, [...(out.get(at) ?? []), s])
+    }
+  }
+  return out
+}
