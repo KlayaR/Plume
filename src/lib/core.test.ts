@@ -51,6 +51,7 @@ import { compareEntries, comparePlan, compareSnap, makeSnap, planText } from './
 import { changedKeys, undoStack } from './undo'
 import { addField, entryNamed, fieldLines, hasField, removeField, renamedValues, renameField, setFieldSend, sortEntries } from './fields'
 import { renderEntry } from './context'
+import { placeComments, stackCards } from './comments'
 import { beatMove, chapterAsBeats, outlineRows, pastedLines, plainChapter, plainScene, stockSceneTitle } from './outliner'
 import { referenceTargets, type Reference } from './references'
 import { applyLink, isKnownName, linkMatches, linkQuery } from './links'
@@ -1605,5 +1606,20 @@ describe('grouped undo that has to wait', () => {
     s.undo()
     expect(seen).toEqual(['undo2', 'undo1'])
     expect(s.undo()).toBeNull()
+  })
+})
+
+describe('comments beside the text', () => {
+  const comment = (id: string, quote: string, at?: number) => ({ id, quote, text: id, date: '2026-11-04', at })
+  it('puts them in reading order and sets aside those whose passage is gone', () => {
+    const { placed, orphans } = placeComments('Un chat. Un chien. Un chat.', [comment('c', 'chien'), comment('a', 'Un chat'), comment('x', 'un loup')])
+    expect(placed.map(p => [p.comment.id, p.at])).toEqual([['a', 0], ['c', 12]])
+    expect(orphans.map(c => c.id)).toEqual(['x'])
+    expect(placeComments('Un chat. Un chat.', [comment('b', 'Un chat', 12)]).placed[0].at).toBe(9)
+    expect(placeComments('Texte', undefined)).toEqual({ placed: [], orphans: [] })
+  })
+  it('keeps each card level with its passage unless the one above is in the way', () => {
+    expect(stackCards([{ y: 10, height: 30 }, { y: 100, height: 20 }])).toEqual([10, 100])
+    expect(stackCards([{ y: 10, height: 30 }, { y: 20, height: 20 }, { y: 40, height: 10 }], 6)).toEqual([10, 46, 72])
   })
 })

@@ -57,6 +57,11 @@ export default function ManuscriptOptions({ full = false }: { full?: boolean }) 
         <Switch checked={prefs.showStatus} onChange={v => set({ showStatus: v })} label={t('Status (draft, revised, done)')} />
       </SettingRow>
 
+      <div className="pl-opt-group">{t('Beside the text')}</div>
+      <SettingRow label={t('Comments, level with their passages')}>
+        <Switch checked={prefs.commentColumn} onChange={v => set({ commentColumn: v })} label={t('Comments, level with their passages')} />
+      </SettingRow>
+
       <div className="pl-opt-group">{t('Page view')}</div>
       <SettingRow label={t('Page numbers')} description={t('Not on a chapter’s opening page, as in printed books')}>
         <Switch checked={prefs.pageNumbers} onChange={v => set({ pageNumbers: v })} label={t('Page numbers')} />

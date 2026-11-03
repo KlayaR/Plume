@@ -103,6 +103,11 @@ export function addComment(view: EditorView, sceneId: string, text: string) {
   useStore.getState().updateScene(sceneId, { comments: [...(scene.comments ?? []), { id: newId(), quote, text, date: now().slice(0, 10), at: from + raw.indexOf(quote) }] })
 }
 
+export function updateComment(sceneId: string, id: string, text: string) {
+  const scene = findScene(useStore.getState().book, sceneId)?.scene
+  if (scene) useStore.getState().updateScene(sceneId, { comments: (scene.comments ?? []).map(c => c.id === id ? { ...c, text } : c) })
+}
+
 export function removeComment(sceneId: string, id: string) {
   const scene = findScene(useStore.getState().book, sceneId)?.scene
   if (scene) useStore.getState().updateScene(sceneId, { comments: (scene.comments ?? []).filter(c => c.id !== id) })

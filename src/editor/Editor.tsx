@@ -1,6 +1,6 @@
 // One scene's editor. A chapter shows one per scene; the scene you are in is
 // the "active" one: the AI panel, Accept/Discard and the counters follow it.
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Compartment, EditorState, RangeSetBuilder, StateField } from '@codemirror/state'
 import { Decoration, EditorView, highlightActiveLine, keymap, placeholder, showTooltip, ViewPlugin, type DecorationSet, type Tooltip, type ViewUpdate } from '@codemirror/view'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
@@ -16,6 +16,7 @@ import { editorMenu } from '../menus'
 import { enterStartsScene } from '../lib/chapters'
 import { proposalField, sceneExtensions, setNames } from './cm'
 import { captureExt } from './captures'
+import CommentColumn, { commentColumnExt } from './CommentColumn'
 import { accept, discard, fillPlaceholder, getEditorView, runAction, setEditorView, syncProposalState, useAI } from './actions'
 import { changesField, inlineExt, marksExt, placeholderExt, setChanges, setHighlights, trackedChangesExt, unknownNamesExt, type Highlight } from './marks'
 import { takePending, useEdit } from '../edit'
@@ -180,6 +181,7 @@ function makeState(s: Scene, lang: Lang, locked: boolean) {
       lockC.of(lockExt(locked)),
       systemLinesExt,
       captureExt(s.id),
+      commentColumnExt,
       spelling.of(spellingExt(windowsSpell())),
       languageToolExt({
         // Review mode, LanguageTool chosen, and this is the scene you are in.
@@ -258,6 +260,7 @@ function makeState(s: Scene, lang: Lang, locked: boolean) {
 export default function Editor({ scene }: { scene: Scene }) {
   const host = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
+  const [view, setView] = useState<EditorView | null>(null)
   const lang = useStore(s => s.book!.meta.language)
   const entries = useStore(s => s.book!.entries)
   const mode = useStore(s => s.prefs.mode)
@@ -267,9 +270,11 @@ export default function Editor({ scene }: { scene: Scene }) {
   useEffect(() => {
     const view = new EditorView({ state: makeState(scene, lang, locked), parent: host.current! })
     viewRef.current = view
+    setView(view)
     view.dispatch({ effects: names(useStore.getState().book!.entries) })
     return () => {
       if (getEditorView() === view) setEditorView(null)
+      setView(null)
       view.destroy()
       viewRef.current = null
     }
@@ -340,5 +345,8 @@ export default function Editor({ scene }: { scene: Scene }) {
     }
   }, [active])
 
-  return <div className="pl-editor" ref={host} />
+  return <>
+    <div className="pl-editor" ref={host} />
+    {view && !!scene.comments?.length && <CommentColumn view={view} scene={scene} />}
+  </>
 }

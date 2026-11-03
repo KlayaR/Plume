@@ -58,6 +58,8 @@ export type PageSize = 'auto' | 'fr' | 'us' | 'a5'
 
 /** How the manuscript looks and behaves; personal, so kept per computer. */
 export interface Prefs {
+  /** Margin comments beside the text, when the window has room. */
+  commentColumn: boolean
   /** Plan → Outline as a list you type, rather than cards. */
   outlineList: boolean
   /** Bible → Table: rows or portraits. */
@@ -155,6 +157,7 @@ export type Paper = 'auto' | 'ivory' | 'white' | 'sepia' | 'candle' | 'night'
 export type Scope = 'scene' | 'chapter' | 'book'
 
 export const DEFAULT_PREFS: Prefs = {
+  commentColumn: true,
   outlineList: false,
   bibleLayout: 'table',
   font: 'system', size: 19, leading: 1.7, width: 38, page: false, scope: 'chapter', pageSize: 'auto', pageZoom: 1.35,

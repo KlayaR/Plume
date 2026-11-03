@@ -9,6 +9,7 @@ import { addComment, diffWords, dropDarling, listVersions, readVersion, removeCo
 import { parseEntry, serializeEntry } from '../lib/bible'
 import { hashText } from '../ai'
 import { locateQuote } from '../lib/text'
+import { placeComments } from '../lib/comments'
 import { useT } from '../i18n'
 import { PassChecks } from './Revision'
 
@@ -25,6 +26,7 @@ export default function NotesPanel() {
   const { scene } = found
   const stale = staleScenes(book).length
   const fresh = scene.summaryOf === hashText(scene.text)
+  const { orphans } = placeComments(scene.text, scene.comments)
 
   const jump = (quote: string, near?: number) => {
     const v = getEditorView()
@@ -37,9 +39,18 @@ export default function NotesPanel() {
       <PassChecks scene={scene} />
       <section>
         <span className="sk-label">{t('Comments')}</span>
-        {(scene.comments ?? []).map(c => (
+        {placeComments(scene.text, scene.comments).placed.map(({ comment: c }) => (
           <div key={c.id} className="pl-comment">
             <button type="button" className="pl-quiet pl-comment-quote" onClick={() => jump(c.quote, c.at)} title={t('Show in the text')}>« {c.quote.slice(0, 80)}{c.quote.length > 80 ? '…' : ''} »</button>
+            <div className="pl-row"><span className="pl-grow">{c.text}</span>
+              <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm sk-btn-icon" onClick={() => removeComment(scene.id, c.id)} aria-label={t('Delete')}><Trash2 size={12} /></button>
+            </div>
+          </div>
+        ))}
+        {orphans.length > 0 && <span className="sk-hint">{t('Their passage is no longer in the text:')}</span>}
+        {orphans.map(c => (
+          <div key={c.id} className="pl-comment pl-comment-gone">
+            <span className="pl-comment-quote">« {c.quote.slice(0, 80)}{c.quote.length > 80 ? '…' : ''} »</span>
             <div className="pl-row"><span className="pl-grow">{c.text}</span>
               <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm sk-btn-icon" onClick={() => removeComment(scene.id, c.id)} aria-label={t('Delete')}><Trash2 size={12} /></button>
             </div>
