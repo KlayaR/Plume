@@ -47,7 +47,8 @@ import { toHtml, toMarkdown } from './export'
 import { matchRanges, replaceInText } from './find'
 import { speakerStats } from './speakers'
 import { nextToDo, progress, togglePass } from './revision'
-import { compareSnap, makeSnap } from './snapshots'
+import { compareEntries, comparePlan, compareSnap, makeSnap, planText } from './snapshots'
+import { changedKeys, undoStack } from './undo'
 import { referenceTargets, type Reference } from './references'
 import { applyLink, isKnownName, linkMatches, linkQuery } from './links'
 import { keysOf, keysOwner, keysProblem } from './shortcuts'
@@ -1377,5 +1378,101 @@ describe('capture lines', () => {
     expect(text.slice(c.at, c.at + c.quote.length)).toBe(c.quote)
     expect(captureQuote('« Non ! » dit-il.\n::comment x', 18)?.quote).toBe('« Non ! » dit-il.')
     expect(captureQuote('::comment x', 0)).toBeNull()
+  })
+})
+
+describe('undo for the Plan and the Bible', () => {
+  it('undoes and redoes, newest first', () => {
+    const s = undoStack()
+    let v = 0
+    s.push('', 'a', () => { v = 0 }, () => { v = 1 })
+    v = 1
+    s.push('', 'b', () => { v = 1 }, () => { v = 2 })
+    v = 2
+    expect(s.undo()?.name).toBe('b')
+    expect(v).toBe(1)
+    expect(s.undo()?.name).toBe('a')
+    expect(v).toBe(0)
+    expect(s.undo()).toBeNull()
+    expect(s.redo()?.name).toBe('a')
+    expect(v).toBe(1)
+  })
+  it('counts a burst on the same thing as one step, and only a burst', () => {
+    const s = undoStack(60, 1000)
+    const seen: string[] = []
+    s.push('name', 'x', () => seen.push('first'), () => seen.push('redo1'), 0)
+    s.push('name', 'x', () => seen.push('second'), () => seen.push('redo2'), 500)
+    s.undo()
+    expect(seen).toEqual(['first'])
+    s.redo()
+    expect(seen).toEqual(['first', 'redo2'])
+    s.push('name', 'x', () => seen.push('late'), () => {}, 900)
+    s.undo()
+    expect(seen).toEqual(['first', 'redo2', 'late'])
+  })
+  it('forgets what could be redone once you change something else', () => {
+    const s = undoStack()
+    s.push('', 'a', () => {}, () => {})
+    s.undo()
+    s.push('', 'b', () => {}, () => {})
+    expect(s.redo()).toBeNull()
+  })
+  it('does not record what undo itself changes, and keeps a limit', () => {
+    const s = undoStack(2)
+    s.push('', 'a', () => { s.push('', 'inner', () => {}, () => {}) }, () => {})
+    expect(s.undo()?.name).toBe('a')
+    expect(s.undo()).toBeNull()
+    s.push('', '1', () => {}, () => {})
+    s.push('', '2', () => {}, () => {})
+    s.push('', '3', () => {}, () => {})
+    expect([s.undo()?.name, s.undo()?.name, s.undo()]).toEqual(['3', '2', null])
+  })
+  it('a toast takes back its own step, even under another', () => {
+    const s = undoStack()
+    let back = false
+    const step = s.push('', 'a', () => { back = true }, () => {})
+    s.push('', 'b', () => {}, () => {})
+    s.takeBack(step)
+    expect(back).toBe(true)
+    expect(s.undo()?.name).toBe('b')
+    expect(s.undo()).toBeNull()
+  })
+  it('sees which keys change', () => {
+    const o = { a: 1, b: 2, c: 3 }
+    expect(changedKeys(o, { a: 1, b: 5 })).toEqual(['b'])
+    expect(changedKeys(o, { b: 5, c: 6 }, ['c'])).toEqual(['c'])
+  })
+})
+
+describe('snapshots of the bible and the plan', () => {
+  const elise = entry({ slug: 'elise', name: 'Élise', short: 'Une duchesse.' })
+  const book = bookOf([scene('a', 'Texte.', { note: 'Elle arrive.', beats: ['entrer'] })], [elise])
+  const snap = makeSnap(book, 'avant')
+  it('sees nothing when nothing changed', () => {
+    expect(compareEntries(book, snap)).toEqual([])
+    expect(comparePlan(book, snap)).toEqual([])
+  })
+  it('finds changed, new and removed entries', () => {
+    const marc = entry({ slug: 'marc', name: 'Marc' })
+    const later = { ...book, entries: [{ ...elise, short: 'Une reine.' }, marc] }
+    expect(compareEntries(later, snap).map(c => [c.slug, c.kind])).toEqual([['elise', 'changed'], ['marc', 'new']])
+    const gone = compareEntries({ ...book, entries: [] }, snap)
+    expect(gone.map(c => [c.slug, c.kind])).toEqual([['elise', 'removed']])
+    expect(parseEntry(gone[0].path, gone[0].before).short).toBe('Une duchesse.')
+  })
+  it('finds a card that changed, not one that only went from nothing to empty', () => {
+    const edit = (patch: object) => ({ ...book, chapters: book.chapters.map(c => ({ ...c, scenes: c.scenes.map(s => ({ ...s, ...patch })) })) })
+    const changes = comparePlan(edit({ note: 'Elle fuit.' }), snap)
+    expect(changes.map(c => [c.id, c.level])).toEqual([['a', 'scene']])
+    expect(planText(changes[0].before, k => k.toUpperCase())).toContain('NOTE: Elle arrive.')
+    expect(planText(changes[0].before, k => k)).toContain('beats: entrer')
+    const empty = makeSnap(edit({ reveals: undefined }), 'x')
+    expect(comparePlan(edit({ reveals: '' }), empty)).toEqual([])
+  })
+  it('still opens a snapshot from before 0.39', () => {
+    const old = { ...snap, entries: undefined, plan: undefined }
+    expect(compareEntries(book, old)).toEqual([])
+    expect(comparePlan(book, old)).toEqual([])
+    expect(compareSnap(book, old)).toEqual([])
   })
 })

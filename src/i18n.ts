@@ -801,7 +801,6 @@ const FR: Record<string, string> = {
   'New books start with Plume’s fantasy voice settings (Settings → Voice).': 'Les nouveaux livres démarrent avec les réglages de voix fantasy de Plume (Réglages → Voix).',
   '“{beat}” usually peaks, but its scene “{scene}” is rated {n}.': '« {beat} » est d’ordinaire un sommet, mais sa scène « {scene} » est notée {n}.',
   '“{beat}” usually breathes, but its scene “{scene}” is rated {n}.': '« {beat} » est d’ordinaire un temps calme, mais sa scène « {scene} » est notée {n}.',
-  'Move undone.': 'Déplacement annulé.',
   'Magic & powers': 'Magie et pouvoirs',
   'Creature': 'Créature',
   'Bestiary': 'Bestiaire',
@@ -1341,6 +1340,22 @@ const FR: Record<string, string> = {
   'Removed from the scratch pad.': 'Retiré du bloc-notes.', 'Sent to the scene.': 'Envoyé dans la scène.',
   'The book has no chapter yet.': 'Le livre n’a pas encore de chapitre.', 'New card in {chapter}.': 'Nouvelle carte dans {chapter}.',
   'Added to the loose ideas.': 'Ajouté aux idées en vrac.', 'Added to {name}.': 'Ajouté à {name}.',
+  // 0.39.0: undo and history for the bible and the plan
+  'Undone: {name}.': 'Annulé : {name}.', 'Undone.': 'Annulé.', 'Redone: {name}.': 'Rétabli : {name}.', 'Redone.': 'Rétabli.',
+  'Undo the last change': 'Annuler la dernière modification', 'Redo the change': 'Rétablir la modification',
+  'Nothing to undo.': 'Rien à annuler.', 'Nothing to redo.': 'Rien à rétablir.',
+  'Plan → Outline': 'Plan → Plan détaillé', 'Plan → Board': 'Plan → Tableau', 'Plan → Structure': 'Plan → Structure',
+  'Plan → Arcs': 'Plan → Arcs', 'Plan → Release': 'Plan → Publication', 'Plan → Threads': 'Plan → Fils',
+  'Plan → Timeline': 'Plan → Chronologie', 'Plan → Story lines': 'Plan → Intrigues', 'Plan → Dashboard': 'Plan → Tableau de bord',
+  'Bible → To review': 'Bible → À relire', 'Bible → AI check': 'Bible → Contrôle IA', 'Bible → Presence': 'Bible → Présence',
+  'Bible → Map': 'Bible → Carte du monde', 'Bible → Relations': 'Bible → Relations', 'Bible → Contradictions': 'Bible → Contradictions',
+  'New character…': 'Nouveau personnage…',
+  'Earlier versions of this entry…': 'Versions précédentes de cette fiche…', 'Earlier versions…': 'Versions précédentes…',
+  'No earlier version yet: Plume keeps one when you change an entry, at most every ten minutes.': 'Pas encore de version précédente : Plume en garde une quand vous modifiez une fiche, au plus toutes les dix minutes.',
+  'Part': 'Partie', 'Note': 'Note', 'Locked': 'Verrouillée', 'Foundation': 'Fondations',
+  'Restore this entry': 'Restaurer cette fiche', 'Put it back': 'Rétablir', 'Entry restored.': 'Fiche restaurée.',
+  'Put back as it was in the snapshot.': 'Rétabli tel que dans l’instantané.',
+  'This snapshot is older than version 0.39: it holds the text of the scenes only.': 'Cet instantané date d’avant la version 0.39 : il ne contient que le texte des scènes.',
 }
 
 const SHELL = {

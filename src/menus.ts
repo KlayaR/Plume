@@ -328,6 +328,7 @@ export function entryMenu(slug: string): MenuItem[] {
     !plain && !!e.tags?.length && { label: t('Remove a tag'), sub: e.tags.map(tag => ({ label: tag, onClick: () => st.updateEntry(slug, { tags: e.tags!.filter(x => x !== tag) }) })) },
     !!book.meta.series && e.type !== 'style' && { label: t('Shared with every book of the series'), checked: !!e.shared, onClick: () => st.shareEntry(slug, !e.shared) },
     e.type !== 'style' && { separator: true },
+    { label: t('Earlier versions…'), onClick: () => useStore.setState({ dialog: 'history', dialogArg: slug }) },
     e.type !== 'style' && { label: t('Duplicate'), onClick: () => duplicateEntry(e) },
     e.type !== 'style' && { label: t('Remove entry'), danger: true, onClick: async () => { if (await askDialog(t('Move "{title}" to the book\'s trash folder?', { title: e.name }), { title: t('Remove entry'), kind: 'warning' })) st.removeEntry(slug) } },
   ].filter(Boolean) as MenuItem[]

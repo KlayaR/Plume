@@ -12,8 +12,9 @@ import { bookCounts } from './lib/stats'
 import { sessionOf, worthShowing, type Session } from './lib/session'
 import type { Direction } from './lib/directions'
 import { EMPTY_RATE, learnCall, learnWindow, weigh, type Rate } from './lib/windowCost'
+import { CHAPTER_PLAN_KEYS, changedKeys, META_PLAN_KEYS, SCENE_PLAN_KEYS, undoStack } from './lib/undo'
 
-const undos: (() => void)[] = []
+const steps = undoStack()
 
 export type View = 'bible' | 'plan' | 'manuscript'
 export type BibleTab = 'entry' | 'review' | 'aicheck' | 'tracker' | 'map' | 'relations' | 'contradictions'
@@ -260,7 +261,7 @@ interface State {
   /** A place to go to in a scene: the editor selects it once the scene is open. */
   jump: { sceneId: string; from: number; to: number } | null
   /** The book's big dialogs, and the PDF print view. */
-  dialog: 'export' | 'agents' | 'tour' | 'find' | 'snapshots' | 'outline' | 'synonyms' | 'entry' | 'shortcuts' | 'jump' | 'help' | null
+  dialog: 'export' | 'agents' | 'tour' | 'find' | 'snapshots' | 'outline' | 'synonyms' | 'entry' | 'shortcuts' | 'jump' | 'help' | 'history' | null
   /** What a dialog opens on, when something asks for it (the words to find, the action to set a shortcut for). */
   dialogArg: string | null
   printing: boolean
@@ -282,8 +283,9 @@ interface State {
   unlock: (chapterId: string) => void
   /** Marks a chapter published on a day (today by default), or not published; a published chapter gets its summaries. */
   publishChapter: (chapterId: string, day: string | null) => void
-  /** Takes back the last move of a card or chapter in the Plan. */
-  undoMove: () => boolean
+  /** Plan and Bible: takes back the last change, or does it again. False when there is none. */
+  undoChange: () => boolean
+  redoChange: () => boolean
   addChapter: (title: string, opts?: { stay?: boolean }) => string
   /** Adds a scene at the end of a chapter; `stay` keeps the current view (the Plan board). */
   addScene: (chapterId: string, title: string, opts?: { stay?: boolean; note?: string }) => string
@@ -298,6 +300,8 @@ interface State {
   addEntry: (type: EntryType, name: string, opts?: { stay?: boolean }) => Entry
   updateEntry: (slug: string, patch: Partial<Entry>) => void
   removeEntry: (slug: string) => Promise<void>
+  /** Puts back an entry that is gone (from a snapshot). */
+  restoreEntry: (e: Entry) => Promise<void>
   updateMeta: (patch: Partial<Book['meta']>) => void
   /** Changes the series plan (saved in the series folder, shared by every book). */
   updateSeriesPlan: (patch: Partial<SeriesPlan>) => void
@@ -371,9 +375,14 @@ export const findScene = (book: Book | null, id: string | null) => {
 }
 
 export const useStore = create<State>((set, get) => {
-  // Undo for moves in the Plan (cards and chapters): each move leaves the move that reverses it.
-  let undoing = false
-  const remember = (inverse: () => void) => { if (!undoing) { undos.push(inverse); if (undos.length > 40) undos.shift() } }
+  // Undo: a field changed by hand leaves the value it had.
+  const rememberPatch = <T extends object>(what: string, name: string, obj: T, patch: Partial<T>, apply: (p: Partial<T>) => void, only?: readonly (keyof T)[]) => {
+    const keys = changedKeys(obj, patch, only)
+    if (!keys.length) return
+    const pick = (from: Partial<T>) => Object.fromEntries(keys.map(k => [k, from[k]] as const)) as Partial<T>
+    const old = pick(obj), next = pick(patch)
+    steps.push(`${what}:${keys.join()}`, name, () => apply(old), () => apply(next))
+  }
   const mutate = (f: (b: Book) => Book) => { const b = get().book; if (b) set({ book: f(b) }) }
   // Today's words for the goals, at most every half minute.
   let progressAt = 0
@@ -384,6 +393,63 @@ export const useStore = create<State>((set, get) => {
   }
   const metaLater = () => later('plume.json', () => saveMeta(get().book!))
   const fail = (err: unknown) => { useStore.setState({ saving: 'error', saveError: String(err) }); get().notify('error', t('Could not save: {e}', { e: String(err) })) }
+
+  // What goes to the trash can come back: it is written again from memory (the trash keeps its own copy).
+  const dropScene = async (id: string) => {
+    const found = findScene(get().book, id)
+    if (!found) return false
+    cancelLater(found.scene.path)
+    try { await trash(get().book!.root, found.scene.path) } catch (err) { get().notify('error', t('Could not move the scene to the trash: {e}', { e: String(err) })); return false }
+    const chapters = get().book!.chapters.map(c => ({ ...c, scenes: c.scenes.filter(s => s.id !== id) }))
+    set({ book: { ...get().book!, chapters }, sceneId: get().sceneId === id ? chapters.flatMap(c => c.scenes)[0]?.id ?? null : get().sceneId })
+    await saveMeta(get().book!)
+    return true
+  }
+  const putScene = async (scene: Scene, chapterId: string, index: number) => {
+    const bk = get().book!
+    if (!bk.chapters.some(c => c.id === chapterId) || findScene(bk, scene.id)) return
+    set({ book: { ...bk, chapters: bk.chapters.map(c => c.id === chapterId ? { ...c, scenes: [...c.scenes.slice(0, index), scene, ...c.scenes.slice(index)] } : c) }, sceneId: scene.id })
+    await saveScene(bk.root, scene)
+    await saveMeta(get().book!)
+  }
+  const dropChapter = async (id: string) => {
+    const b = get().book!
+    const c = b.chapters.find(x => x.id === id)
+    if (!c) return false
+    for (const s of c.scenes) { cancelLater(s.path); await trash(b.root, s.path) }
+    cancelLater(`ch:${id}`)
+    await trash(b.root, `manuscript/${c.folder}/chapter.md`).catch(() => {})
+    const chapters = get().book!.chapters.filter(x => x.id !== id)
+    const keep = get().sceneId && chapters.some(ch => ch.scenes.some(s => s.id === get().sceneId)) ? get().sceneId : chapters.flatMap(ch => ch.scenes)[0]?.id ?? null
+    set({ book: { ...get().book!, chapters }, sceneId: keep })
+    await saveMeta(get().book!)
+    return true
+  }
+  const putChapter = async (c: Chapter, at: number) => {
+    const bk = get().book!
+    if (bk.chapters.some(x => x.id === c.id)) return
+    const list = [...bk.chapters]
+    list.splice(Math.min(at, list.length), 0, c)
+    set({ book: { ...bk, chapters: list } })
+    await saveChapter(bk.root, c)
+    for (const s of c.scenes) await saveScene(bk.root, s)
+    await saveMeta(get().book!)
+  }
+  const dropEntry = async (slug: string) => {
+    const b = get().book!
+    const e = b.entries.find(x => x.slug === slug)
+    if (!e) return false
+    cancelLater(e.path)
+    try { await trash(e.shared ? seriesRootOf(b.root, b.meta.series) ?? b.root : b.root, e.path) } catch (err) { get().notify('error', t('Could not move the entry to the trash: {e}', { e: String(err) })); return false }
+    set({ book: { ...get().book!, entries: get().book!.entries.filter(x => x.slug !== slug) }, entrySlug: get().entrySlug === slug ? null : get().entrySlug })
+    return true
+  }
+  const putEntry = async (e: Entry) => {
+    const bk = get().book!
+    if (bk.entries.some(x => x.slug === e.slug)) return
+    set({ book: { ...bk, entries: [...bk.entries, e] }, entrySlug: e.slug })
+    await saveEntry(e.shared ? seriesRootOf(bk.root, bk.meta.series) ?? bk.root : bk.root, e)
+  }
 
   return {
     book: null,
@@ -434,13 +500,14 @@ export const useStore = create<State>((set, get) => {
       const back = spot && book.chapters.some(c => c.scenes.some(x => x.id === spot.sceneId)) ? spot : null
       const sceneId = back?.sceneId ?? book.chapters[0]?.scenes[0]?.id ?? null
       session = { root: book.root, words: bookCounts(book.chapters).words, start: Date.now() }
+      steps.clear()
       set({ book, recent, view: 'manuscript', sceneId, unlocked: [], jump: back ? { sceneId: back.sceneId, from: back.pos, to: back.pos } : null, entrySlug: null, freshSceneId: null, bibleTab: 'entry', planTab: 'outline' })
       import('./chat').then(m => m.loadChat(book))
       import('./writing').then(m => m.loadNotes(book))
       import('./scratch').then(m => m.loadScratch(book))
       import('./agents').then(m => m.loadAgents())
       // Library and safety: the lock for synced folders, today's backup, progress, the shelf card.
-      import('./library').then(m => { m.takeLock(book); m.autoBackup(book); m.recordProgress(get().book!); m.noteOnShelf(get().book!); m.refreshSnapshots(get().book!); m.applyFantasyDefaults(get().book!) })
+      import('./library').then(m => { m.takeLock(book); m.autoBackup(book); m.recordProgress(get().book!); m.noteOnShelf(get().book!); m.refreshSnapshots(get().book!); m.applyFantasyDefaults(get().book!); steps.clear() })
     },
     close: () => {
       const b = get().book
@@ -462,6 +529,10 @@ export const useStore = create<State>((set, get) => {
     showEntry: slug => { rememberPlace(here()); set({ entrySlug: slug, bibleTab: 'entry', ...(get().prefs.dual === 'bible' ? {} : { view: 'bible' as View }) }) },
 
     updateScene: (id, patch) => {
+      if (!('text' in patch)) {
+        const was = findScene(get().book, id)?.scene
+        if (was) rememberPatch(`scene:${id}`, was.title, was, patch, p => get().updateScene(id, p), SCENE_PLAN_KEYS)
+      }
       mutate(b => ({ ...b, chapters: b.chapters.map(c => ({ ...c, scenes: c.scenes.map(s => s.id === id ? { ...s, ...patch } : s) })) }))
       if (patch.text && get().freshSceneId === id) set({ freshSceneId: null })
       const found = findScene(get().book, id)
@@ -485,6 +556,8 @@ export const useStore = create<State>((set, get) => {
       if (patch.status === 'done' && get().claudeExe) import('./writing').then(m => { if (m.staleScenes(get().book!).some(s => s.id === id)) m.summarizeScene(id).catch(() => {}) })
     },
     updateChapter: (id, patch) => {
+      const was = get().book?.chapters.find(c => c.id === id)
+      if (was) rememberPatch(`chapter:${id}`, was.title || t('Untitled'), was, patch, p => get().updateChapter(id, p), CHAPTER_PLAN_KEYS)
       mutate(b => ({ ...b, chapters: b.chapters.map(c => c.id === id ? { ...c, ...patch } : c) }))
       later(`ch:${id}`, async () => { const c = get().book!.chapters.find(x => x.id === id); if (c) await saveChapter(get().book!.root, c) })
     },
@@ -510,6 +583,8 @@ export const useStore = create<State>((set, get) => {
       const at = chapters[chapters.length - 1]?.kind === 'epilogue' ? chapters.length - 1 : chapters.length
       chapters.splice(at, 0, ch)
       set({ book: { ...b, chapters }, ...(opts?.stay ? {} : { sceneId: sc.id, view: 'manuscript' as View }) })
+      let made = ch
+      steps.push('', title || t('Untitled'), () => { made = get().book!.chapters.find(c => c.id === ch.id) ?? made; return dropChapter(ch.id).catch(fail) }, () => putChapter(made, at).catch(fail))
       const root = b.root
       saveChapter(root, ch).then(() => saveScene(root, sc)).then(() => saveMeta(get().book!)).catch(fail)
       return ch.id
@@ -521,23 +596,27 @@ export const useStore = create<State>((set, get) => {
       mutate(bk => ({ ...bk, chapters: bk.chapters.map(c => c.id === chapterId ? { ...c, scenes: [...c.scenes, sc] } : c) }))
       if (!opts?.stay) set({ sceneId: sc.id, view: 'manuscript' })
       saveScene(b.root, sc).then(() => saveMeta(get().book!)).catch(fail)
+      let made = sc
+      steps.push('', title, () => { made = findScene(get().book, sc.id)?.scene ?? made; return dropScene(sc.id).catch(fail) }, () => putScene(made, chapterId, ch.scenes.length).catch(fail))
       return sc.id
     },
-    undoMove: () => {
-      const f = undos.pop()
-      if (!f) return false
-      undoing = true
-      try { f() } finally { undoing = false }
-      get().notify('ok', t('Move undone.'))
-      return true
+    undoChange: () => {
+      const step = steps.undo()
+      if (step) get().notify('ok', step.name ? t('Undone: {name}.', { name: step.name }) : t('Undone.'))
+      return !!step
+    },
+    redoChange: () => {
+      const step = steps.redo()
+      if (step) get().notify('ok', step.name ? t('Redone: {name}.', { name: step.name }) : t('Redone.'))
+      return !!step
     },
     moveChapter: (id, toIndex) => {
       const b = get().book!
       const was = b.chapters.findIndex(c => c.id === id)
-      remember(() => get().moveChapter(id, was))
       const chapters = b.chapters.filter(c => c.id !== id)
       const ch = b.chapters.find(c => c.id === id)
       if (!ch) return
+      steps.push('', ch.title || t('Untitled'), () => get().moveChapter(id, was), () => get().moveChapter(id, toIndex))
       chapters.splice(Math.max(0, Math.min(toIndex, chapters.length)), 0, ch)
       // Only the first chapter can stay a prologue, only the last an epilogue.
       const fixed = chapters.map((c, i) => (c.kind === 'prologue' && i !== 0) || (c.kind === 'epilogue' && i !== chapters.length - 1) ? { ...c, kind: 'chapter' as const } : c)
@@ -587,7 +666,7 @@ export const useStore = create<State>((set, get) => {
       if (!found) return
       const b = get().book!
       const from = { chapter: found.chapter.id, index: found.index }
-      remember(() => get().moveScene(sceneId, from.chapter, from.index))
+      steps.push('', found.scene.title, () => get().moveScene(sceneId, from.chapter, from.index), () => get().moveScene(sceneId, toChapterId, toIndex))
       if (found.chapter.id !== toChapterId) {
         // A scene file lives in its chapter's folder: write it there, trash the old copy.
         const to = b.chapters.find(c => c.id === toChapterId)!
@@ -613,46 +692,20 @@ export const useStore = create<State>((set, get) => {
       metaLater()
     },
     removeChapter: async id => {
-      const b = get().book!
-      const c = b.chapters.find(x => x.id === id)
-      if (!c) return
-      for (const s of c.scenes) { cancelLater(s.path); await trash(b.root, s.path) }
-      cancelLater(`ch:${id}`)
-      await trash(b.root, `manuscript/${c.folder}/chapter.md`).catch(() => {})
       const at = get().book!.chapters.findIndex(x => x.id === id)
-      const chapters = get().book!.chapters.filter(x => x.id !== id)
-      const keep = get().sceneId && chapters.some(ch => ch.scenes.some(s => s.id === get().sceneId)) ? get().sceneId : chapters.flatMap(ch => ch.scenes)[0]?.id ?? null
-      set({ book: { ...get().book!, chapters }, sceneId: keep })
-      await saveMeta(get().book!)
-      // Undo writes the chapter back from memory (the trash keeps its own copy).
-      get().notify('ok', t('Chapter moved to the trash.'), { label: t('Undo'), run: async () => {
-        const bk = get().book!
-        if (bk.chapters.some(x => x.id === id)) return
-        const list = [...bk.chapters]
-        list.splice(Math.min(at, list.length), 0, c)
-        set({ book: { ...bk, chapters: list } })
-        await saveChapter(bk.root, c)
-        for (const s of c.scenes) await saveScene(bk.root, s)
-        await saveMeta(get().book!)
-      } })
+      const first = get().book!.chapters[at]
+      if (!first || !await dropChapter(id)) return
+      let c = first
+      const step = steps.push('', c.title || t('Untitled'), () => putChapter(c, at).catch(fail), () => { c = get().book!.chapters.find(x => x.id === id) ?? c; return dropChapter(id).catch(fail) })
+      get().notify('ok', t('Chapter moved to the trash.'), { label: t('Undo'), run: () => steps.takeBack(step) })
     },
     removeScene: async id => {
       const found = findScene(get().book, id)
-      if (!found) return
-      const b = get().book!
-      cancelLater(found.scene.path)
-      try { await trash(b.root, found.scene.path) } catch (err) { get().notify('error', t('Could not move the scene to the trash: {e}', { e: String(err) })); return }
-      const chapters = b.chapters.map(c => ({ ...c, scenes: c.scenes.filter(s => s.id !== id) }))
-      set({ book: { ...b, chapters }, sceneId: get().sceneId === id ? chapters.flatMap(c => c.scenes)[0]?.id ?? null : get().sceneId })
-      await saveMeta(get().book!)
-      const { scene, chapter, index } = found
-      get().notify('ok', t('Scene moved to the trash.'), { label: t('Undo'), run: async () => {
-        const bk = get().book!
-        if (!bk.chapters.some(c => c.id === chapter.id) || findScene(bk, id)) return
-        set({ book: { ...bk, chapters: bk.chapters.map(c => c.id === chapter.id ? { ...c, scenes: [...c.scenes.slice(0, index), scene, ...c.scenes.slice(index)] } : c) }, sceneId: id })
-        await saveScene(bk.root, scene)
-        await saveMeta(get().book!)
-      } })
+      if (!found || !await dropScene(id)) return
+      const { chapter, index } = found
+      let scene = found.scene
+      const step = steps.push('', scene.title, () => putScene(scene, chapter.id, index).catch(fail), () => { scene = findScene(get().book, id)?.scene ?? scene; return dropScene(id).catch(fail) })
+      get().notify('ok', t('Scene moved to the trash.'), { label: t('Undo'), run: () => steps.takeBack(step) })
     },
 
     addEntry: (type, name, opts) => {
@@ -660,9 +713,18 @@ export const useStore = create<State>((set, get) => {
       const e = makeEntry(b, type, name)
       set({ book: { ...b, entries: [...b.entries, e] }, ...(opts?.stay ? {} : { entrySlug: e.slug }) })
       saveEntry(b.root, e).catch(fail)
+      let made = e
+      steps.push('', name, () => { made = get().book!.entries.find(x => x.slug === e.slug) ?? made; return dropEntry(e.slug).catch(fail) }, () => putEntry(made).catch(fail))
       return e
     },
     updateEntry: (slug, patch) => {
+      const was = get().book?.entries.find(x => x.slug === slug)
+      if (was) {
+        rememberPatch(`entry:${slug}`, was.name, was, patch, p => { if (get().view === 'bible') set({ entrySlug: slug }); get().updateEntry(slug, p) })
+        // Version history: the entry as it was before these changes, in .plume/history.
+        const root = get().book!.root
+        import('./writing').then(m => m.snapshotEntry(root, was))
+      }
       mutate(b => ({ ...b, entries: b.entries.map(e => e.slug === slug ? { ...e, ...patch } : e) }))
       const e = get().book!.entries.find(x => x.slug === slug)!
       later(e.path, async () => {
@@ -680,26 +742,23 @@ export const useStore = create<State>((set, get) => {
       })
     },
     removeEntry: async slug => {
-      const b = get().book!
-      const e = b.entries.find(x => x.slug === slug)
-      if (!e) return
-      cancelLater(e.path)
-      try {
-        await trash(e.shared ? seriesRootOf(b.root, b.meta.series) ?? b.root : b.root, e.path)
-      } catch (err) {
-        get().notify('error', t('Could not move the entry to the trash: {e}', { e: String(err) }))
-        return
-      }
-      set({ book: { ...get().book!, entries: get().book!.entries.filter(x => x.slug !== slug) }, entrySlug: null })
-      get().notify('ok', t('Entry moved to the trash.'), { label: t('Undo'), run: async () => {
-        const bk = get().book!
-        if (bk.entries.some(x => x.slug === slug)) return
-        set({ book: { ...bk, entries: [...bk.entries, e] }, entrySlug: slug })
-        await saveEntry(e.shared ? seriesRootOf(bk.root, bk.meta.series) ?? bk.root : bk.root, e)
-      } })
+      const first = get().book!.entries.find(x => x.slug === slug)
+      if (!first || !await dropEntry(slug)) return
+      let e = first
+      const step = steps.push('', e.name, () => putEntry(e).catch(fail), () => { e = get().book!.entries.find(x => x.slug === slug) ?? e; return dropEntry(slug).catch(fail) })
+      get().notify('ok', t('Entry moved to the trash.'), { label: t('Undo'), run: () => steps.takeBack(step) })
     },
-    updateMeta: patch => { mutate(b => ({ ...b, meta: { ...b.meta, ...patch } })); metaLater() },
-    updateSeriesPlan: patch => { mutate(b => ({ ...b, seriesPlan: { ...b.seriesPlan, ...patch } })); later('series.json', () => saveSeriesPlan(get().book!)) },
+    restoreEntry: e => {
+      steps.push('', e.name, () => dropEntry(e.slug).catch(fail), () => putEntry(e).catch(fail))
+      return putEntry(e)
+    },
+    updateMeta: patch => {
+      const b = get().book
+      if (b) rememberPatch('meta', '', b.meta, patch, p => get().updateMeta(p), META_PLAN_KEYS)
+      mutate(bk => ({ ...bk, meta: { ...bk.meta, ...patch } }))
+      metaLater()
+    },
+    updateSeriesPlan: patch => { rememberPatch('series', '', get().book?.seriesPlan ?? {}, patch, p => get().updateSeriesPlan(p)); mutate(b => ({ ...b, seriesPlan: { ...b.seriesPlan, ...patch } })); later('series.json', () => saveSeriesPlan(get().book!)) },
     shareEntry: async (slug, shared) => {
       const b = get().book!
       const e = b.entries.find(x => x.slug === slug)

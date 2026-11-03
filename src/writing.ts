@@ -5,8 +5,9 @@
 import { create } from 'zustand'
 import { invoke } from '@tauri-apps/api/core'
 import type { EditorView } from '@codemirror/view'
-import type { ActionId, Book, Scene } from './lib/types'
+import type { ActionId, Book, Entry, Scene } from './lib/types'
 import { newId } from './lib/text'
+import { serializeEntry } from './lib/bible'
 import { ask, hashText } from './ai'
 import { findScene, useStore } from './store'
 import { arcsOf } from './lib/serial'
@@ -121,6 +122,18 @@ export function snapshot(root: string, scene: Scene, force = false) {
   lastSnap.set(scene.id, { at: Date.now(), text: scene.text })
   const stamp = new Date().toISOString().replace(/[:.]/g, '-')
   invoke('write_text', { root, rel: `${historyDir(scene.id)}/${stamp}.md`, content: scene.text }).catch(() => {})
+}
+
+/** A bible entry's file as it stands, before you change it: at most one every ten minutes. Its versions go by the id `entry-<slug>`. */
+export function snapshotEntry(root: string, e: Entry, force = false) {
+  const id = `entry-${e.slug}`
+  const prev = lastSnap.get(id)
+  if (!force && prev && Date.now() - prev.at < 10 * 60_000) return
+  const text = serializeEntry(e)
+  if (prev?.text === text) return
+  lastSnap.set(id, { at: Date.now(), text })
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+  invoke('write_text', { root, rel: `${historyDir(id)}/${stamp}.md`, content: text }).catch(() => {})
 }
 
 export async function listVersions(root: string, sceneId: string): Promise<{ rel: string; date: Date }[]> {

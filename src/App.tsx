@@ -30,6 +30,7 @@ import ContextMenuHost from './components/ContextMenuHost'
 import LTFields from './components/LTFields'
 import HelpDialog from './components/HelpDialog'
 import SnapshotsDialog from './components/SnapshotsDialog'
+import { EntryHistoryDialog } from './components/NotesPanel'
 import EditChapterDialog from './components/EditChapterDialog'
 
 /** Scroll positions per space and scrolling element, for this run of the app. */
@@ -114,9 +115,13 @@ export default function App() {
       if (e.key === 'F11' && useStore.getState().book) { e.preventDefault(); const p = useStore.getState().prefs; useStore.getState().setPrefs({ zen: !p.zen }) }
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'j' && useStore.getState().book) { e.preventDefault(); toggleScratch() }
       if ((e.ctrlKey || e.metaKey) && e.key === '/' && useStore.getState().book) { e.preventDefault(); useStore.setState({ dialog: 'shortcuts' }) }
-      // Ctrl+Z in the Plan, outside any text field: take back the last card or chapter move.
-      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z' && useStore.getState().view === 'plan' && !(e.target as HTMLElement | null)?.closest?.('input, textarea, select, [contenteditable]')) {
-        if (useStore.getState().undoMove()) e.preventDefault()
+      // Plan and Bible, outside a text box (those have their own undo): take back the last change, or do it again.
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && ['z', 'y'].includes(e.key.toLowerCase())) {
+        const st = useStore.getState()
+        const again = e.key.toLowerCase() === 'y' ? !e.shiftKey : e.shiftKey
+        const undo = e.key.toLowerCase() === 'z' && !e.shiftKey
+        const typing = (e.target as HTMLElement | null)?.closest?.('textarea, [contenteditable], input:not([type=checkbox], [type=radio], [type=range])')
+        if (st.book && st.view !== 'manuscript' && !st.dialog && !st.showSettings && !typing && (undo ? st.undoChange() : again && st.redoChange())) e.preventDefault()
       }
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'b' && useStore.getState().book) { e.preventDefault(); useStore.setState({ dialog: 'entry' }) }
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'y' && useStore.getState().book) { e.preventDefault(); useStore.setState({ dialog: 'synonyms' }) }
@@ -179,6 +184,7 @@ export default function App() {
       {book && dialog === 'outline' && <OutlineDialog onClose={() => useStore.setState({ dialog: null })} />}
       {book && dialog === 'synonyms' && <SynonymDialog onClose={() => useStore.setState({ dialog: null })} />}
       {book && dialog === 'snapshots' && <SnapshotsDialog onClose={() => useStore.setState({ dialog: null })} />}
+      {book && dialog === 'history' && <EntryHistoryDialog onClose={() => useStore.setState({ dialog: null })} />}
       {book && dialog === 'entry' && <EntryFromText onClose={() => useStore.setState({ dialog: null })} />}
       {book && dialog === 'shortcuts' && <ShortcutsDialog onClose={() => useStore.setState({ dialog: null })} />}
       {book && dialog === 'jump' && <QuickJump onClose={() => useStore.setState({ dialog: null })} />}

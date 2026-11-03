@@ -5,7 +5,8 @@ import { History, MessageSquarePlus, RotateCcw, ScrollText, Trash2, Undo2 } from
 import { Dialog } from '../studio-kit/shell.js'
 import { findScene, useStore } from '../store'
 import { getEditorView } from '../editor/actions'
-import { addComment, diffWords, dropDarling, listVersions, readVersion, removeComment, restoreDarling, snapshot, staleScenes, summarizeScene, updateSummaries, useNotes, type DiffPart } from '../writing'
+import { addComment, diffWords, dropDarling, listVersions, readVersion, removeComment, restoreDarling, snapshot, snapshotEntry, staleScenes, summarizeScene, updateSummaries, useNotes, type DiffPart } from '../writing'
+import { parseEntry, serializeEntry } from '../lib/bible'
 import { hashText } from '../ai'
 import { locateQuote } from '../lib/text'
 import { useT } from '../i18n'
@@ -79,33 +80,31 @@ export default function NotesPanel() {
         <span className="sk-label">{t('History')}</span>
         <button type="button" className="sk-btn sk-btn-sm" onClick={() => setHistory(true)}><History size={13} /> {t('Earlier versions of this scene')}</button>
       </section>
-      {history && <HistoryDialog sceneId={scene.id} onClose={() => setHistory(false)} />}
+      {history && <HistoryDialog id={scene.id} name={scene.title} current={scene.text} empty={t('No earlier version yet: Plume keeps one every ten minutes of writing.')} onClose={() => setHistory(false)}
+        restore={old => {
+          snapshot(useStore.getState().book!.root, scene, true) // the current text is kept too
+          useStore.getState().updateScene(scene.id, { text: old })
+        }} />}
     </div>
   )
 }
 
-function HistoryDialog({ sceneId, onClose }: { sceneId: string; onClose: () => void }) {
+function HistoryDialog({ id, name, current, empty, restore, onClose }: { id: string; name: string; current: string; empty: string; restore: (old: string) => void; onClose: () => void }) {
   const book = useStore(s => s.book)!
-  const scene = findScene(book, sceneId)!.scene
   const t = useT()
   const [versions, setVersions] = useState<{ rel: string; date: Date }[]>([])
   const [pick, setPick] = useState<string>('')
   const [old, setOld] = useState('')
-  useEffect(() => { listVersions(book.root, sceneId).then(v => { setVersions(v); if (v[0]) setPick(v[0].rel) }) }, [book.root, sceneId])
+  useEffect(() => { listVersions(book.root, id).then(v => { setVersions(v); if (v[0]) setPick(v[0].rel) }) }, [book.root, id])
   useEffect(() => { if (pick) readVersion(book.root, pick).then(setOld).catch(() => setOld('')) }, [book.root, pick])
-  const parts: DiffPart[] = pick ? diffWords(old, scene.text) : []
-  const restore = () => {
-    snapshot(book.root, scene, true) // the current text is kept too
-    useStore.getState().updateScene(sceneId, { text: old })
-    onClose()
-  }
+  const parts: DiffPart[] = pick ? diffWords(old, current) : []
   return (
-    <Dialog wide title={t('History of “{name}”', { name: scene.title })} icon={History} onClose={onClose}
+    <Dialog wide title={t('History of “{name}”', { name })} icon={History} onClose={onClose}
       footer={<>
         <button type="button" className="sk-btn sk-btn-ghost" onClick={onClose}>{t('Close')}</button>
-        <button type="button" className="sk-btn sk-btn-primary" disabled={!pick} onClick={restore}><RotateCcw size={14} /> {t('Restore this version')}</button>
+        <button type="button" className="sk-btn sk-btn-primary" disabled={!pick} onClick={() => { restore(old); onClose() }}><RotateCcw size={14} /> {t('Restore this version')}</button>
       </>}>
-      {versions.length === 0 ? <p className="sk-hint">{t('No earlier version yet: Plume keeps one every ten minutes of writing.')}</p> : (
+      {versions.length === 0 ? <p className="sk-hint">{empty}</p> : (
         <>
           <select className="sk-select" value={pick} onChange={e => setPick(e.target.value)}>
             {versions.map(v => <option key={v.rel} value={v.rel}>{v.date.toLocaleString()}</option>)}
@@ -115,5 +114,22 @@ function HistoryDialog({ sceneId, onClose }: { sceneId: string; onClose: () => v
         </>
       )}
     </Dialog>
+  )
+}
+
+/** The versions of a bible entry: opened with dialogArg = its slug. */
+export function EntryHistoryDialog({ onClose }: { onClose: () => void }) {
+  const t = useT()
+  const [slug] = useState(() => useStore.getState().dialogArg)
+  const entry = useStore(s => s.book?.entries.find(e => e.slug === slug))
+  if (!entry) return null
+  return (
+    <HistoryDialog id={`entry-${entry.slug}`} name={entry.name} current={serializeEntry(entry)} empty={t('No earlier version yet: Plume keeps one when you change an entry, at most every ten minutes.')} onClose={onClose}
+      restore={old => {
+        const st = useStore.getState()
+        snapshotEntry(st.book!.root, entry, true) // the current one is kept too
+        const { slug: _slug, path: _path, shared: _shared, ...fields } = parseEntry(entry.path, old)
+        st.updateEntry(entry.slug, fields)
+      }} />
   )
 }
