@@ -1373,6 +1373,19 @@ const FR: Record<string, string> = {
   'With the full version': 'Avec la version complète',
   'Remove the field': 'Retirer le champ',
   'Field removed. The values stay in the files, and come back if you add it again.': 'Champ retiré. Les valeurs restent dans les fichiers et reviennent si vous le rajoutez.',
+  'Outline as cards': 'Plan détaillé en fiches',
+  'Outline as a list you type': 'Plan détaillé en liste à taper',
+  'New row': 'Nouvelle ligne',
+  'Nothing above to put it under.': 'Rien au-dessus où la ranger.',
+  '“{title}” has text or notes, which a beat can’t hold.': '« {title} » a du texte ou des notes, qu’une étape ne peut pas contenir.',
+  'Change of level': 'Changement de niveau',
+  '“{title}” has text or notes that a scene can’t hold. To join two chapters, use Merge in the cards.': '« {title} » a du texte ou des notes qu’une scène ne peut pas contenir. Pour réunir deux chapitres, utilisez Fusionner dans les fiches.',
+  'Row moved': 'Ligne déplacée',
+  'A beat': 'Une étape',
+  'Enter: a new row. Tab and Shift+Tab: chapter, scene, beat. Alt+Up and Alt+Down: move. Ctrl+Enter: its note.': 'Entrée : nouvelle ligne. Tab et Maj+Tab : chapitre, scène, étape. Alt+Haut et Alt+Bas : déplacer. Ctrl+Entrée : sa note.',
+  'Cards': 'Fiches',
+  'List': 'Liste',
+  'Claude’s proposals are waiting in the cards: see them': 'Les propositions de Claude attendent dans les fiches : les voir',
 }
 
 const SHELL = {

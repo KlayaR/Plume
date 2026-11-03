@@ -36,12 +36,12 @@ export function undoStack(limit = 60, burst = 30_000) {
       if (done.length > limit) done.shift()
       return step
     },
-    /** Everything `f` changes counts as one step, undone in reverse. */
-    group(name: string, f: () => void) {
-      if (collecting) return f()
+    /** Everything `f` changes, even once it has had to wait, counts as one step, undone in reverse. */
+    async group(name: string, f: () => unknown): Promise<void> {
+      if (collecting) { await f(); return }
       const parts: Step[] = []
       collecting = parts
-      try { f() } finally { collecting = null }
+      try { await f() } finally { collecting = null }
       if (parts.length) this.push('', name, () => [...parts].reverse().forEach(p => p.undo()), () => parts.forEach(p => p.redo()))
     },
     undo: () => replay(done, undone, 'undo'),

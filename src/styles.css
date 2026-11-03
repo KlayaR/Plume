@@ -1023,3 +1023,22 @@ body.pl-printing .pl-scratch { display: none; }
 .pl-galempty { color: var(--text-muted); font-size: 2.2rem; font-family: var(--pl-serif, serif); }
 .pl-galname { text-align: left; color: var(--text); font-weight: 500; padding: 0; }
 .pl-galshort { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* The outline as a list you type */
+.pl-li-list { display: flex; flex-direction: column; gap: 1px; }
+.pl-li { display: flex; flex-direction: column; border-radius: 6px; padding: 0 8px; }
+.pl-li:focus-within { background: var(--surface-1); }
+.pl-li-main { display: flex; align-items: baseline; gap: 8px; }
+.pl-li-text { flex: 1; min-width: 0; padding: 3px 0; border: 0; outline: 0; background: none; color: inherit; font: inherit; line-height: 1.45; resize: none; overflow: hidden; display: block; }
+.pl-li-text::placeholder { color: var(--text-muted); }
+.pl-li-0 { margin-top: 14px; font-weight: 600; }
+.pl-li-0:first-child { margin-top: 0; }
+.pl-li-0 .pl-li-text { font-family: var(--pl-serif); font-size: 1.08rem; }
+.pl-li-1 { margin-left: 1.4rem; }
+.pl-li-2 { margin-left: 2.8rem; color: var(--text-dim); font-size: 0.92rem; }
+.pl-li-num, .pl-li-words { flex: none; color: var(--text-muted); font-size: var(--fs-sm); font-weight: 400; white-space: nowrap; }
+.pl-li-dot { flex: none; color: var(--text-muted); }
+.pl-li-note { display: block; width: 100%; padding: 0 0 4px; text-align: left; color: var(--text-muted); font-size: var(--fs-sm); font-weight: 400; }
+.pl-li-notebox { width: 100%; box-sizing: border-box; margin: 2px 0 6px; font-size: var(--fs-sm); font-weight: 400; resize: none; overflow: hidden; }
+.pl-li-list .pl-ol-addch { margin-top: 12px; align-self: flex-start; }
+.pl-li-list .sk-hint { margin-top: 6px; }

@@ -58,6 +58,8 @@ export type PageSize = 'auto' | 'fr' | 'us' | 'a5'
 
 /** How the manuscript looks and behaves; personal, so kept per computer. */
 export interface Prefs {
+  /** Plan → Outline as a list you type, rather than cards. */
+  outlineList: boolean
   /** Bible → Table: rows or portraits. */
   bibleLayout: 'table' | 'gallery'
   font: FontId
@@ -153,6 +155,7 @@ export type Paper = 'auto' | 'ivory' | 'white' | 'sepia' | 'candle' | 'night'
 export type Scope = 'scene' | 'chapter' | 'book'
 
 export const DEFAULT_PREFS: Prefs = {
+  outlineList: false,
   bibleLayout: 'table',
   font: 'system', size: 19, leading: 1.7, width: 38, page: false, scope: 'chapter', pageSize: 'auto', pageZoom: 1.35,
   mode: 'write', focus: true, enterBreaks: true,
@@ -290,17 +293,17 @@ interface State {
   undoChange: () => boolean
   redoChange: () => boolean
   /** Everything `run` changes is one step for undo. */
-  groupChanges: (name: string, run: () => void) => void
-  addChapter: (title: string, opts?: { stay?: boolean }) => string
+  groupChanges: (name: string, run: () => unknown) => Promise<void>
+  addChapter: (title: string, opts?: { stay?: boolean; empty?: boolean }) => string
   /** Adds a scene at the end of a chapter; `stay` keeps the current view (the Plan board). */
   addScene: (chapterId: string, title: string, opts?: { stay?: boolean; note?: string }) => string
   moveChapter: (id: string, toIndex: number) => void
   splitScene: (id: string, text: string) => void
   promoteScene: (id: string) => void
   moveScene: (sceneId: string, toChapterId: string, toIndex: number) => void
-  removeScene: (id: string) => Promise<void>
+  removeScene: (id: string, opts?: { quiet?: boolean }) => Promise<void>
   /** Moves a chapter and all its scenes to the book's trash folder. */
-  removeChapter: (id: string) => Promise<void>
+  removeChapter: (id: string, opts?: { quiet?: boolean }) => Promise<void>
   /** Adds an entry and opens it; `stay` keeps the entry you are on. */
   addEntry: (type: EntryType, name: string, opts?: { stay?: boolean }) => Entry
   updateEntry: (slug: string, patch: Partial<Entry>) => void
@@ -581,17 +584,17 @@ export const useStore = create<State>((set, get) => {
     addChapter: (title, opts) => {
       const b = get().book!
       const ch = makeChapter(b, title)
-      const sc = makeScene(ch, b.meta.language === 'fr' ? 'Scène 1' : 'Scene 1')
-      ch.scenes.push(sc)
+      const sc = opts?.empty ? null : makeScene(ch, b.meta.language === 'fr' ? 'Scène 1' : 'Scene 1')
+      if (sc) ch.scenes.push(sc)
       // A new chapter goes before an epilogue, never after it.
       const chapters = [...b.chapters]
       const at = chapters[chapters.length - 1]?.kind === 'epilogue' ? chapters.length - 1 : chapters.length
       chapters.splice(at, 0, ch)
-      set({ book: { ...b, chapters }, ...(opts?.stay ? {} : { sceneId: sc.id, view: 'manuscript' as View }) })
+      set({ book: { ...b, chapters }, ...(opts?.stay || !sc ? {} : { sceneId: sc.id, view: 'manuscript' as View }) })
       let made = ch
       steps.push('', title || t('Untitled'), () => { made = get().book!.chapters.find(c => c.id === ch.id) ?? made; return dropChapter(ch.id).catch(fail) }, () => putChapter(made, at).catch(fail))
       const root = b.root
-      saveChapter(root, ch).then(() => saveScene(root, sc)).then(() => saveMeta(get().book!)).catch(fail)
+      saveChapter(root, ch).then(() => sc && saveScene(root, sc)).then(() => saveMeta(get().book!)).catch(fail)
       return ch.id
     },
     addScene: (chapterId, title, opts) => {
@@ -697,21 +700,21 @@ export const useStore = create<State>((set, get) => {
       set({ book: { ...b, chapters } })
       metaLater()
     },
-    removeChapter: async id => {
+    removeChapter: async (id, opts) => {
       const at = get().book!.chapters.findIndex(x => x.id === id)
       const first = get().book!.chapters[at]
       if (!first || !await dropChapter(id)) return
       let c = first
       const step = steps.push('', c.title || t('Untitled'), () => putChapter(c, at).catch(fail), () => { c = get().book!.chapters.find(x => x.id === id) ?? c; return dropChapter(id).catch(fail) })
-      get().notify('ok', t('Chapter moved to the trash.'), { label: t('Undo'), run: () => steps.takeBack(step) })
+      if (!opts?.quiet) get().notify('ok', t('Chapter moved to the trash.'), { label: t('Undo'), run: () => steps.takeBack(step) })
     },
-    removeScene: async id => {
+    removeScene: async (id, opts) => {
       const found = findScene(get().book, id)
       if (!found || !await dropScene(id)) return
       const { chapter, index } = found
       let scene = found.scene
       const step = steps.push('', scene.title, () => putScene(scene, chapter.id, index).catch(fail), () => { scene = findScene(get().book, id)?.scene ?? scene; return dropScene(id).catch(fail) })
-      get().notify('ok', t('Scene moved to the trash.'), { label: t('Undo'), run: () => steps.takeBack(step) })
+      if (!opts?.quiet) get().notify('ok', t('Scene moved to the trash.'), { label: t('Undo'), run: () => steps.takeBack(step) })
     },
 
     addEntry: (type, name, opts) => {

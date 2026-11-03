@@ -18,6 +18,7 @@ import { writeChapter, writeFromPlan } from '../editor/actions'
 import { askText, showMenu } from '../contextMenu'
 import { chapterMenu, sceneMenu } from '../menus'
 import { useT } from '../i18n'
+import OutlineList from './OutlineList'
 
 /** What is open for editing: a scene's id, or "ch:" + a chapter's id for its goal and ending. One at a time. */
 const useEditing = create<{ id: string | null }>(() => ({ id: null }))
@@ -39,6 +40,7 @@ export default function OutlineView() {
   const editing = useEditing(s => s.id)
   const pending = useOutline(s => Object.keys(s.proposals).length)
   const revising = useOutline(s => s.revising)
+  const list = useStore(s => s.prefs.outlineList)
   const t = useT()
   const [query, setQuery] = useState('')
   const [closed, setClosed] = useState<Set<string>>(new Set())
@@ -72,7 +74,11 @@ export default function OutlineView() {
   return (
     <div className="pl-ol">
       <div className="pl-ol-bar">
-        <input className="sk-input pl-ol-search" placeholder={t('Search the outline')} value={query} onChange={e => setQuery(e.target.value)} />
+        <nav className="pl-switch" aria-label={t('Layout')}>
+          <button type="button" aria-pressed={!list} onClick={() => useStore.getState().setPrefs({ outlineList: false })}>{t('Cards')}</button>
+          <button type="button" aria-pressed={list} onClick={() => useStore.getState().setPrefs({ outlineList: true })}>{t('List')}</button>
+        </nav>
+        {!list && <input className="sk-input pl-ol-search" placeholder={t('Search the outline')} value={query} onChange={e => setQuery(e.target.value)} />}
         <button type="button" className="sk-btn sk-btn-sm" disabled={!!busy} onClick={() => useStore.setState({ dialog: 'outline' })}><Sparkles size={13} /> {t('Outline from a premise')}</button>
         <button type="button" className="sk-btn sk-btn-sm" disabled={!book.chapters.length} onClick={() => useOutline.setState({ revising: true })} title={t('Tell Claude what to change in the whole outline: add, move, merge or remove chapters, change what happens. You tick the changes to keep.')}><PencilRuler size={13} /> {t('Revise the outline…')}</button>
         <button type="button" className="sk-btn sk-btn-sm" disabled={!!busy} onClick={detailAll} title={t('Claude details every chapter that has no beats yet, one after the other. Each comes back as a proposal.')}><Wand2 size={13} /> {t('Detail all')}</button>
@@ -104,14 +110,17 @@ export default function OutlineView() {
 
       {book.chapters.length === 0 && <div className="pl-emptystate"><b>{t('No outline yet.')}</b><span>{t('Start from a premise: Claude proposes chapters and scenes, then you detail each chapter here.')}</span></div>}
 
-      {shown.map(({ c, i }) => (
-        <ChapterBlock key={c.id} book={book} c={c} n={i} label={names[i]} open={!closed.has(c.id) || !!q} onFold={() => fold(c.id)} />
-      ))}
-      <button type="button" className="sk-btn sk-btn-ghost pl-ol-addch" onClick={() => {
-        const id = useStore.getState().addChapter(`${book.meta.language === 'fr' ? 'Chapitre' : 'Chapter'} ${book.chapters.filter(c => c.kind === 'chapter').length + 1}`, { stay: true })
-        const sc = useStore.getState().book!.chapters.find(c => c.id === id)?.scenes[0]
-        if (sc) edit(sc.id)
-      }}><Plus size={14} /> {t('Chapter')}</button>
+      {list && pending > 0 && <button type="button" className="sk-btn sk-btn-sm" onClick={() => useStore.getState().setPrefs({ outlineList: false })}>{t('Claude’s proposals are waiting in the cards: see them')}</button>}
+      {list ? <OutlineList book={book} /> : <>
+        {shown.map(({ c, i }) => (
+          <ChapterBlock key={c.id} book={book} c={c} n={i} label={names[i]} open={!closed.has(c.id) || !!q} onFold={() => fold(c.id)} />
+        ))}
+        <button type="button" className="sk-btn sk-btn-ghost pl-ol-addch" onClick={() => {
+          const id = useStore.getState().addChapter(`${book.meta.language === 'fr' ? 'Chapitre' : 'Chapter'} ${book.chapters.filter(c => c.kind === 'chapter').length + 1}`, { stay: true })
+          const sc = useStore.getState().book!.chapters.find(c => c.id === id)?.scenes[0]
+          if (sc) edit(sc.id)
+        }}><Plus size={14} /> {t('Chapter')}</button>
+      </>}
     </div>
   )
 }

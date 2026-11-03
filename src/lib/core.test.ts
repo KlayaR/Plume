@@ -51,6 +51,7 @@ import { compareEntries, comparePlan, compareSnap, makeSnap, planText } from './
 import { changedKeys, undoStack } from './undo'
 import { addField, entryNamed, fieldLines, hasField, removeField, renamedValues, renameField, setFieldSend, sortEntries } from './fields'
 import { renderEntry } from './context'
+import { beatMove, chapterAsBeats, outlineRows, pastedLines, plainChapter, plainScene, stockSceneTitle } from './outliner'
 import { referenceTargets, type Reference } from './references'
 import { applyLink, isKnownName, linkMatches, linkQuery } from './links'
 import { keysOf, keysOwner, keysProblem } from './shortcuts'
@@ -1534,10 +1535,10 @@ describe('fields per type of entry', () => {
 })
 
 describe('grouped undo', () => {
-  it('counts a group as one step, undone in reverse', () => {
+  it('counts a group as one step, undone in reverse', async () => {
     const s = undoStack()
     const seen: string[] = []
-    s.group('rename', () => {
+    await s.group('rename', () => {
       s.push('k', '1', () => seen.push('undo1'), () => seen.push('redo1'))
       s.push('k', '2', () => seen.push('undo2'), () => seen.push('redo2'))
     })
@@ -1546,5 +1547,63 @@ describe('grouped undo', () => {
     expect(s.undo()).toBeNull()
     s.redo()
     expect(seen).toEqual(['undo2', 'undo1', 'redo1', 'redo2'])
+  })
+})
+
+describe('the outline as a list', () => {
+  const chapter = (id: string, scenes: Scene[], over: Partial<Chapter> = {}): Chapter => ({ id, folder: `ch-${id}`, kind: 'chapter', title: id, notes: '', scenes, ...over })
+  const withChapters = (...chapters: Chapter[]) => ({ ...bookOf([]), chapters })
+
+  it('lists chapters, scenes and beats in order', () => {
+    const book = withChapters(chapter('c1', [scene('s1', '', { beats: ['un', 'deux'] }), scene('s2', '')]), chapter('c2', []))
+    expect(outlineRows(book).map(r => [r.level, r.text])).toEqual([[0, 'c1'], [1, 's1'], [2, 'un'], [2, 'deux'], [1, 's2'], [0, 'c2']])
+    expect(outlineRows(book)[3]).toMatchObject({ scene: 's1', beat: 1, chapter: 'c1' })
+  })
+  it('only lets a scene turn into a beat when nothing would be lost', () => {
+    expect(plainScene(scene('a', ''))).toBe(true)
+    expect(plainScene(scene('a', '', { beats: ['x'], comments: [] }))).toBe(true)
+    expect(plainScene(scene('a', 'Du texte.'))).toBe(false)
+    expect(plainScene(scene('a', '', { note: 'Elle arrive.' }))).toBe(false)
+    expect(plainScene(scene('a', '', { locked: true }))).toBe(false)
+    expect(plainScene(scene('a', '', { extra: { mine: 1 } }))).toBe(false)
+    // Its POV is no loss if the scene it joins has the same.
+    expect(plainScene(scene('a', '', { pov: 'elise' }))).toBe(false)
+    expect(plainScene(scene('a', '', { pov: 'elise', cast: ['Marc'] }), scene('b', '', { pov: 'elise', cast: ['Marc'] }))).toBe(true)
+    expect(plainScene(scene('a', '', { pov: 'elise' }), scene('b', '', { pov: 'marc' }))).toBe(false)
+  })
+  it('only lets a chapter turn into a scene when nothing would be lost', () => {
+    expect(plainChapter(chapter('c', []))).toBe(true)
+    expect(plainChapter(chapter('c', [], { goal: 'Fuir.' }))).toBe(false)
+    expect(plainChapter(chapter('c', [], { notes: 'Note' }))).toBe(false)
+    expect(chapterAsBeats(chapter('c', [scene('Scène 1', ''), scene('La fuite', '', { beats: ['Elle court'] }), scene('', '', { beats: ['Elle tombe'] })]))).toEqual(['La fuite', 'Elle court', 'Elle tombe'])
+    expect(stockSceneTitle('Scene 12')).toBe(true)
+    expect(stockSceneTitle('Scène 2 bis')).toBe(false)
+  })
+  it('moves a beat within its scene, then into the next one', () => {
+    const book = withChapters(chapter('c1', [scene('s1', '', { beats: ['a', 'b'] })]), chapter('c2', [scene('s2', '', { beats: ['c'] }), scene('s3', '')]))
+    expect(beatMove(book, 's1', 0, 1)).toMatchObject({ scene: { id: 's1' }, at: 1 })
+    expect(beatMove(book, 's1', 1, 1)).toMatchObject({ scene: { id: 's2' }, at: 0 })
+    expect(beatMove(book, 's2', 0, -1)).toMatchObject({ scene: { id: 's1' }, at: 2 })
+    expect(beatMove(book, 's1', 0, -1)).toBeNull()
+    expect(beatMove(book, 's3', 0, 1)).toBeNull()
+  })
+  it('makes rows of pasted lines', () => {
+    expect(pastedLines('- Un\r\n* Deux\n\n3. Trois\n  • Quatre  \n1) Cinq\nSix-sept')).toEqual(['Un', 'Deux', 'Trois', 'Quatre', 'Cinq', 'Six-sept'])
+    expect(pastedLines('Une seule ligne')).toEqual(['Une seule ligne'])
+  })
+})
+
+describe('grouped undo that has to wait', () => {
+  it('keeps what comes after an await in the same step', async () => {
+    const s = undoStack()
+    const seen: string[] = []
+    await s.group('both', async () => {
+      s.push('', '1', () => seen.push('undo1'), () => {})
+      await Promise.resolve()
+      s.push('', '2', () => seen.push('undo2'), () => {})
+    })
+    s.undo()
+    expect(seen).toEqual(['undo2', 'undo1'])
+    expect(s.undo()).toBeNull()
   })
 })

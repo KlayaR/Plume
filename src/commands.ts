@@ -30,6 +30,7 @@ export function commands(): Command[] {
     { id: 'undo', label: t('Undo the last change'), keys: 'Ctrl+Z', where: ['plan', 'bible'], run: () => { if (!st.undoChange()) st.notify('ok', t('Nothing to undo.')) } },
     { id: 'redo', label: t('Redo the change'), keys: 'Ctrl+Y', where: ['plan', 'bible'], run: () => { if (!st.redoChange()) st.notify('ok', t('Nothing to redo.')) } },
     planTab('outline', t('Plan → Outline')),
+    { id: 'outline-list', label: st.prefs.outlineList ? t('Outline as cards') : t('Outline as a list you type'), where: ['plan'], run: () => { st.setPrefs({ outlineList: !st.prefs.outlineList }); set({ view: 'plan', planTab: 'outline' }) } },
     planTab('board', t('Plan → Board')),
     ...(serial ? [planTab('arcs', t('Plan → Arcs')), planTab('release', t('Plan → Release')), planTab('threads', t('Plan → Threads'))] : [planTab('structure', t('Plan → Structure'))]),
     ...(st.prefs.simple ? [] : [planTab('timeline', t('Plan → Timeline')), planTab('lines', t('Plan → Story lines')), planTab('dashboard', t('Plan → Dashboard'))]),
