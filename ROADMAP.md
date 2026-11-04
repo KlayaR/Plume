@@ -18,7 +18,6 @@ or changes features.
 - The UX plan (five releases, simpler and calmer): see [docs/UX_PLAN.md](docs/UX_PLAN.md).
 - Try OpenRouter with a real key for a while: streaming, long replies, errors.
 - Test every feature in daily use on real books and fix what breaks.
-- Undo for deletions and renames in the Plan and the Bible (moves already undo).
 - Code-signed installer, so Windows stops warning about an unknown publisher.
 - Automatic updates (Tauri updater) once releases are public.
 

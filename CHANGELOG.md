@@ -7,6 +7,32 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.39.0
+**Writing**
+- **Scratch pad (Ctrl+J).** Notes, tasks and an inbox for the whole book, open from any space. It stays with the book and is never sent to Claude. Any item can be pinned to the top or sent on: to the scene at the cursor, a new card, the loose ideas, the grid or a bible entry.
+- **Capture lines.** While drafting, start a line with `::idea`, `::todo`, `::bible Name:` or `::comment` (`::idee`, `::tache`, `::fiche Nom :` and `::commentaire` work too) and press Enter. The line leaves the text and lands in the inbox, in your tasks or as a margin comment.
+- **Draft mode.** A button in the bottom bar, or Ctrl+K. The text only goes forward: typing lands at the end, Backspace stays within the word (or is off altogether, in Settings → Manuscript), and undo and moving the cursor are off. Enter twice still starts a new scene, and Claude's proposals and capture lines still work. Typewriter sounds are optional. Esc leaves it.
+- **Comments beside the text.** When there is room next to the sheet, comments sit in a column level with their passages, and those whose passage is gone are set apart at the bottom. Without the room they stay in the Margin tab.
+- **Scenes not written yet show in place.** A scene with a card note or beats but no text shows them where it belongs in the manuscript, with **Write it**. They are never printed.
+- **Fixed: a stray `* * *`.** Empty scenes no longer leave a scene break in page view and in print.
+
+**The bible**
+- **Fields per type of entry.** Add Age, Role or Home once and every entry of that type gets the row; you choose whether it goes to the AI. **More → Table** compares the entries of a type and edits them in place, and **Gallery** shows their portraits.
+- **Links as you type.** `[[` in an entry links another entry, or makes a new one.
+- **From entry to name and back.** Mentions now land on the name itself in the scene (click again for the next one), and Ctrl+click on a name in the text opens its entry, as does Open in its hover card.
+- **Detect the name in the text.** A switch per entry, for a name that is also an ordinary word: no underline, and Claude only gets the entry when it is @-mentioned, always sent, the point of view or linked.
+- **Earlier versions of an entry** (right-click it), one kept at most every ten minutes, and one click to restore.
+
+**The plan**
+- **An outline you can type.** Plan → Outline → List: Enter makes a new row, Tab and Shift+Tab change its level (chapter, scene, beat), Alt+Up and Alt+Down move it, Ctrl+Enter opens its note. A change that would lose text or notes is refused.
+- **A free-form grid.** Plan → Grid: open sheets of tiles, sticky notes and titles, with lines between them, labels and arrows. A tile can stand for a scene or a bible entry (**Put on the grid**, in their menus), and removing the tile leaves them alone. Sheets stay with the book, are in your backups and are never sent to the AI.
+
+**Everywhere**
+- **Undo and redo in the Plan and the Bible.** Ctrl+Z and Ctrl+Y, outside text boxes, take back deletions, renames and changes as well as moves, until the book closes.
+- **Snapshots hold the bible and the plan.** Compare a snapshot with the book as it is now and put back a scene, an entry or part of the plan. Older snapshots still work, with the scenes' text only.
+- **Ctrl+K knows more.** The tabs of the Plan and the Bible are in it, the actions of the space you are in come first, and each action shows its shortcut. Ctrl+. on an action gives it a short name or a shortcut of your own; Ctrl+/ lists them all.
+- **Export the bible or the outline on their own,** as Word or Markdown, from the ⋯ menu (now **Export…**), Ctrl+K, the Outline's ⋯ menu or an entry's right-click menu. Secret entries and private notes stay out unless you tick them. Portraits and the voice settings are left out.
+
 ## 0.38.0
 - **Fix what's flagged, on text already written.** A new button in the Review panel, for the scene or the chapter (also in the chapter menu and Ctrl+K), asks Claude to fix what Plume measures: your rules, AI tells and every report well over its target. Until now this was only offered right after Claude had written something.
 - **The fixes are safer.** Claude sends back only its replacements, so the rest of the scene can't move, and each one shows as a tracked change to accept or reject. A snapshot is taken first. A scene whose fixes would replace more than half of it, or change its length by more than 15 %, is left as written. The summary says how many points are flagged now and how many would remain once everything is accepted. "Fix them", after a chapter written straight in, now works the same way instead of replacing the text.

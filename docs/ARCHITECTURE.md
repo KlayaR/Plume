@@ -8,7 +8,7 @@ files, backups and running the `claude` command line.
 
 ```
 My Book/
-  plume.json                 title, language, chapter and scene order, AI settings
+  plume.json                 title, language, chapter and scene order, AI settings, fields per type of entry
   bible/style.md             style guide, always sent
   bible/<type>/<slug>.md     one entry per file
   manuscript/<chapter>/chapter.md
@@ -17,8 +17,10 @@ My Book/
 ```
 
 `.plume/` also holds the chat, the review list, darlings, the taste log,
-agent findings, version history (`history/<scene>/`) and the lock file. Backups
-go to Plume's own folder on this computer (`%LOCALAPPDATA%`), not the book.
+agent findings, version history (`history/<scene>/`, `history/entry-<slug>/`),
+snapshots, the scratch pad (`scratch.json`), the grid (`grids.json`) and the lock
+file. Backups go to Plume's own folder on this computer (`%LOCALAPPDATA%`), not
+the book; they leave out `.plume/`, except the scratch pad and the grid.
 
 Front matter is YAML at the top of each Markdown file. Keys Plume doesn't know
 are kept as they are, so a file edited by hand or by another tool survives.
@@ -51,7 +53,7 @@ before anything is sent.
 - `src/*.ts` at the top: stores and AI tasks (`llm.ts` sends every AI request
   to the claude command line or to OpenRouter, `ai.ts` one-shot calls and
   cheap mode, `chat.ts`, `writing.ts`, `review.ts`, `library.ts`, `agents.ts`,
-  `bibleAI.ts`).
+  `bibleAI.ts`, `scratch.ts`, `grids.ts`).
 - `src/editor/`: CodeMirror pieces: typography as you type, AI proposals,
   overlays (unknown names, placeholders, highlights, tracked changes).
 - `src/components/`: the screens and dialogs.

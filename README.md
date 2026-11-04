@@ -25,7 +25,11 @@ editor, back them up however you like.
 - Typography as you type for French and English (quotes, dashes, ellipses,
   French spaces), automatic capitals, italics and bold, clean paste from Word.
 - Enter, Enter, Enter: a new scene, then a new chapter. Darlings drawer,
-  placeholders to fill later, margin comments, version history per scene.
+  placeholders to fill later, comments beside their passages, version history
+  per scene.
+- A scratch pad open from any space (notes, tasks, an inbox), capture lines while
+  drafting (`::idea`, `::todo`, `::bible Name:`, `::comment`), and a draft mode
+  where the text only goes forward, typewriter sounds optional.
 
 **Write with Claude**
 - Continue, rewrite, beats to prose, fill a placeholder, and quick actions
@@ -44,6 +48,8 @@ editor, back them up however you like.
 - Entries are stacks of **blocks** you can reorder; each block says whether the AI always reads it, reads it with the full entry, or never reads it (secrets stay out). Tags, and a second view to keep the bible beside the manuscript.
 - Facts dated by chapter ("blind in the left eye from chapter 12"), series
   shared across books, a relationship web, an appearance tracker.
+- Fields per type of entry (age, role, home…), a table to compare them, a gallery
+  of portraits, `[[` links as you type, and earlier versions of every entry.
 - **AI check:** finds what makes the AI's context worse (missing short versions,
   bloated entries, characters without a voice, duplicate names) and fixes it.
 
@@ -51,6 +57,8 @@ editor, back them up however you like.
 - Index cards that are the real scenes, structure templates with a pacing
   view, a tension curve, a timeline in story time, story lines, a dashboard,
   revision passes, an outline from a premise.
+- An outline you can type (Enter, Tab, Alt+arrows), a free-form grid of tiles,
+  sticky notes and lines, and Ctrl+Z for every change in the Plan and the Bible.
 
 **Review** (after AutoCrit)
 - Reports for pacing, dialogue, strong writing, word choice, repetition and
@@ -70,6 +78,7 @@ editor, back them up however you like.
 **Out**
 - EPUB (KDP-ready), Word (book or submission format), PDF, HTML for beta
   readers, Markdown; front and back matter, part pages; named snapshots.
+- The bible or the outline on their own, as Word or Markdown.
 
 ## Install
 
@@ -88,7 +97,8 @@ To build it yourself, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 - Your books never leave your computer, except the passages and bible entries
   sent to Claude when you ask for something, through your own `claude` CLI.
-- Secret bible entries and private notes are never sent.
+- Secret bible entries, private notes, the scratch pad and the grid are never
+  sent.
 - If you turn on OpenRouter, the passages and entries of a request go to
   OpenRouter and the model you chose instead of Claude. Your key stays on your
   computer, never in a book.
