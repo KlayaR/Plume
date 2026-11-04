@@ -106,7 +106,7 @@ export interface Built {
   budget: number
 }
 
-const VOICE_LABELS: Record<Lang, Record<string, string>> = {
+export const VOICE_LABELS: Record<Lang, Record<string, string>> = {
   fr: { register: 'Registre', sentences: 'Phrases', tic: 'Tic de langage', gesture: 'Geste signature', never: 'Ne dit jamais', inner: 'Voix intérieure', lines: 'Répliques types' },
   en: { register: 'Register', sentences: 'Sentences', tic: 'Verbal tic', gesture: 'Signature gesture', never: 'Never says', inner: 'Inner voice', lines: 'Sample lines' },
 }

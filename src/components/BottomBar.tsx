@@ -175,7 +175,7 @@ function MoreMenu() {
           <button type="button" role="menuitem" className="pl-menuitem" onClick={go(() => useStore.setState({ dialog: 'help' }))}><CircleHelp size={15} /> {t('Help')} (F1)</button>
           <button type="button" role="menuitem" className="pl-menuitem" onClick={go(() => useStore.setState({ dialog: 'agents' }))}><Bot size={15} /> {t('Agent tasks')}</button>
           <button type="button" role="menuitem" className="pl-menuitem" onClick={go(() => useStore.setState({ dialog: 'snapshots' }))}><Camera size={15} /> {t('Snapshots')}</button>
-          <button type="button" role="menuitem" className="pl-menuitem" onClick={go(() => useStore.setState({ dialog: 'export' }))}><FileOutput size={15} /> {t('Export the book')}</button>
+          <button type="button" role="menuitem" className="pl-menuitem" onClick={go(() => useStore.setState({ dialog: 'export' }))}><FileOutput size={15} /> {t('Export…')}</button>
           <button type="button" role="menuitem" className="pl-menuitem" onClick={go(() => useStore.setState({ dialog: 'shortcuts' }))}><Keyboard size={15} /> {t('Keyboard shortcuts')}</button>
           <button type="button" role="menuitem" className="pl-menuitem" onClick={go(() => useStore.setState({ dialog: 'tour' }))}><Compass size={15} /> {t('Quick tour')}</button>
         </div>

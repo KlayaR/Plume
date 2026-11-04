@@ -1423,6 +1423,12 @@ const FR: Record<string, string> = {
   'Move around the sheet': 'Se déplacer sur la feuille',
   'Shift+click': 'Maj+clic',
   'Add a tile to the selection': 'Ajouter une tuile à la sélection',
+  'What to export': 'Quoi exporter',
+  'Export the bible': 'Exporter la bible', 'Export the outline': 'Exporter le plan détaillé',
+  'Export the bible…': 'Exporter la bible…', 'Export the outline…': 'Exporter le plan détaillé…',
+  'Secret entries ({n})': 'Fiches secrètes ({n})',
+  'A section per type of entry, with its fields, dated facts, voice and links. Portraits and the voice settings are left out.': 'Une section par type de fiche, avec ses champs, ses faits datés, sa voix et ses liens. Les portraits et les réglages de voix n’y sont pas.',
+  'Chapters with their goals and endings, then scenes with their notes and beats.': 'Les chapitres avec leur but et leur fin, puis les scènes avec leurs notes et leurs étapes.',
 }
 
 const SHELL = {

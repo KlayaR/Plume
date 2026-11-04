@@ -334,6 +334,7 @@ export function entryMenu(slug: string): MenuItem[] {
     !!book.meta.series && e.type !== 'style' && { label: t('Shared with every book of the series'), checked: !!e.shared, onClick: () => st.shareEntry(slug, !e.shared) },
     e.type !== 'style' && { separator: true },
     { label: t('Earlier versions…'), onClick: () => useStore.setState({ dialog: 'history', dialogArg: slug }) },
+    !plain && { label: t('Export the bible…'), onClick: () => useStore.setState({ dialog: 'export', dialogArg: 'bible' }) },
     e.type !== 'style' && { label: t('Duplicate'), onClick: () => duplicateEntry(e) },
     e.type !== 'style' && { label: t('Remove entry'), danger: true, onClick: async () => { if (await askDialog(t('Move "{title}" to the book\'s trash folder?', { title: e.name }), { title: t('Remove entry'), kind: 'warning' })) st.removeEntry(slug) } },
   ].filter(Boolean) as MenuItem[]

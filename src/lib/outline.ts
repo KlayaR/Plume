@@ -402,19 +402,20 @@ export function addVersion(all: Record<string, OutlineVersion[]>, chapterId: str
 /** The outline as Markdown, to copy elsewhere. */
 export function outlineMarkdown(book: Book): string {
   const fr = book.meta.language === 'fr'
+  const colon = fr ? ' :' : ':'
   return [`# ${book.meta.title}`, ...book.chapters.map((c, i) => [
     `## ${i + 1}. ${c.title || '…'}`,
-    c.goal ? `*${fr ? 'But' : 'Goal'} :* ${c.goal}` : '',
-    c.ending ? `*${fr ? 'Fin' : 'Ending'} :* ${c.ending}` : '',
+    c.goal ? `*${fr ? 'But' : 'Goal'}${colon}* ${c.goal}` : '',
+    c.ending ? `*${fr ? 'Fin' : 'Ending'}${colon}* ${c.ending}` : '',
     ...c.scenes.map(s => [
       `### ${s.title}`,
-      [s.pov && `${fr ? 'Point de vue' : 'POV'} : ${nameOf(book, s.pov)}`, s.place && `${fr ? 'Lieu' : 'Place'} : ${nameOf(book, s.place)}`, s.time].filter(Boolean).join(' · '),
+      [s.pov && `${fr ? 'Point de vue' : 'POV'}${colon} ${nameOf(book, s.pov)}`, s.place && `${fr ? 'Lieu' : 'Place'}${colon} ${nameOf(book, s.place)}`, s.time].filter(Boolean).join(' · '),
       s.note ?? '',
       ...(s.beats ?? []).map((b, j) => `${j + 1}. ${b}`),
-      s.reveals ? `*${fr ? 'Le lecteur apprend' : 'Reveals'} :* ${s.reveals}` : '',
-      s.seeds ? `*${fr ? 'Graines pour la suite' : 'Seeds'} :* ${s.seeds}` : '',
-      s.arc ? `*Arc :* ${s.arc}` : '',
-      s.pace ? `*${fr ? 'Rythme' : 'Pace'} :* ${s.pace}` : '',
+      s.reveals ? `*${fr ? 'Le lecteur apprend' : 'Reveals'}${colon}* ${s.reveals}` : '',
+      s.seeds ? `*${fr ? 'Graines pour la suite' : 'Seeds'}${colon}* ${s.seeds}` : '',
+      s.arc ? `*Arc${colon}* ${s.arc}` : '',
+      s.pace ? `*${fr ? 'Rythme' : 'Pace'}${colon}* ${s.pace}` : '',
     ].filter(Boolean).join('\n\n')),
   ].filter(Boolean).join('\n\n'))].join('\n\n')
 }

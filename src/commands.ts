@@ -42,6 +42,8 @@ export function commands(): Command[] {
     bibleTab('aicheck', t('Bible → AI check')),
     ...(st.prefs.simple ? [] : [bibleTab('table', t('Bible → Table')), bibleTab('tracker', t('Bible → Presence')), bibleTab('map', t('Bible → Map')), bibleTab('relations', t('Bible → Relations')), bibleTab('contradictions', t('Bible → Contradictions'))]),
     { id: 'export', label: t('Export…'), run: () => set({ dialog: 'export' }) },
+    { id: 'export-bible', label: t('Export the bible…'), where: ['bible'], run: () => set({ dialog: 'export', dialogArg: 'bible' }) },
+    { id: 'export-outline', label: t('Export the outline…'), where: ['plan'], run: () => set({ dialog: 'export', dialogArg: 'outline' }) },
     { id: 'snapshots', label: t('Snapshots'), run: () => set({ dialog: 'snapshots' }) },
     { id: 'find', label: t('Find and replace'), keys: 'Ctrl+Shift+F', run: () => set({ dialog: 'find' }) },
     { id: 'outline', label: t('Propose an outline'), where: ['plan'], run: () => set({ dialog: 'outline' }) },

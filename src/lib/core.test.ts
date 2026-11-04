@@ -31,6 +31,8 @@ import { EditorState } from '@codemirror/state'
 import { changesField, setChanges } from '../editor/marks'
 import { parseStoryTime } from './structures'
 import { makeZip, readZip, utf8, fromUtf8 } from './zip'
+import { bibleMarkdown, markdownToDocx, toDocx } from './export'
+import { outlineMarkdown } from './outline'
 import { arcsOf, beatChapter, bufferOf, hookFlags, maskSystem, mergeStats, readBox, releaseDates, releaseStreak, statConflicts, statsAt, systemBoxes, textKey, threadStates, volumesOf, weekReleases } from './serial'
 import { chapterTitleFor, royalRoadHtml, volumeBook } from './export'
 import { serialStorySoFar } from './context'
@@ -1746,5 +1748,76 @@ describe('the grid', () => {
     expect(read).toHaveLength(1)
     expect(read[0].tiles.map(t => t.id)).toEqual(['a'])
     expect(read[0].links).toEqual([])
+  })
+})
+
+describe('exporting the bible and the outline', () => {
+  const book = () => {
+    const b = bookOf([scene('s1', 'Texte.', { title: 'L’arrivée', note: 'Elle arrive.', beats: ['Le bal', 'La fuite'] })], [
+      entry({ slug: 'marc', name: 'Marc', type: 'character', rank: 'secondary', short: 'Le traître.' }),
+      entry({ slug: 'elise', name: 'Élise', type: 'character', rank: 'main', aliases: ['Élise', 'Éli!'], short: 'La duchesse.', full: '### Rôle\n\nHéroïne.', fields: { Âge: '19' }, facts: [{ from: 3, to: 5, text: 'Blessée' }, { from: null, to: null, text: 'Née à Valombre' }], links: ['marc', 'gone'], notes: 'Pour moi seul.' }),
+      entry({ slug: 'cle', name: 'La clé', type: 'object', include: 'secret', short: 'Cachée.' }),
+      entry({ slug: 'style', name: 'Style', type: 'style', short: 'Sec.' }),
+    ], 'fr')
+    return { ...b, meta: { ...b.meta, fields: { character: [{ name: 'Âge' }] } } }
+  }
+
+  it('gives the bible by type of entry, the main characters first', () => {
+    const md = bibleMarkdown(book(), {}, s => s === 'Characters' ? 'Personnages' : s)
+    expect(md.indexOf('## Personnages')).toBeGreaterThan(0)
+    expect(md.indexOf('### Élise')).toBeLessThan(md.indexOf('### Marc'))
+    expect(md).toContain('**Aussi appelé :** Éli')
+    expect(md).toContain('**Âge :** 19')
+    expect(md).toContain('#### Rôle')
+    expect(md).toContain('- *ch. 3–5 :* Blessée')
+    expect(md).toContain('- Née à Valombre')
+    expect(md).toContain('**Liens :** Marc\n')
+  })
+
+  it('leaves out what is secret, private or not the bible, unless asked', () => {
+    const md = bibleMarkdown(book())
+    expect(md).not.toContain('Pour moi seul')
+    expect(md).not.toContain('La clé')
+    expect(md).not.toContain('Sec.')
+    const all = bibleMarkdown(book(), { secret: true, notes: true })
+    expect(all).toContain('**Notes privées :** Pour moi seul.')
+    expect(all).toContain('## Objects')
+    expect(all).toContain('### La clé')
+    expect(all).not.toContain('Sec.')
+  })
+
+  it('makes Word from the Markdown: headings, lists, paragraphs', async () => {
+    const files = await readZip(await markdownToDocx('# T & co\n\n## Sec\n\n### Nom\n\n#### Bloc\n\n##### Plus bas\n\n**A :** b\n\n- un\n1. deux\n*But :* trois', book()))
+    const xml = fromUtf8(files.get('word/document.xml')!)
+    const styleOf = (text: string) => xml.split('</w:p>').find(p => p.includes(`>${text}<`))?.match(/w:pStyle w:val="(\w+)"/)?.[1]
+    expect(styleOf('T &amp; co')).toBe('Title')
+    expect(styleOf('Sec')).toBe('Heading1')
+    expect(styleOf('Nom')).toBe('Heading2')
+    expect(styleOf('Bloc')).toBe('Heading3')
+    expect(styleOf('Plus bas')).toBe('Heading3')
+    expect(styleOf('un')).toBe('Item')
+    expect(xml).toContain('<w:r><w:t>1.</w:t><w:tab/></w:r>')
+    expect(styleOf(' trois')).toBe('Body')
+    expect(xml).toContain('<w:b/></w:rPr><w:t xml:space="preserve">A :</w:t>')
+    expect(files.has('word/footer1.xml')).toBe(true)
+  })
+
+  it('still writes the book in Word, with its header', async () => {
+    const b = book()
+    const en = { ...b, meta: { ...b.meta, language: 'en' as const, author: 'Ann Lee', title: 'Ash' } }
+    const files = await readZip(await toDocx(en, { format: 'docx', layout: 'submission', titlePage: true, sceneBreak: '#' }))
+    expect(fromUtf8(files.get('word/header1.xml')!)).toContain('Lee / ASH / ')
+    expect(fromUtf8(files.get('word/document.xml')!)).toContain('Texte.')
+  })
+
+  it('writes the outline’s labels in the book’s language', () => {
+    const b = book()
+    const c = b.chapters[0]
+    const chapters = [{ ...c, goal: 'Entrer', scenes: c.scenes.map(s => ({ ...s, pace: 'Lent' })) }]
+    expect(outlineMarkdown({ ...b, chapters })).toContain('*But :* Entrer')
+    const en = outlineMarkdown({ ...b, chapters, meta: { ...b.meta, language: 'en' } })
+    expect(en).toContain('*Goal:* Entrer')
+    expect(en).toContain('*Pace:* Lent')
+    expect(en).toContain('1. Le bal')
   })
 })

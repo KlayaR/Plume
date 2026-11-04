@@ -67,6 +67,7 @@ export default function OutlineView() {
   }
   const more = (e: React.MouseEvent) => showMenu(e, [
     { label: t('Copy the outline as Markdown'), onClick: copy },
+    { label: t('Export the outline…'), disabled: !book.chapters.length, onClick: () => useStore.setState({ dialog: 'export', dialogArg: 'outline' }) },
     { separator: true },
     { label: t('Clean outline…'), danger: true, disabled: !book.chapters.length, onClick: clean },
   ])

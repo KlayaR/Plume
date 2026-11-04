@@ -2,7 +2,10 @@
 // Word (.docx, as a book or in submission format), or Markdown. The text is
 // cleaned on the way: placeholders removed, typography fixed for the language.
 // PDF is printed from Page view (window.print), see ExportDialog.
-import type { Book, Chapter } from './types'
+// The bible and the outline go out as Markdown, or as Word made from that Markdown.
+import { ENTRY_TYPES, VOICE_TYPES, type Book, type Chapter, type Entry, type Fact } from './types'
+import { VOICE_LABELS } from './context'
+import { sortEntries } from './fields'
 import { chapterLabels } from './chapters'
 import { fixTypography } from './typography'
 import { countWords, newId } from './text'
@@ -305,11 +308,6 @@ ${o.titlePage ? '<w:titlePg/>' : ''}
 </w:sectPr>
 </w:body>
 </w:document>`
-  const pageField = '<w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText xml:space="preserve"> PAGE </w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:t>1</w:t></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r>'
-  const footer = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p><w:pPr><w:jc w:val="center"/></w:pPr>${pageField}</w:p></w:ftr>`
-  const headerXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p><w:pPr><w:jc w:val="right"/></w:pPr>${run(header)}${pageField}</w:p></w:hdr>`
   const indent = sub ? 709 : 360
   const styles = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
@@ -325,6 +323,16 @@ ${o.titlePage ? '<w:titlePg/>' : ''}
 <w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="heading 1"/><w:pPr><w:keepNext/><w:jc w:val="center"/><w:spacing w:before="1200" w:after="480"/><w:outlineLvl w:val="0"/></w:pPr><w:rPr><w:caps/><w:spacing w:val="40"/>${sub ? '' : '<w:sz w:val="22"/>'}</w:rPr></w:style>
 <w:style w:type="paragraph" w:styleId="Heading2"><w:name w:val="heading 2"/><w:pPr><w:keepNext/><w:jc w:val="center"/><w:spacing w:after="480"/><w:outlineLvl w:val="1"/></w:pPr><w:rPr><w:sz w:val="${sub ? 24 : 32}"/></w:rPr></w:style>
 </w:styles>`
+  return docxZip(document, styles, header)
+}
+
+/** The .docx file around a document and its styles: a page number in the footer, and in the header after `header`. */
+function docxZip(document: string, styles: string, header = ''): Promise<Uint8Array> {
+  const pageField = '<w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText xml:space="preserve"> PAGE </w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:t>1</w:t></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r>'
+  const footer = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p><w:pPr><w:jc w:val="center"/></w:pPr>${pageField}</w:p></w:ftr>`
+  const headerXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p><w:pPr><w:jc w:val="right"/></w:pPr><w:r><w:t xml:space="preserve">${esc(header)}</w:t></w:r>${pageField}</w:p></w:hdr>`
   return makeZip([
     { name: '[Content_Types].xml', data: utf8(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
@@ -348,4 +356,79 @@ ${o.titlePage ? '<w:titlePg/>' : ''}
     { name: 'word/footer1.xml', data: utf8(footer) },
     { name: 'word/header1.xml', data: utf8(headerXml) },
   ])
+}
+
+function factWhen(f: Fact, fr: boolean): string {
+  const chapters = f.from === null && f.to === null ? '' : f.to === null ? `ch. ${f.from}+` : f.from === null ? `ch. 1–${f.to}` : f.from === f.to ? `ch. ${f.from}` : `ch. ${f.from}–${f.to}`
+  return [f.book ? `${fr ? 'tome' : 'book'} ${f.book}` : '', chapters].filter(Boolean).join(', ')
+}
+
+/**
+ * The bible as one document: a section per type of entry, the main characters first.
+ * Secret entries and your private notes only when asked for. `plural` names the sections.
+ */
+export function bibleMarkdown(book: Book, o: { secret?: boolean; notes?: boolean } = {}, plural: (label: string) => string = s => s): string {
+  const fr = book.meta.language === 'fr'
+  const colon = fr ? ' :' : ':'
+  const line = (label: string, value = '') => value.trim() ? `**${label}${colon}** ${value.trim()}` : ''
+  const list = (label: string, rows: string[]) => rows.length ? [`**${label}${colon}**`, ...rows.map(r => `- ${r}`)].join('\n') : ''
+  const entry = (e: Entry) => [
+    `### ${e.name}`,
+    line(fr ? 'Aussi appelé' : 'Also known as', e.aliases.filter(a => a !== e.name).map(a => a.replace(/!$/, '')).join(', ')),
+    ...(book.meta.fields?.[e.type] ?? []).map(d => line(d.name, e.fields?.[d.name])),
+    e.short.trim(),
+    // Its own headings go one level down, under its name.
+    e.full.trim().replace(/^(#{1,5}) /gm, '#$1 '),
+    list(fr ? 'Faits datés' : 'Dated facts', e.facts.map(f => { const when = factWhen(f, fr); return when ? `*${when}${colon}* ${f.text}` : f.text })),
+    list(fr ? 'Statistiques' : 'Stats', (e.stats ?? []).map(s => `${s.name} ${s.value} (ch. ${s.from}+)`)),
+    line(fr ? 'Sait' : 'Knows', e.knows),
+    line(fr ? 'Ignore' : 'Does not know', e.unaware),
+    list(fr ? 'Voix' : 'Voice', Object.entries(e.voice ?? {}).filter(([, v]) => v.trim()).map(([k, v]) => `${VOICE_LABELS[fr ? 'fr' : 'en'][k] ?? k}${colon} ${v.trim()}`)),
+    line(fr ? 'Liens' : 'Links', e.links.flatMap(slug => book.entries.find(x => x.slug === slug)?.name ?? []).join(', ')),
+    line(fr ? 'Plus tard dans la série' : 'Later in the series', e.later),
+    o.notes ? line(fr ? 'Notes privées' : 'Private notes', e.notes) : '',
+  ].filter(Boolean).join('\n\n')
+  const shown = book.entries.filter(e => !VOICE_TYPES.includes(e.type) && (o.secret || e.include !== 'secret'))
+  const sections = ENTRY_TYPES.flatMap(info => {
+    const here = shown.filter(e => e.type === info.type)
+    return here.length ? [[`## ${plural(info.plural)}`, ...sortEntries(sortEntries(here, 'name'), 'rank').map(entry)].join('\n\n')] : []
+  })
+  return [`# ${book.meta.title}${colon} ${fr ? 'la bible' : 'the bible'}`, ...sections].join('\n\n')
+}
+
+/** A working document in Word: its Markdown headings, lists and paragraphs, on A4, with numbered pages. */
+export function markdownToDocx(markdown: string, book: Book): Promise<Uint8Array> {
+  const para = (style: string, runs: string) => `<w:p><w:pPr><w:pStyle w:val="${style}"/></w:pPr>${runs}</w:p>`
+  const body = markdown.split('\n').map(l => l.trim()).filter(Boolean).map(l => {
+    const heading = /^(#{1,6})\s+(.*)$/.exec(l)
+    if (heading) return para(['Title', 'Heading1', 'Heading2', 'Heading3'][Math.min(heading[1].length, 4) - 1], inlineDocx(heading[2], esc))
+    const item = /^(?:[-*]|(\d+[.)]))\s+(.*)$/.exec(l)
+    if (item) return para('Item', `<w:r><w:t>${item[1] ?? '•'}</w:t><w:tab/></w:r>${inlineDocx(item[2], esc)}`)
+    return para('Body', inlineDocx(l, esc))
+  })
+  const margin = 1247
+  const document = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+<w:body>
+${body.join('\n')}
+<w:sectPr>
+<w:footerReference w:type="default" r:id="rIdFooter"/>
+<w:pgSz w:w="11906" w:h="16838"/>
+<w:pgMar w:top="${margin}" w:right="${margin}" w:bottom="${margin}" w:left="${margin}" w:header="708" w:footer="708" w:gutter="0"/>
+</w:sectPr>
+</w:body>
+</w:document>`
+  const font = 'Georgia'
+  const styles = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+<w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="${font}" w:hAnsi="${font}" w:cs="${font}"/><w:sz w:val="22"/><w:lang w:val="${book.meta.language === 'fr' ? 'fr-FR' : 'en-US'}"/></w:rPr></w:rPrDefault>
+<w:pPrDefault><w:pPr><w:spacing w:after="120" w:line="276" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults>
+<w:style w:type="paragraph" w:default="1" w:styleId="Body"><w:name w:val="Body"/></w:style>
+<w:style w:type="paragraph" w:styleId="Item"><w:name w:val="List item"/><w:pPr><w:spacing w:after="60"/><w:ind w:left="400" w:hanging="400"/></w:pPr></w:style>
+<w:style w:type="paragraph" w:styleId="Title"><w:name w:val="Title"/><w:pPr><w:jc w:val="center"/><w:spacing w:after="480"/></w:pPr><w:rPr><w:sz w:val="40"/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="heading 1"/><w:pPr><w:keepNext/><w:spacing w:before="480" w:after="160"/><w:outlineLvl w:val="0"/></w:pPr><w:rPr><w:b/><w:sz w:val="30"/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="Heading2"><w:name w:val="heading 2"/><w:pPr><w:keepNext/><w:spacing w:before="320" w:after="100"/><w:outlineLvl w:val="1"/></w:pPr><w:rPr><w:b/><w:sz w:val="26"/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="Heading3"><w:name w:val="heading 3"/><w:pPr><w:keepNext/><w:spacing w:before="200" w:after="80"/><w:outlineLvl w:val="2"/></w:pPr><w:rPr><w:b/><w:i/></w:rPr></w:style>
+</w:styles>`
+  return docxZip(document, styles)
 }

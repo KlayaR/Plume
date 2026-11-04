@@ -7,7 +7,9 @@ import { invoke } from '@tauri-apps/api/core'
 import { Bot, Check, Compass, FileOutput, ListChecks, Search, Square, Undo2 } from 'lucide-react'
 import { Dialog } from '../studio-kit/shell.js'
 import { useStore } from '../store'
-import { toDocx, toEpub, toHtml, toMarkdown, volumeBook, type DocxLayout, type ExportFormat } from '../lib/export'
+import { bibleMarkdown, markdownToDocx, toDocx, toEpub, toHtml, toMarkdown, volumeBook, type DocxLayout, type ExportFormat } from '../lib/export'
+import { outlineMarkdown } from '../lib/outline'
+import { VOICE_TYPES } from '../lib/types'
 import { isSerial, volumesOf } from '../lib/serial'
 import { chapterLabels } from '../lib/chapters'
 import { volumeToBook } from '../library'
@@ -16,14 +18,23 @@ import { pageSizeFor } from '../lib/fonts'
 import { clearDone, estimate, goTo, markDone, missingSummaries, runTask, stopTask, toBible, useAgents, type AgentTask } from '../agents'
 import { updateSummaries, useNotes } from '../writing'
 import BookView from './BookView'
-import { numLocale, useT } from '../i18n'
+import { numLocale, translate, useT } from '../i18n'
 
 const n = (x: number) => x.toLocaleString(numLocale())
 
 export function ExportDialog({ onClose }: { onClose: () => void }) {
   const book = useStore(s => s.book)!
   const t = useT()
-  const [format, setFormat] = useState<ExportFormat>('epub')
+  // What goes out: the book, or the bible or the outline as working documents.
+  const [what, setWhat] = useState<'book' | 'bible' | 'outline'>(() => { const arg = useStore.getState().dialogArg; return arg === 'bible' || arg === 'outline' ? arg : 'book' })
+  useEffect(() => { useStore.setState({ dialogArg: null }) }, [])
+  const [format, setFormat] = useState<ExportFormat>(what === 'book' ? 'epub' : 'docx')
+  const [secret, setSecret] = useState(false)
+  const [privateNotes, setPrivateNotes] = useState(false)
+  const choose = (next: typeof what) => { setWhat(next); if (next !== 'book' && format !== 'md') setFormat('docx') }
+  const heading = what === 'bible' ? t('Export the bible') : what === 'outline' ? t('Export the outline') : t('Export the book')
+  const secrets = book.entries.filter(e => e.include === 'secret' && !VOICE_TYPES.includes(e.type)).length
+  const nothing = what === 'bible' ? !book.entries.some(e => !VOICE_TYPES.includes(e.type) && (secret || e.include !== 'secret')) : what === 'outline' && !book.chapters.length
   const [layout, setLayout] = useState<DocxLayout>('book')
   const [titlePage, setTitlePage] = useState(true)
   const [sceneBreak, setSceneBreak] = useState('* * *')
@@ -44,11 +55,14 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
     const { out, range } = chosen()
     const o = { format, layout, titlePage, sceneBreak, range }
     if (format === 'pdf') { onClose(); useStore.setState({ printing: true }); return }
-    const path = await save({ title: t('Export the book'), defaultPath: `${out.meta.title}.${format}`, filters: [{ name: format.toUpperCase(), extensions: [format] }] })
+    const name = what === 'book' ? out.meta.title : `${book.meta.title} - ${(what === 'bible' ? t('Bible') : t('Outline')).toLowerCase()}`
+    const path = await save({ title: heading, defaultPath: `${name}.${format}`, filters: [{ name: format.toUpperCase(), extensions: [format] }] })
     if (!path) return
     setBusy(true)
     try {
-      const data = format === 'epub' ? await toEpub(out, o) : format === 'docx' ? await toDocx(out, o) : format === 'html' ? utf8(toHtml(out, o)) : utf8(toMarkdown(out, o))
+      const working = what === 'bible' ? bibleMarkdown(book, { secret, notes: privateNotes }, s => translate(book.meta.language, s)) : what === 'outline' ? outlineMarkdown(book) : null
+      const data = working !== null ? (format === 'docx' ? await markdownToDocx(working, book) : utf8(working))
+        : format === 'epub' ? await toEpub(out, o) : format === 'docx' ? await toDocx(out, o) : format === 'html' ? utf8(toHtml(out, o)) : utf8(toMarkdown(out, o))
       await invoke('write_file_base64', { path, data: toBase64(data) })
       useStore.getState().notify('ok', t('Exported: {path}', { path }))
       onClose()
@@ -64,12 +78,20 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
     ['md', 'Markdown', 'Plain text with headings'],
   ]
   return (
-    <Dialog title={t('Export the book')} icon={FileOutput} onClose={onClose}
+    <Dialog title={heading} icon={FileOutput} onClose={onClose}
       footer={<>
         <button type="button" className="sk-btn sk-btn-ghost" onClick={onClose}>{t('Cancel')}</button>
-        <button type="button" className="sk-btn sk-btn-primary" disabled={busy} onClick={go}>{busy ? t('Exporting…') : format === 'pdf' ? t('Print…') : t('Export…')}</button>
+        <button type="button" className="sk-btn sk-btn-primary" disabled={busy || nothing} onClick={go}>{busy ? t('Exporting…') : format === 'pdf' ? t('Print…') : t('Export…')}</button>
       </>}>
-      {(volumes.length > 0 || isSerial(book)) && (
+      <div className="sk-field">
+        <label>{t('What to export')}</label>
+        <div className="sk-segmented" role="group">
+          <button type="button" aria-pressed={what === 'book'} onClick={() => choose('book')}>{t('Book')}</button>
+          <button type="button" aria-pressed={what === 'bible'} onClick={() => choose('bible')}>{t('Bible')}</button>
+          <button type="button" aria-pressed={what === 'outline'} onClick={() => choose('outline')}>{t('Outline')}</button>
+        </div>
+      </div>
+      {what === 'book' && (volumes.length > 0 || isSerial(book)) && (
         <div className="sk-field">
           <label>{t('Chapters')}</label>
           <select className="sk-select" value={which} onChange={e => setWhich(e.target.value)}>
@@ -98,14 +120,22 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
         </div>
       )}
       <div className="pl-formats">
-        {FORMATS.map(([id, label, hint]) => (
+        {FORMATS.filter(([id]) => what === 'book' || id === 'docx' || id === 'md').map(([id, label, hint]) => (
           <label key={id} className={`pl-format ${format === id ? 'pl-active' : ''}`}>
             <input type="radio" name="fmt" checked={format === id} onChange={() => setFormat(id)} />
             <span><b>{t(label)}</b><br /><span className="sk-hint">{t(hint)}</span></span>
           </label>
         ))}
       </div>
-      {format === 'docx' && (
+      {what === 'bible' && (
+        <>
+          {secrets > 0 && <label className="pl-row pl-check-label"><input type="checkbox" className="sk-check" checked={secret} onChange={e => setSecret(e.target.checked)} /> {t('Secret entries ({n})', { n: secrets })}</label>}
+          <label className="pl-row pl-check-label"><input type="checkbox" className="sk-check" checked={privateNotes} onChange={e => setPrivateNotes(e.target.checked)} /> {t('Private notes')}</label>
+          <p className="sk-hint">{t('A section per type of entry, with its fields, dated facts, voice and links. Portraits and the voice settings are left out.')}</p>
+        </>
+      )}
+      {what === 'outline' && <p className="sk-hint">{t('Chapters with their goals and endings, then scenes with their notes and beats.')}</p>}
+      {what === 'book' && format === 'docx' && (
         <div className="sk-field">
           <label>{t('Layout')}</label>
           <div className="sk-segmented" role="group">
@@ -117,7 +147,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
             : t('Book pages: serif, justified, indented paragraphs, each chapter on a new page.')}</span>
         </div>
       )}
-      {format !== 'pdf' && (
+      {what === 'book' && format !== 'pdf' && (
         <>
           <label className="pl-row pl-check-label"><input type="checkbox" className="sk-check" checked={titlePage} onChange={e => setTitlePage(e.target.checked)} /> {t('Title page')}</label>
           <div className="sk-field">
@@ -126,7 +156,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
           </div>
         </>
       )}
-      <p className="sk-hint">{t('Placeholders ⟦…⟧ are left out and the typography is fixed for the book’s language.')}</p>
+      {what === 'book' && <p className="sk-hint">{t('Placeholders ⟦…⟧ are left out and the typography is fixed for the book’s language.')}</p>}
     </Dialog>
   )
 }
