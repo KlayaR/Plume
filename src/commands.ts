@@ -33,6 +33,7 @@ export function commands(): Command[] {
     planTab('outline', t('Plan → Outline')),
     { id: 'outline-list', label: st.prefs.outlineList ? t('Outline as cards') : t('Outline as a list you type'), where: ['plan'], run: () => { st.setPrefs({ outlineList: !st.prefs.outlineList }); set({ view: 'plan', planTab: 'outline' }) } },
     planTab('board', t('Plan → Board')),
+    ...(st.prefs.simple ? [] : [planTab('grid', t('Plan → Grid'))]),
     ...(serial ? [planTab('arcs', t('Plan → Arcs')), planTab('release', t('Plan → Release')), planTab('threads', t('Plan → Threads'))] : [planTab('structure', t('Plan → Structure'))]),
     ...(st.prefs.simple ? [] : [planTab('timeline', t('Plan → Timeline')), planTab('lines', t('Plan → Story lines')), planTab('dashboard', t('Plan → Dashboard'))]),
     { id: 'new-character', label: t('New character…'), where: ['bible'], run: async () => { const name = (await askText(t('Name of the new entry')))?.trim(); if (name) { st.addEntry('character', name); set({ view: 'bible', bibleTab: 'entry' }) } } },

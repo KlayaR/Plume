@@ -1,6 +1,6 @@
 // The scratch pad, a small panel that stays open while you work in any space:
 // the inbox of captured lines, your notes, your tasks. Each can be pinned, or sent
-// to a scene, a card or a bible entry.
+// to a scene, a card, the grid or a bible entry.
 import { useEffect, useRef, useState } from 'react'
 import { Ellipsis, Inbox, ListChecks, Pin, StickyNote, X } from 'lucide-react'
 import { addItem, removeItem, updateItem, useScratch, type ScratchItem, type ScratchTab } from '../scratch'

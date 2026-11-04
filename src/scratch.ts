@@ -7,6 +7,7 @@ import { findScene, later, useStore } from './store'
 import type { Book, EntryType } from './lib/types'
 import { firstWords, newId } from './lib/text'
 import { getEditorView } from './editor/actions'
+import { noteOnGrid } from './grids'
 import { t } from './i18n'
 
 export type ScratchTab = 'inbox' | 'notes' | 'tasks'
@@ -93,6 +94,12 @@ export function sendToCard(item: ScratchItem) {
   if (!chapter) return st.notify('warn', t('The book has no chapter yet.'))
   st.addScene(chapter.id, firstWords(item.text, 6), { stay: true, note: item.text })
   moved(item, t('New card in {chapter}.', { chapter: chapter.title || t('Untitled') }))
+}
+
+/** A sticky note on the grid (Plan → Grid). */
+export function sendToGrid(item: ScratchItem) {
+  noteOnGrid(item.text)
+  moved(item, t('On the grid (Plan).'))
 }
 
 /** A loose idea, outside any chapter (Plan → Board). */

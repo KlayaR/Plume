@@ -19,11 +19,12 @@ import Dashboard from './Dashboard'
 import Tension from './Tension'
 import { ShowEverything } from './BibleView'
 import OutlineView from './OutlineView'
+import GridView from './GridView'
 import { Arcs, Release, Threads } from './SerialPlan'
 
-const TABS: [PlanTab, string][] = [['outline', 'Outline'], ['board', 'Board'], ['structure', 'Structure']]
+const TABS: [PlanTab, string][] = [['outline', 'Outline'], ['board', 'Board'], ['grid', 'Grid'], ['structure', 'Structure']]
 /** A web novel plans by arcs and by release instead of one structure. */
-const SERIAL_TABS: [PlanTab, string][] = [['outline', 'Outline'], ['board', 'Board'], ['arcs', 'Arcs'], ['release', 'Release']]
+const SERIAL_TABS: [PlanTab, string][] = [['outline', 'Outline'], ['board', 'Board'], ['grid', 'Grid'], ['arcs', 'Arcs'], ['release', 'Release']]
 /** Plan tabs grouped under "Analysis". Revision moved to Manuscript → Review. */
 const ANALYSIS: [PlanTab, string][] = [['timeline', 'Timeline'], ['lines', 'Story lines'], ['dashboard', 'Dashboard']]
 const SERIAL_ANALYSIS: [PlanTab, string][] = [['threads', 'Threads'], ...ANALYSIS]
@@ -32,7 +33,7 @@ export default function PlanView() {
   const simple = useStore(s => s.prefs.simple)
   const serial = useStore(s => s.book?.meta.kind === 'serial')
   const chosen = useStore(s => s.planTab)
-  const tabs = serial ? SERIAL_TABS : TABS
+  const tabs = (serial ? SERIAL_TABS : TABS).filter(([id]) => !simple || id !== 'grid')
   const analysis = serial ? SERIAL_ANALYSIS : ANALYSIS
   const isAnalysis = (x: PlanTab) => analysis.some(([id]) => id === x)
   // Beginner mode keeps the main tabs; the analysis ones come with "Show everything". A tab of the other kind of book falls back to the Outline.
@@ -54,6 +55,7 @@ export default function PlanView() {
         )}
         {tab === 'outline' && <OutlineView />}
         {tab === 'board' && <Board />}
+        {tab === 'grid' && <GridView />}
         {tab === 'structure' && <Structure />}
         {tab === 'arcs' && <><Tension /><Arcs /></>}
         {tab === 'release' && <Release />}

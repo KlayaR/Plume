@@ -53,6 +53,7 @@ import { addField, entryNamed, fieldLines, hasField, removeField, renamedValues,
 import { renderEntry } from './context'
 import { placeComments, stackCards } from './comments'
 import { forwardOnly, wordStart, type DraftBack } from './draft'
+import { CELL, boundsOf, boxBetween, connect, copyTiles, freeSpot, layerTiles, linkEnds, makeSheet, makeTile, moveTiles, overlaps, pasteTiles, readSheets, removeLink, removeTiles, resizeTile, snap, tilesInBox } from './grid'
 import { beatMove, chapterAsBeats, outlineRows, pastedLines, plainChapter, plainScene, stockSceneTitle } from './outliner'
 import { referenceTargets, type Reference } from './references'
 import { applyLink, isKnownName, linkMatches, linkQuery } from './links'
@@ -1679,5 +1680,71 @@ describe('draft mode', () => {
     expect(after(start('Un chat'), 7, 7, ' noir', 'input.ai').doc.toString()).toBe('Un chat noir')
     expect(after(start('::idea\nUn chat'), 0, 7, '', 'delete.capture').doc.toString()).toBe('Un chat')
     expect(after(start('Un chat'), 0, 2, 'Le').doc.toString()).toBe('Le chat')
+  })
+})
+
+describe('the grid', () => {
+  const sheet = () => {
+    const a = makeTile('tile', 0, 0, { id: 'a' }), b = makeTile('note', 400, 0, { id: 'b' }), c = makeTile('label', 0, 400, { id: 'c' })
+    return connect(connect({ ...makeSheet('Une'), tiles: [a, b, c] }, 'a', 'b'), 'b', 'c')
+  }
+  it('keeps tiles on its cells', () => {
+    expect(snap(CELL * 3 + 4)).toBe(CELL * 3)
+    expect(makeTile('tile', 33, 7)).toMatchObject({ x: 40, y: 0, kind: 'tile', text: '' })
+    const moved = moveTiles(sheet(), ['a', 'c'], 33, -7)
+    expect(moved.tiles.map(t => [t.id, t.x, t.y])).toEqual([['b', 400, 0], ['a', 40, 0], ['c', 40, 400]])
+    expect(resizeTile(sheet(), 'a', 10, 133).tiles[0]).toMatchObject({ w: 60, h: 140 })
+  })
+  it('draws one line between two tiles, whichever way', () => {
+    const s = sheet()
+    expect(s.links.map(l => [l.a, l.b])).toEqual([['a', 'b'], ['b', 'c']])
+    expect(connect(s, 'b', 'a')).toBe(s)
+    expect(connect(s, 'a', 'a')).toBe(s)
+    expect(connect(s, 'a', 'nobody')).toBe(s)
+    expect(removeLink(s, s.links[0].id).links.map(l => l.a)).toEqual(['b'])
+  })
+  it('takes a tile\'s lines away with it', () => {
+    const s = removeTiles(sheet(), ['b'])
+    expect(s.tiles.map(t => t.id)).toEqual(['a', 'c'])
+    expect(s.links).toEqual([])
+  })
+  it('copies tiles with the lines among them, under new ids', () => {
+    const s = sheet()
+    const clip = copyTiles(s, ['a', 'b'])
+    expect(clip.links.map(l => [l.a, l.b])).toEqual([['a', 'b']])
+    const { sheet: pasted, ids } = pasteTiles(s, clip)
+    expect(pasted.tiles).toHaveLength(5)
+    expect(ids.some(id => ['a', 'b', 'c'].includes(id))).toBe(false)
+    expect(pasted.tiles.find(t => t.id === ids[0])).toMatchObject({ x: CELL, y: CELL })
+    expect(pasted.links[2]).toMatchObject({ a: ids[0], b: ids[1] })
+    expect(pasteTiles(s, clip, { x: 1000, y: 1000 }).sheet.tiles[3]).toMatchObject({ x: 1000, y: 1000 })
+  })
+  it('layers, selects by box and finds room', () => {
+    const s = sheet()
+    expect(layerTiles(s, ['a'], true).tiles.map(t => t.id)).toEqual(['b', 'c', 'a'])
+    expect(layerTiles(s, ['c'], false).tiles.map(t => t.id)).toEqual(['c', 'a', 'b'])
+    expect(boundsOf(s.tiles)).toEqual({ x: 0, y: 0, w: 560, h: 440 })
+    expect(boundsOf([])).toEqual({ x: 0, y: 0, w: 0, h: 0 })
+    expect(boxBetween({ x: 10, y: 50 }, { x: 0, y: 20 })).toEqual({ x: 0, y: 20, w: 10, h: 30 })
+    expect(tilesInBox(s, { x: 100, y: 100, w: 400, h: 400 })).toEqual(['a', 'b', 'c'])
+    expect(tilesInBox(s, { x: 300, y: 300, w: 10, h: 10 })).toEqual([])
+    const spot = freeSpot(s, 220, 120)
+    expect(s.tiles.some(t => overlaps(t, { ...spot, w: 220, h: 120 }))).toBe(false)
+    expect(freeSpot(makeSheet('Vide'), 220, 120)).toEqual({ x: 0, y: 0 })
+  })
+  it('runs a line between the edges of its tiles', () => {
+    expect(linkEnds({ x: 0, y: 0, w: 100, h: 100 }, { x: 300, y: 0, w: 100, h: 100 })).toEqual({ x1: 100, y1: 50, x2: 300, y2: 50 })
+    expect(linkEnds({ x: 0, y: 0, w: 100, h: 100 }, { x: 0, y: 300, w: 100, h: 100 })).toEqual({ x1: 50, y1: 100, x2: 50, y2: 300 })
+  })
+  it('reads what it can of a file', () => {
+    expect(readSheets(null)).toEqual([])
+    expect(readSheets({ sheets: 'x' })).toEqual([])
+    const read = readSheets({ sheets: [
+      { id: 's', name: 'Une', tiles: [{ id: 'a', x: 0, y: 0, w: 1, h: 1, kind: 'tile', text: '' }, { id: 'b', x: 'non' }], links: [{ id: 'l', a: 'a', b: 'b' }] },
+      { name: 'sans id', tiles: [] },
+    ] })
+    expect(read).toHaveLength(1)
+    expect(read[0].tiles.map(t => t.id)).toEqual(['a'])
+    expect(read[0].links).toEqual([])
   })
 })

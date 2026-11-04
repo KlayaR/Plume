@@ -112,7 +112,7 @@ const BACKED = 'plume.backed-up'
 /** A zip of the whole book (without Plume's own folder), kept two weeks. */
 export async function backupNow(book: Book): Promise<string> {
   // The folder list leaves out .plume, but these are your words.
-  const files = [...await invoke<string[]>('list_all', { root: book.root }), '.plume/scratch.json']
+  const files = [...await invoke<string[]>('list_all', { root: book.root }), '.plume/scratch.json', '.plume/grids.json']
   const entries = []
   for (const rel of files) {
     try { entries.push({ name: rel, data: fromBase64(await invoke<string>('read_base64', { root: book.root, rel })) }) } catch { /* moved meanwhile */ }

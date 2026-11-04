@@ -18,7 +18,8 @@ import { proposalField } from './editor/cm'
 import { insertPlaceholder, toggleInline, unknownNames } from './editor/marks'
 import { cutToDarlings, removeComment } from './writing'
 import { addField, hasField, removeField, renamedValues, renameField, setFieldSend } from './lib/fields'
-import { removeItem, sendToCard, sendToEntry, sendToLoose, sendToNewEntry, sendToScene, updateItem, type ScratchItem } from './scratch'
+import { putOnGrid } from './grids'
+import { removeItem, sendToCard, sendToEntry, sendToGrid, sendToLoose, sendToNewEntry, sendToScene, updateItem, type ScratchItem } from './scratch'
 import { boxOwner, dayOf, isLitRPG, isLocked, isSerial, mergeStats, readBox, systemBoxes } from './lib/serial'
 import { chapterTitleFor, royalRoadHtml, royalRoadText } from './lib/export'
 
@@ -207,6 +208,7 @@ export function sceneMenu(sceneId: string, opts: { card?: boolean } = {}): MenuI
     { label: t('Write it from the plan (Claude)'), disabled: !scene.note?.trim() && !scene.beats?.length, onClick: () => writeFromPlan(sceneId) },
     opts.card && st.view !== 'manuscript' && { label: t('Open in the second pane'), onClick: () => { st.setPrefs({ dual: 'manuscript' }); st.selectScene(sceneId) } },
     { label: t('Rename…'), onClick: async () => { const v = await askText(t('Scene title'), scene.title); if (v?.trim()) st.updateScene(sceneId, { title: v.trim() }) } },
+    !st.prefs.simple && { label: t('Put on the grid'), onClick: () => putOnGrid({ kind: 'scene', id: sceneId }) },
     { separator: true },
     ...statusAndPov(scene),
     opts.card && lines.length > 0 && { label: t('Story lines'), sub: lines.map(l => ({ label: l.name, checked: !!scene.lines?.includes(l.slug), onClick: () => st.updateScene(sceneId, { lines: scene.lines?.includes(l.slug) ? scene.lines.filter(x => x !== l.slug) : [...(scene.lines ?? []), l.slug] }) })) },
@@ -302,6 +304,7 @@ export function scratchMenu(item: ScratchItem): MenuItem[] {
     { label: t('The scene, at the cursor'), disabled: !getEditorView(), onClick: () => sendToScene(item) },
     { label: t('A new card in this chapter'), disabled: !book.chapters.length, onClick: () => sendToCard(item) },
     { label: t('The loose ideas (Plan)'), onClick: () => sendToLoose(item) },
+    !st.prefs.simple && { label: t('The grid (Plan)'), onClick: () => sendToGrid(item) },
     { label: t('A bible entry'), sub: [...first.map(e => ({ label: e.name, onClick: () => sendToEntry(item, e.slug) })), { separator: true }, ...newRows] },
     { separator: true },
     { label: t('Delete'), danger: true, onClick: () => removeItem(item.id) },
@@ -321,6 +324,7 @@ export function entryMenu(slug: string): MenuItem[] {
   return [
     { label: t('Open'), onClick: () => st.showEntry(slug) },
     st.view !== 'bible' && { label: t('Open in the second pane'), onClick: () => { st.setPrefs({ dual: 'bible' }); st.showEntry(slug) } },
+    !st.prefs.simple && !plain && { label: t('Put on the grid'), onClick: () => putOnGrid({ kind: 'entry', id: slug }) },
     !plain && { separator: true },
     !plain && { label: t('Sent to the AI'), sub: INCLUDES.map(([id, label]) => ({ label: t(label), checked: e.include === id, onClick: () => st.updateEntry(slug, { include: id }) })) },
     e.type === 'character' && { label: t('Rank'), sub: [...RANKS.map(([id, label]) => ({ label: t(label), checked: e.rank === id, onClick: () => st.updateEntry(slug, { rank: id }) })), { label: t('No rank'), checked: !e.rank, onClick: () => st.updateEntry(slug, { rank: undefined }) }] },

@@ -41,6 +41,16 @@ const GROUPS: [string, [string, string][]][] = [
     ['Ctrl+/', 'This list'],
     ['F1', 'Help: how to use Plume'],
   ]],
+  ['Grid', [
+    ['Double-click', 'A new tile; on a tile, edit its text'],
+    ['Enter or F2 / Esc', 'Edit the selected tile / stop editing'],
+    ['Arrows', 'Move the selected tiles'],
+    ['Delete', 'Remove the selected tiles or line'],
+    ['Ctrl+D', 'Duplicate the selected tiles'],
+    ['Ctrl+wheel', 'Zoom'],
+    ['Wheel, Space+drag', 'Move around the sheet'],
+    ['Shift+click', 'Add a tile to the selection'],
+  ]],
   ['Outline list', [
     ['Enter', 'A new row after this one'],
     ['Tab / Shift+Tab', 'One level down / up: chapter, scene, beat'],

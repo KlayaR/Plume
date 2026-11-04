@@ -16,12 +16,15 @@ import { CHAPTER_PLAN_KEYS, changedKeys, META_PLAN_KEYS, SCENE_PLAN_KEYS, undoSt
 import type { DraftBack } from './lib/draft'
 
 const steps = undoStack()
+/** For what lives outside the book's own files (the grid): one more step for Ctrl+Z. */
+export const rememberStep = (key: string, name: string, undo: () => unknown, redo: () => unknown) => steps.push(key, name, undo, redo)
+export const forgetStep = (step: Parameters<typeof steps.takeBack>[0]) => steps.takeBack(step)
 
 export type View = 'bible' | 'plan' | 'manuscript'
 export type BibleTab = 'entry' | 'review' | 'aicheck' | 'table' | 'tracker' | 'map' | 'relations' | 'contradictions'
 /** Bible tabs grouped under "More". */
 export const MORE_TABS: BibleTab[] = ['table', 'tracker', 'map', 'relations', 'contradictions']
-export type PlanTab = 'outline' | 'board' | 'structure' | 'timeline' | 'lines' | 'dashboard' | 'revision' | 'arcs' | 'release' | 'threads'
+export type PlanTab = 'outline' | 'board' | 'grid' | 'structure' | 'timeline' | 'lines' | 'dashboard' | 'revision' | 'arcs' | 'release' | 'threads'
 /** What the right pane of the Manuscript shows in Write mode. */
 export type RightTab = 'write' | 'chat' | 'notes'
 
@@ -523,6 +526,7 @@ export const useStore = create<State>((set, get) => {
       import('./chat').then(m => m.loadChat(book))
       import('./writing').then(m => m.loadNotes(book))
       import('./scratch').then(m => m.loadScratch(book))
+      import('./grids').then(m => m.loadGrids(book))
       import('./agents').then(m => m.loadAgents())
       // Library and safety: the lock for synced folders, today's backup, progress, the shelf card.
       import('./library').then(m => { m.takeLock(book); m.autoBackup(book); m.recordProgress(get().book!); m.noteOnShelf(get().book!); m.refreshSnapshots(get().book!); m.applyFantasyDefaults(get().book!); steps.clear() })
