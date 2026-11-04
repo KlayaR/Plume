@@ -7,6 +7,9 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.39.1
+- **French:** the Outline and the help now call a plan card a "carte" everywhere. Older labels and messages still said "fiche", which is the word for a bible entry.
+
 ## 0.39.0
 **Writing**
 - **Scratch pad (Ctrl+J).** Notes, tasks and an inbox for the whole book, open from any space. It stays with the book and is never sent to Claude. Any item can be pinned to the top or sent on: to the scene at the cursor, a new card, the loose ideas, the grid or a bible entry.
