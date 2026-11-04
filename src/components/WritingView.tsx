@@ -3,14 +3,14 @@
 // right, on hover, or stay open when pinned.
 import { useEffect, useRef, useState } from 'react'
 import { ask } from '@tauri-apps/plugin-dialog'
-import { ChevronLeft, FilePlus2, FolderPlus, GripVertical, Lock, Pin, PinOff, Trash2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, FilePlus2, FolderPlus, GripVertical, Lock, Pin, PinOff, Trash2 } from 'lucide-react'
 import { isLocked, isSerial } from '../lib/serial'
 import { findScene, useStore } from '../store'
 import type { Chapter, Entry, Scene, SceneStatus } from '../lib/types'
 import { countWords } from '../lib/text'
 import { allowedKinds, chapterLabels } from '../lib/chapters'
 import Editor from '../editor/Editor'
-import { accept, discard, retry, useAI } from '../editor/actions'
+import { accept, discard, proposalReplaces, proposalToChanges, retry, useAI } from '../editor/actions'
 import { leaveDraft, useDraft } from '../editor/draft'
 import ContextPanel from './ContextPanel'
 import ReviewPanel from './ReviewPanel'
@@ -68,6 +68,7 @@ export default function WritingView() {
         <div className="pl-propbar" role="group" aria-label={t('Proposal')}>
           <span>{running ? t('Claude is writing…') : t('Proposal')}</span>
           <button type="button" className="sk-btn sk-btn-sm sk-btn-primary" disabled={!!running} onClick={() => accept()}>{t('Accept')} <kbd>Tab</kbd></button>
+          {proposalReplaces() && <button type="button" className="sk-btn sk-btn-sm" disabled={!!running} onClick={proposalToChanges} title={t('Puts each change in the text, to accept or reject one by one')}>{t('Change by change')}</button>}
           <button type="button" className="sk-btn sk-btn-sm" disabled={!!running} onClick={() => retry()}>{t('Retry')}</button>
           <button type="button" className="sk-btn sk-btn-sm sk-btn-ghost" onClick={() => discard()}>{t('Discard')} <kbd>Esc</kbd></button>
         </div>
@@ -83,6 +84,7 @@ export default function WritingView() {
       </div>
 
       {!pinL && <div className="pl-hotzone pl-hotzone-left" onMouseEnter={() => setHoverL(true)} />}
+      {!openL && <button type="button" className="pl-panehandle pl-panehandle-left" aria-label={t('Chapters and scenes')} title={t('Chapters and scenes')} onClick={() => setHoverL(true)} onMouseEnter={() => setHoverL(true)}><ChevronRight size={14} /></button>}
       <aside className="pl-pane pl-pane-left" data-open={openL} data-pinned={pinL} onMouseLeave={() => setHoverL(false)} aria-label={t('Chapters and scenes')}>
         <ResizeHandle side="left" />
         <div className="pl-pane-head pl-pane-book">
@@ -99,6 +101,7 @@ export default function WritingView() {
       {found && (
         <>
           {!pinR && <div className="pl-hotzone pl-hotzone-right" onMouseEnter={() => setHoverR(true)} />}
+          {!openR && <button type="button" className="pl-panehandle pl-panehandle-right" aria-label={t(prefs.mode === 'review' ? 'Review' : 'Assistant')} title={t(prefs.mode === 'review' ? 'Review' : 'Assistant')} onClick={() => setHoverR(true)} onMouseEnter={() => setHoverR(true)}><ChevronLeft size={14} /></button>}
           <aside className="pl-pane pl-pane-right" data-open={openR} data-pinned={pinR} onMouseLeave={() => setHoverR(false)}>
             <ResizeHandle side="right" />
             <PaneHead title={prefs.mode === 'review' ? t('Review') : (

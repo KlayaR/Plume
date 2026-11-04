@@ -8,7 +8,10 @@ import { reviewChecks } from '../lib/review'
 import { lastWords } from '../lib/text'
 import { checkRules, fixDirection, type Check } from '../lib/voice'
 import { ask, effective, isCheap, stopAsk } from '../ai'
-import { noteTaste } from '../writing'
+import { diffWords, noteTaste } from '../writing'
+import { hunksOf } from '../lib/hunks'
+import { newId } from '../lib/text'
+import { changesField, setChanges } from './marks'
 import { canRun, cancelLLM, runLLM } from '../llm'
 import type { Effort, Model } from '../lib/types'
 import { findScene, useStore } from '../store'
@@ -267,6 +270,29 @@ export function accept(): boolean {
   if (found) st.updateScene(found.scene.id, { extra: { ...found.scene.extra, aiWords: Number(found.scene.extra.aiWords ?? 0) + (text.match(/\S+/g) ?? []).length } })
   syncProposalState()
   return ok
+}
+
+/** True when the proposal on screen replaces text, so it can be gone through change by change. */
+export const proposalReplaces = () => {
+  const p = view?.state.field(proposalField, false)
+  return !!p && p.to > p.from
+}
+
+/** A finished rewrite becomes tracked changes in the text, to accept or reject one by one. */
+export function proposalToChanges() {
+  const st = useStore.getState()
+  const p = view?.state.field(proposalField, false)
+  if (!view || !st.book || !p || p.streaming || p.to <= p.from) return
+  const text = fixTypography(p.text.replace(/\s+$/, ''), st.book.meta.language).replace(/^\s+/, '')
+  const hunks = hunksOf(diffWords(view.state.doc.sliceString(p.from, p.to), text), p.from)
+  if (!hunks.length) return st.notify('ok', t('Claude changed nothing in this passage.'))
+  discardProposal(view)
+  view.dispatch({ effects: setChanges.of([...view.state.field(changesField), ...hunks.map(h => ({ ...h, id: newId(), why: t('Claude\'s rewrite') }))]) })
+  // Counted as Claude's words, even if some are rejected: better not to take them for your voice.
+  const found = findScene(st.book, st.sceneId)
+  if (found) st.updateScene(found.scene.id, { extra: { ...found.scene.extra, aiWords: Number(found.scene.extra.aiWords ?? 0) + (text.match(/\S+/g) ?? []).length } })
+  syncProposalState()
+  view.focus()
 }
 
 export function discard() {

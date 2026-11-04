@@ -146,6 +146,13 @@ body { background: var(--bg); }
 .pl-hotzone { position: absolute; top: var(--pl-tool-h, 0px); bottom: 0; width: clamp(18px, calc((100% - var(--pl-sheet-w)) / 2 - 40px), 90px); z-index: 60; }
 .pl-hotzone-left { left: 0; }
 .pl-hotzone-right { right: 0; }
+/* What says a hidden pane is there: a small tab on the edge, level with the middle of the page. */
+.pl-panehandle { position: absolute; top: 50%; z-index: 65; display: flex; align-items: center; justify-content: center; width: 20px; height: 56px; margin-top: -28px; padding: 0; color: var(--text-muted); background: var(--surface-1); border: 0; cursor: pointer; }
+.pl-panehandle:hover { color: var(--text); background: var(--surface-2); }
+.pl-panehandle-left { left: 0; border-radius: 0 6px 6px 0; }
+.pl-panehandle-right { right: 0; border-radius: 6px 0 0 6px; }
+body.pl-typing .pl-panehandle { opacity: 0.08; }
+body.pl-zen .pl-panehandle { display: none; }
 .pl-pane { position: absolute; top: var(--pl-tool-h, 0px); bottom: 0; width: var(--pl-pane-w); z-index: 70; overflow-y: auto; background: var(--surface-1); transition: transform 0.18s ease; display: flex; flex-direction: column; }
 .pl-pane-left { left: 0; border-right: 1px solid var(--border); transform: translateX(-100%); }
 .pl-pane-right { right: 0; width: var(--pl-pane-r, 380px); border-left: 1px solid var(--border); transform: translateX(100%); }
@@ -299,8 +306,13 @@ body.pl-typing .pl-pane[data-pinned="true"] { opacity: 0.35; }
 .pl-instruction { resize: vertical; font: inherit; font-size: var(--fs-sm); line-height: 1.45; }
 .pl-send { display: flex; }
 .pl-send .sk-btn { flex: 1; justify-content: center; }
+.pl-send { gap: 6px; }
+.pl-send .sk-btn + .sk-btn { flex: none; }
 .pl-context .pl-row .sk-select { flex: 1; min-width: 0; }
-.pl-proposalbar { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 6px 8px; border-radius: 6px; background: var(--accent-tint); font-size: var(--fs-sm); font-weight: 500; }
+.pl-fold > summary { font-size: 12px; color: var(--text-muted); cursor: pointer; padding: 4px 0; overflow-wrap: anywhere; }
+.pl-fold > summary:hover { color: var(--text); }
+.pl-fold > summary.pl-warn { color: var(--warn); }
+.pl-fold-body { display: flex; flex-direction: column; gap: var(--space-3); margin-top: 6px; }
 .pl-meter { display: flex; flex-direction: column; gap: 6px; }
 .pl-bar-meter { display: flex; height: 6px; border-radius: 3px; overflow: hidden; background: var(--surface-3); }
 .pl-bar-meter > span { display: block; height: 100%; min-width: 2px; }

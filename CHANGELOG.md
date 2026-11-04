@@ -7,6 +7,13 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.41.0
+Second of the six interface releases: the Assistant.
+- **One box, one main action.** The Assistant now opens on your direction and its button. Quick actions fold away, and the model, prompt, size and bible entries fold into one line: "Sonnet · Fantasy · ≈ 2,643 tokens · 5 entries". It turns orange when the bible goes over budget. Each fold stays as you left it.
+- **A rewrite, change by change.** On a proposal that replaces text, "Change by change" puts each difference in the text with ✓ and ✕. Accept stays for taking it whole.
+- **One proposal bar.** Accept, Retry and Discard stay above the page; the copy in the Assistant is gone.
+- **Hidden panes show a small tab** on each edge of the page. Click it or hover the edge; pinning works as before.
+
 ## 0.40.0
 The first of six releases that tidy the interface after 0.39 (the plan is in docs/UI_PLAN.md). Nothing about your books changes.
 - **A screen that fails no longer leaves a blank window.** Plume says whether your text reached the disk and offers a way back to your books.

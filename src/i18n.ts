@@ -571,7 +571,7 @@ const FR: Record<string, string> = {
   'Write, then ask': 'Écrivez, puis demandez',
   'In the Manuscript the right pane has Assistant (Continue, Rewrite, Beats), Chat and Notes. Claude only gets the bible entries your text mentions.': 'Dans le Manuscrit, le panneau de droite a Assistant (Continuer, Réécrire, Étapes), Chat et Notes. Claude ne reçoit que les fiches de la bible que votre texte mentionne.',
   'See what it costs': 'Voyez ce que ça coûte',
-  'The size meter shows the request before you send it. The dot and the percentages in the bar show your plan\'s usage.': 'La jauge montre la requête avant l’envoi. Le point et les pourcentages de la barre montrent l’usage de votre forfait.',
+  'The line under the button gives the model and the size of the request before you send it: open it for the details. The dot and the percentages in the bar show your plan\'s usage.': 'La ligne sous le bouton donne le modèle et la taille de la requête avant l’envoi : ouvrez-la pour le détail. Le point et les pourcentages de la barre montrent l’usage de votre forfait.',
   'The toolbar above the page': 'La barre d’outils au-dessus de la page',
   'Write / Review, then the View menu: Sheet or Page, Scene, Chapter or Book, fonts and paper.': 'Écrire / Relire, puis le menu Vue : Feuille ou Page, Scène, Chapitre ou Livre, polices et papier.',
   'The chat tab thinks with you and knows your bible. "Turn into entries" drafts entries for the review list; the clock button brings back old conversations.': 'L’onglet Chat réfléchit avec vous et connaît votre bible. « Transformer en fiches » prépare des fiches pour la liste à relire ; le bouton horloge rappelle les anciennes conversations.',
@@ -1439,6 +1439,13 @@ const FR: Record<string, string> = {
   'As a printed book (read-only)': 'Comme un livre imprimé (lecture seule)',
   'A wide page, for writing': 'Une large page, pour écrire',
   'What the page shows': 'Ce que montre la page',
+  'Claude changed nothing in this passage.': 'Claude n’a rien changé à ce passage.',
+  'Claude\'s rewrite': 'Réécriture de Claude',
+  '{n} entry': '{n} fiche',
+  '{n} entries': '{n} fiches',
+  'The model, the prompt and what will be sent': 'Le modèle, le prompt et ce qui sera envoyé',
+  'Puts each change in the text, to accept or reject one by one': 'Place chaque modification dans le texte, à accepter ou refuser une par une',
+  'Change by change': 'Modification par modification',
 }
 
 const SHELL = {

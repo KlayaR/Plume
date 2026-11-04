@@ -1,12 +1,12 @@
 // Right panel: the three AI actions, the size meter, and the bible entries
 // that will be sent, each droppable or switchable between short and full.
 import { useMemo, useState } from 'react'
-import { Check, CircleCheck, CircleX, Copy, Eye, GraduationCap, Pin, RotateCcw, Send, Square, Wand2, X } from 'lucide-react'
+import { Check, CircleCheck, CircleX, Copy, Eye, GraduationCap, Pin, Send, Square, Wand2 } from 'lucide-react'
 import { Dialog } from '../studio-kit/shell.js'
 import { useStore } from '../store'
 import type { ActionId, Effort, Model } from '../lib/types'
 import type { Override } from '../lib/context'
-import { accept, alternatives, currentContext, discard, pickAlternative, retry, retryFixing, runAction, stopAction, useAI } from '../editor/actions'
+import { alternatives, assistantChoice, currentContext, pickAlternative, retryFixing, runAction, stopAction, useAI } from '../editor/actions'
 import { diffWords, learnTaste, useNotes } from '../writing'
 import { getEditorView } from '../editor/actions'
 import { allPrompts } from '../lib/voice'
@@ -62,7 +62,9 @@ export default function ContextPanel() {
   const t = useT()
   const prompts = allPrompts()
   const voice = book.meta.voice
-  const directions = useStore(s => s.prefs.directions)
+  const prefs = useStore(s => s.prefs)
+  const directions = prefs.directions
+  const setFold = (patch: { assistQuick?: boolean; assistDetails?: boolean }) => useStore.getState().setPrefs(patch)
   // Runs the action and keeps what you asked as a chip for next time.
   const go = () => {
     if (text[action].trim()) useStore.getState().setPrefs({ directions: addDirection(directions, text[action]) })
@@ -89,6 +91,18 @@ export default function ContextPanel() {
   const total = ctx ? ctx.total : 0
   const seg = (v: number) => `${total ? (v / total) * 100 : 0}%`
   const bibleOver = ctx ? ctx.parts.bible > ctx.budget : false
+
+  // The one line that stands for all of it: "Sonnet · Fantasy · ≈ 2,643 tokens · 3 entries".
+  const chosen = assistantChoice(action)
+  const promptId = voice.actionPrompts[action as ActionId] ?? voice.prompt
+  const promptOf = prompts.find(p => p.id === promptId)
+  const sent = ctx ? ctx.picked.filter(p => !p.dropped).length : 0
+  const summary = [
+    chosen.orModel ?? chosen.model[0].toUpperCase() + chosen.model.slice(1),
+    promptOf && (promptOf.preset ? t(promptOf.name) : promptOf.name),
+    ctx && `≈ ${n(total)} ${t('tokens')}`,
+    ctx && t(sent === 1 ? '{n} entry' : '{n} entries', { n: sent }),
+  ].filter(Boolean).join(' · ')
 
   return (
     <aside className="pl-context">
@@ -118,20 +132,6 @@ export default function ContextPanel() {
         onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); go() } }}
       />
 
-      <div className="pl-row">
-        <BackendModelSelect scope="assist" />
-      </div>
-      <div className="pl-row">
-        <select className="sk-select sk-btn-sm" value={voice.actionPrompts[action as ActionId] ?? ''} onChange={e => setActionPrompt(e.target.value)} aria-label={t('Prompt')} title={t('Instructions from your prompt library for this action')}>
-          <option value="">{t('Prompt')} : {voice.prompt ? (prompts.find(p => p.id === voice.prompt)?.name ?? '–') + ' ' + t('(book)') : t('None')}</option>
-          {prompts.map(p => <option key={p.id} value={p.id}>{t('Prompt')} : {p.preset ? t(p.name) : p.name}</option>)}
-        </select>
-      </div>
-      <div className="pl-row pl-quick" role="group" aria-label={t('Quick actions')}>
-        {QUICK.map(([id, label, hint]) => (
-          <button key={id} type="button" className="sk-btn sk-btn-sm sk-btn-ghost" disabled={hasProposal || !!running} title={t(hint)} onClick={() => runAction(id, '', overrides)}>{t(label)}</button>
-        ))}
-      </div>
       {isCheap() && <p className="sk-hint pl-cheap">{t('Cheap mode: past your usage threshold, calls use Haiku.')}</p>}
       <div className="pl-send">
         {running ? (
@@ -149,15 +149,14 @@ export default function ContextPanel() {
         )}
       </div>
 
-      {hasProposal && !running && (
-        <div className="pl-proposalbar">
-          <span>{t('Proposal')}</span>
-          <span className="pl-grow" />
-          <button type="button" className="sk-btn sk-btn-sm sk-btn-primary" onClick={accept} title="Tab"><Check size={14} /> {t('Accept')}</button>
-          <button type="button" className="sk-btn sk-btn-sm" onClick={() => retry()}><RotateCcw size={14} /> {t('Retry')}</button>
-          <button type="button" className="sk-btn sk-btn-sm sk-btn-ghost" onClick={discard} title="Esc"><X size={14} /> {t('Discard')}</button>
+      <details className="pl-fold" open={prefs.assistQuick} onToggle={e => setFold({ assistQuick: e.currentTarget.open })}>
+        <summary>{t('Quick actions')}</summary>
+        <div className="pl-row pl-quick" role="group" aria-label={t('Quick actions')}>
+          {QUICK.map(([id, label, hint]) => (
+            <button key={id} type="button" className="sk-btn sk-btn-sm sk-btn-ghost" disabled={hasProposal || !!running} title={t(hint)} onClick={() => runAction(id, '', overrides)}>{t(label)}</button>
+          ))}
         </div>
-      )}
+      </details>
 
       {hasProposal && !running && checks.length > 0 && (
         <section className="pl-scorecard" aria-label={t('Your rules')}>
@@ -179,6 +178,18 @@ export default function ContextPanel() {
         </section>
       )}
 
+      <details className="pl-fold" open={prefs.assistDetails} onToggle={e => setFold({ assistDetails: e.currentTarget.open })}>
+        <summary className={ctx && (bibleOver || ctx.picked.some(p => p.budgetCut)) ? 'pl-warn' : ''} title={t('The model, the prompt and what will be sent')}>{summary}</summary>
+        <div className="pl-fold-body">
+      <div className="pl-row">
+        <BackendModelSelect scope="assist" />
+      </div>
+      <div className="pl-row">
+        <select className="sk-select sk-btn-sm" value={voice.actionPrompts[action as ActionId] ?? ''} onChange={e => setActionPrompt(e.target.value)} aria-label={t('Prompt')} title={t('Instructions from your prompt library for this action')}>
+          <option value="">{t('Prompt')} : {voice.prompt ? (prompts.find(p => p.id === voice.prompt)?.name ?? '–') + ' ' + t('(book)') : t('None')}</option>
+          {prompts.map(p => <option key={p.id} value={p.id}>{t('Prompt')} : {p.preset ? t(p.name) : p.name}</option>)}
+        </select>
+      </div>
       {ctx && (
         <section className="pl-meter">
           <div className="pl-row">
@@ -227,6 +238,8 @@ export default function ContextPanel() {
           )}
         </section>
       )}
+        </div>
+      </details>
 
       {taste >= 6 && (
         <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm pl-learn" disabled={learning}

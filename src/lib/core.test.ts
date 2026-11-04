@@ -1,3 +1,4 @@
+import { hunksOf } from './hunks'
 import { describe, expect, it } from 'vitest'
 import { locate } from '../edit'
 import { parseEntry, serializeEntry, parseScene, serializeScene, factApplies, parseFact } from './bible'
@@ -1819,5 +1820,30 @@ describe('exporting the bible and the outline', () => {
     expect(en).toContain('*Goal:* Entrer')
     expect(en).toContain('*Pace:* Lent')
     expect(en).toContain('1. Le bal')
+  })
+})
+
+describe('hunksOf', () => {
+  it('places each change at its spot in the text', () => {
+    expect(hunksOf(diffWords('Elle marche vers la porte.', 'Elle court vers la porte.'), 10)).toEqual([{ from: 15, to: 21, insert: 'court' }])
+  })
+  it('joins changes separated by a space or a short word', () => {
+    expect(hunksOf([{ kind: 'del', text: 'a' }, { kind: 'add', text: 'b' }, { kind: 'same', text: ' de ' }, { kind: 'del', text: 'c' }, { kind: 'add', text: 'd' }])).toEqual([{ from: 0, to: 6, insert: 'b de d' }])
+  })
+  it('keeps changes apart across a longer passage or a new paragraph', () => {
+    expect(hunksOf([{ kind: 'del', text: 'a' }, { kind: 'same', text: ' tout le reste ' }, { kind: 'add', text: 'b' }])).toEqual([{ from: 0, to: 1, insert: '' }, { from: 16, to: 16, insert: 'b' }])
+    expect(hunksOf([{ kind: 'del', text: 'a' }, { kind: 'same', text: '\n' }, { kind: 'add', text: 'b' }])).toHaveLength(2)
+  })
+  it('leaves out a space that only became non-breaking', () => {
+    expect(hunksOf([{ kind: 'same', text: 'a' }, { kind: 'del', text: ' ' }, { kind: 'add', text: ' ' }, { kind: 'same', text: 'bonjour à tous' }])).toEqual([])
+  })
+  it('finds nothing when nothing changed', () => {
+    expect(hunksOf(diffWords('Même texte.', 'Même texte.'))).toEqual([])
+  })
+  it('applied from the end, gives the new text', () => {
+    const a = 'Il pleut sur la ville et le vent tourne. Marc se tait.', b = 'Il pleut sur Valombre et le vent se lève. Marc se tait longtemps.'
+    let out = a
+    for (const h of hunksOf(diffWords(a, b)).reverse()) out = out.slice(0, h.from) + h.insert + out.slice(h.to)
+    expect(out).toBe(b)
   })
 })

@@ -149,6 +149,9 @@ export interface Prefs {
   zen: boolean
   /** Instructions given to the Assistant, offered again as chips (pinned ones stay). */
   directions: Direction[]
+  /** The Assistant's two folds, left as they were. */
+  assistQuick: boolean
+  assistDetails: boolean
   dimPara: boolean
   advOpen: string[]
   /** A second view shown beside the main one (Bible, Plan or Manuscript), and its width in px. */
@@ -211,6 +214,8 @@ export const DEFAULT_PREFS: Prefs = {
   simple: true,
   zen: false,
   directions: [],
+  assistQuick: false,
+  assistDetails: false,
   dimPara: false,
   advOpen: [],
   dual: null,

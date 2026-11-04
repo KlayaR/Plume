@@ -260,7 +260,7 @@ export function AgentDialog({ onClose }: { onClose: () => void }) {
 const TOUR: [string, string][] = [
   ['The three spaces', 'Bible (what the book knows), Plan (what happens) and Manuscript (the text), in the bar at the bottom.'],
   ['Write, then ask', 'In the Manuscript the right pane has Assistant (Continue, Rewrite, Beats), Chat and Notes. Claude only gets the bible entries your text mentions.'],
-  ['See what it costs', 'The size meter shows the request before you send it. The dot and the percentages in the bar show your plan\'s usage.'],
+  ['See what it costs', 'The line under the button gives the model and the size of the request before you send it: open it for the details. The dot and the percentages in the bar show your plan\'s usage.'],
   ['The toolbar above the page', 'Write / Review, then the View menu: Sheet or Page, Scene, Chapter or Book, fonts and paper.'],
   ['Brainstorm', 'The chat tab thinks with you and knows your bible. "Turn into entries" drafts entries for the review list; the clock button brings back old conversations.'],
   ['Make the panes yours', 'Drag the edge of the side panes to resize them; double-click the edge to reset.'],
