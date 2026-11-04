@@ -7,6 +7,12 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.42.0
+Third of the six interface releases: one Plan.
+- **Outline, Grid, Analysis.** Five tabs of the same outline become one: the Outline switches between Cards, List and Board. Structure moves under Analysis (web novels keep Arcs and Release beside it). In simple mode, Structure now comes with Show everything.
+- **One Claude menu.** The five buttons above the outline are now a single menu: from a premise, revise, detail all, check, missing entries. What Claude does for one chapter or one scene stays on it.
+- **The story lines can be clicked.** A square opens that chapter's scenes, to tick the ones that move the line; "By scene" shows every scene, and a click ticks it directly.
+
 ## 0.41.0
 Second of the six interface releases: the Assistant.
 - **One box, one main action.** The Assistant now opens on your direction and its button. Quick actions fold away, and the model, prompt, size and bible entries fold into one line: "Sonnet · Fantasy · ≈ 2,643 tokens · 5 entries". It turns orange when the bible goes over budget. Each fold stays as you left it.

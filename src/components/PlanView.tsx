@@ -22,12 +22,13 @@ import OutlineView from './OutlineView'
 import GridView from './GridView'
 import { Arcs, Release, Threads } from './SerialPlan'
 
-const TABS: [PlanTab, string][] = [['outline', 'Outline'], ['board', 'Board'], ['grid', 'Grid'], ['structure', 'Structure']]
+const TABS: [PlanTab, string][] = [['outline', 'Outline'], ['grid', 'Grid']]
 /** A web novel plans by arcs and by release instead of one structure. */
-const SERIAL_TABS: [PlanTab, string][] = [['outline', 'Outline'], ['board', 'Board'], ['grid', 'Grid'], ['arcs', 'Arcs'], ['release', 'Release']]
+const SERIAL_TABS: [PlanTab, string][] = [['outline', 'Outline'], ['grid', 'Grid'], ['arcs', 'Arcs'], ['release', 'Release']]
 /** Plan tabs grouped under "Analysis". Revision moved to Manuscript → Review. */
-const ANALYSIS: [PlanTab, string][] = [['timeline', 'Timeline'], ['lines', 'Story lines'], ['dashboard', 'Dashboard']]
-const SERIAL_ANALYSIS: [PlanTab, string][] = [['threads', 'Threads'], ...ANALYSIS]
+const SHARED_ANALYSIS: [PlanTab, string][] = [['timeline', 'Timeline'], ['lines', 'Story lines'], ['dashboard', 'Dashboard']]
+const ANALYSIS: [PlanTab, string][] = [['structure', 'Structure'], ...SHARED_ANALYSIS]
+const SERIAL_ANALYSIS: [PlanTab, string][] = [['threads', 'Threads'], ...SHARED_ANALYSIS]
 
 export default function PlanView() {
   const simple = useStore(s => s.prefs.simple)
@@ -37,17 +38,27 @@ export default function PlanView() {
   const analysis = serial ? SERIAL_ANALYSIS : ANALYSIS
   const isAnalysis = (x: PlanTab) => analysis.some(([id]) => id === x)
   // Beginner mode keeps the main tabs; the analysis ones come with "Show everything". A tab of the other kind of book falls back to the Outline.
-  const known = [...tabs, ...analysis].some(([id]) => id === chosen)
-  const tab = !known || (simple && !tabs.some(([id]) => id === chosen)) ? 'outline' : chosen
+  const known = chosen === 'board' || [...tabs, ...analysis].some(([id]) => id === chosen)
+  const tab = !known || (simple && chosen !== 'board' && !tabs.some(([id]) => id === chosen)) ? 'outline' : chosen
+  const inOutline = tab === 'outline' || tab === 'board'
+  const list = useStore(s => s.prefs.outlineList)
+  const showOutline = (outlineList: boolean) => { useStore.setState({ planTab: 'outline' }); useStore.getState().setPrefs({ outlineList }) }
   const pinned = useStore(s => s.prefs.chatOpen)
   const t = useT()
   return (
     <div className="pl-withdock" data-pin={pinned}>
       <div className="pl-plan">
         <nav className="pl-switch pl-plan-tabs" aria-label={t('Plan')}>
-          {tabs.map(([id, label]) => <button key={id} type="button" aria-pressed={tab === id} onClick={() => useStore.setState({ planTab: id })}>{t(label)}</button>)}
+          {tabs.map(([id, label]) => <button key={id} type="button" aria-pressed={tab === id || (id === 'outline' && inOutline)} onClick={() => useStore.setState({ planTab: id })}>{t(label)}</button>)}
           {simple ? <ShowEverything /> : <button type="button" aria-pressed={isAnalysis(tab)} onClick={() => !isAnalysis(tab) && useStore.setState({ planTab: analysis[0][0] })}>{t('Analysis')}</button>}
         </nav>
+        {inOutline && (
+          <nav className="pl-switch pl-plan-sub" aria-label={t('Layout')}>
+            <button type="button" aria-pressed={tab === 'outline' && !list} onClick={() => showOutline(false)}>{t('Cards')}</button>
+            <button type="button" aria-pressed={tab === 'outline' && list} onClick={() => showOutline(true)}>{t('List')}</button>
+            <button type="button" aria-pressed={tab === 'board'} onClick={() => useStore.setState({ planTab: 'board' })}>{t('Board')}</button>
+          </nav>
+        )}
         {isAnalysis(tab) && (
           <nav className="pl-switch pl-plan-sub" aria-label={t('Analysis')}>
             {analysis.map(([id, label]) => <button key={id} type="button" aria-pressed={tab === id} onClick={() => useStore.setState({ planTab: id })}>{t(label)}</button>)}
@@ -118,7 +129,7 @@ function Board() {
         </div>
       )}
       <div className="pl-row pl-board-bar">
-        <span className="pl-label pl-grow">{t('Drag cards to reorder: the text moves with them. Double-click a card to write it.')}</span>
+        <span className="sk-hint pl-grow">{t('Drag cards to reorder: the text moves with them. Double-click a card to write it.')}</span>
         <select className="sk-select sk-btn-sm" value={colorBy} onChange={e => setColorBy(e.target.value as typeof colorBy)} aria-label={t('Colour the cards by')}>
           <option value="none">{t('No colour')}</option><option value="pov">{t('Colour by POV')}</option><option value="line">{t('Colour by story line')}</option><option value="tension">{t('Colour by tension')}</option>
         </select>
@@ -421,14 +432,27 @@ function Lines() {
   const labels = chapterLabels(book.chapters, book.meta.language)
   const lines = book.entries.filter(e => e.type === 'storyline').sort((a, b) => a.name.localeCompare(b.name))
   const written = book.chapters.reduce((n, c, i) => (c.scenes.some(s => s.text.trim()) ? i : n), -1)
+  const [byScene, setByScene] = useState(false)
+  const scenes = book.chapters.flatMap((c, ci) => c.scenes.map((s, si) => ({ s, ci, first: si === 0 })))
+  const toggleLine = (s: Scene, slug: string) => useStore.getState().updateScene(s.id, { lines: s.lines?.includes(slug) ? s.lines.filter(l => l !== slug) : [...(s.lines ?? []), slug] })
   if (!lines.length) return <div className="sk-empty">{t('Add story lines in the bible (New entry → Story line), then tick them on the cards.')}</div>
   const open = lines.filter(l => !l.resolved)
   return (
     <div className="pl-lines">
-      <span className="pl-label">{t('Which chapters move each story line forward')}</span>
-      <div className="pl-tracker-grid" style={{ gridTemplateColumns: `12rem repeat(${book.chapters.length}, minmax(22px, 1fr)) 16rem` }}>
+      <div className="pl-row">
+        <span className="pl-label pl-grow">{t(byScene ? 'Which scenes move each story line forward' : 'Which chapters move each story line forward')}</span>
+        <nav className="pl-switch" aria-label={t('Layout')}>
+          <button type="button" aria-pressed={!byScene} onClick={() => setByScene(false)}>{t('By chapter')}</button>
+          <button type="button" aria-pressed={byScene} onClick={() => setByScene(true)}>{t('By scene')}</button>
+        </nav>
+      </div>
+      <span className="sk-hint">{t(byScene ? 'Click a square to tick or untick that scene. Right-click it to open the scene.' : 'Click a square to choose the scenes of that chapter.')}</span>
+      <div className="pl-tracker-scroll">
+      <div className="pl-tracker-grid" style={{ gridTemplateColumns: `12rem repeat(${byScene ? scenes.length : book.chapters.length}, minmax(22px, 1fr)) 16rem` }}>
         <span />
-        {labels.map((l, i) => <span key={i} className="pl-tracker-ch" title={l.label}>{book.chapters[i].kind === 'chapter' ? l.number : l.label[0]}</span>)}
+        {byScene
+          ? scenes.map(({ s, ci, first }) => <span key={s.id} className="pl-tracker-ch" title={`${labels[ci].label} · ${s.title}`}>{first ? (book.chapters[ci].kind === 'chapter' ? labels[ci].number : labels[ci].label[0]) : ''}</span>)
+          : labels.map((l, i) => <span key={i} className="pl-tracker-ch" title={l.label}>{book.chapters[i].kind === 'chapter' ? l.number : l.label[0]}</span>)}
         <span />
         {lines.map(line => {
           const hits = book.chapters.map(c => c.scenes.filter(s => s.lines?.includes(line.slug)).length)
@@ -440,7 +464,16 @@ function Lines() {
           const note = !idx.length ? t('never moved forward') : dropped ? t('dropped for {n} chapters', { n: written - last }) : maxGap >= 4 ? t('a gap of {n} chapters', { n: maxGap }) : line.resolved ? t('resolved') : t('still open')
           return [
             <button key={line.slug} type="button" className="pl-quiet pl-tracker-name" onClick={() => useStore.getState().selectEntry(line.slug)} style={{ color: lineColor(line.slug) }}>{line.name}</button>,
-            ...hits.map((h, i) => <span key={`${line.slug}-${i}`} className="pl-tracker-cell" title={`${labels[i].label} : ${h}`}>{h > 0 && <i style={{ background: lineColor(line.slug) }} />}</span>),
+            ...(byScene
+              ? scenes.map(({ s, ci }) => <button key={`${line.slug}-${s.id}`} type="button" className="pl-tracker-cell" aria-pressed={!!s.lines?.includes(line.slug)} title={`${labels[ci].label} · ${s.title}`}
+                onClick={() => toggleLine(s, line.slug)} onContextMenu={e => showMenu(e, sceneMenu(s.id, { card: true }))}>{s.lines?.includes(line.slug) && <i style={{ background: lineColor(line.slug) }} />}</button>)
+              : hits.map((h, i) => <button key={`${line.slug}-${i}`} type="button" className="pl-tracker-cell" disabled={!book.chapters[i].scenes.length} title={`${labels[i].label} : ${h}`}
+                onClick={e => showMenu(e, [
+                  { header: `${labels[i].label} · ${line.name}` },
+                  ...book.chapters[i].scenes.map(s => ({ label: s.title, checked: !!s.lines?.includes(line.slug), onClick: () => toggleLine(s, line.slug) })),
+                  { separator: true },
+                  { label: t('Open a scene'), sub: book.chapters[i].scenes.map(s => ({ label: s.title, onClick: () => useStore.getState().selectScene(s.id) })) },
+                ])}>{h > 0 && <i style={{ background: lineColor(line.slug) }} />}</button>)),
             <span key={`${line.slug}-n`} className={`pl-tracker-note pl-row ${dropped || !idx.length ? 'pl-warn' : ''}`}>
               <span className="pl-grow">{note}</span>
               <label className="pl-row pl-check-label">
@@ -450,6 +483,7 @@ function Lines() {
             </span>,
           ]
         })}
+      </div>
       </div>
       {open.length > 0 && written === book.chapters.length - 1 && (
         <span className="sk-hint pl-warn">{t('Not resolved yet: {names}', { names: open.map(l => l.name).join(', ') })}</span>

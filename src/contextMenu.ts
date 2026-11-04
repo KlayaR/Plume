@@ -4,6 +4,8 @@ import { create } from 'zustand'
 
 export interface MenuItem {
   label?: string
+  /** The longer explanation, on hover. */
+  title?: string
   onClick?: () => void
   disabled?: boolean
   danger?: boolean

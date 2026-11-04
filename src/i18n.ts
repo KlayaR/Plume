@@ -1446,6 +1446,12 @@ const FR: Record<string, string> = {
   'The model, the prompt and what will be sent': 'Le modèle, le prompt et ce qui sera envoyé',
   'Puts each change in the text, to accept or reject one by one': 'Place chaque modification dans le texte, à accepter ou refuser une par une',
   'Change by change': 'Modification par modification',
+  'Which scenes move each story line forward': 'Quelles scènes font avancer chaque intrigue',
+  'By chapter': 'Par chapitre',
+  'By scene': 'Par scène',
+  'Click a square to tick or untick that scene. Right-click it to open the scene.': 'Cliquez sur une case pour cocher ou décocher cette scène. Clic droit pour ouvrir la scène.',
+  'Click a square to choose the scenes of that chapter.': 'Cliquez sur une case pour choisir les scènes de ce chapitre.',
+  'Open a scene': 'Ouvrir une scène',
 }
 
 const SHELL = {

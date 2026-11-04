@@ -34,7 +34,7 @@ export function commands(): Command[] {
     { id: 'outline-list', label: st.prefs.outlineList ? t('Outline as cards') : t('Outline as a list you type'), where: ['plan'], run: () => { st.setPrefs({ outlineList: !st.prefs.outlineList }); set({ view: 'plan', planTab: 'outline' }) } },
     planTab('board', t('Plan → Board')),
     ...(st.prefs.simple ? [] : [planTab('grid', t('Plan → Grid'))]),
-    ...(serial ? [planTab('arcs', t('Plan → Arcs')), planTab('release', t('Plan → Release')), planTab('threads', t('Plan → Threads'))] : [planTab('structure', t('Plan → Structure'))]),
+    ...(serial ? [planTab('arcs', t('Plan → Arcs')), planTab('release', t('Plan → Release')), planTab('threads', t('Plan → Threads'))] : st.prefs.simple ? [] : [planTab('structure', t('Plan → Structure'))]),
     ...(st.prefs.simple ? [] : [planTab('timeline', t('Plan → Timeline')), planTab('lines', t('Plan → Story lines')), planTab('dashboard', t('Plan → Dashboard'))]),
     { id: 'new-character', label: t('New character…'), where: ['bible'], run: async () => { const name = (await askText(t('Name of the new entry')))?.trim(); if (name) { st.addEntry('character', name); set({ view: 'bible', bibleTab: 'entry' }) } } },
     { id: 'entry-history', label: t('Earlier versions of this entry…'), where: ['bible'], run: () => { const slug = useStore.getState().entrySlug; if (slug) set({ dialog: 'history', dialogArg: slug }) } },

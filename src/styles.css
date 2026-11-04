@@ -453,7 +453,10 @@ html[data-theme="light"] .pl-shelf-books { box-shadow: 0 10px 14px -12px rgba(0,
 .pl-tracker-grid { display: grid; gap: 2px 3px; align-items: center; font-size: 12px; }
 .pl-tracker-ch { text-align: center; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .pl-tracker-name { text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pl-tracker-cell { height: 18px; border-radius: 3px; background: var(--surface-2); display: flex; align-items: center; justify-content: center; }
+.pl-tracker-scroll { overflow-x: auto; padding-bottom: 6px; }
+.pl-tracker-cell { height: 24px; min-width: 22px; padding: 0; border: 0; border-radius: 3px; background: var(--surface-2); display: flex; align-items: center; justify-content: center; }
+button.pl-tracker-cell:not(:disabled) { cursor: pointer; }
+button.pl-tracker-cell:not(:disabled):hover { box-shadow: inset 0 0 0 1px var(--accent); }
 .pl-tracker-cell i { display: block; width: 100%; height: 100%; border-radius: 3px; background: var(--accent); }
 .pl-tracker-note { color: var(--text-muted); padding-left: 8px; white-space: nowrap; }
 .pl-warn { color: var(--warning, #d39b3a) !important; }

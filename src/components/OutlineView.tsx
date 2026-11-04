@@ -65,6 +65,15 @@ export default function OutlineView() {
   const clean = async () => {
     if (await askDialog(t('Remove the whole outline? Chapters and scenes with no text go to the book’s trash; written scenes keep their text but lose their cards; goals, endings and turning point notes are cleared. Each chapter’s outline is kept in its earlier versions. The story foundation stays.'), { title: t('Clean outline'), kind: 'warning' })) cleanOutline()
   }
+  /** All Claude does for the whole outline. What's scattered per chapter and per scene stays on them. */
+  const claude = (e: React.MouseEvent) => showMenu(e, [
+    { label: t('Outline from a premise'), disabled: !!busy, onClick: () => useStore.setState({ dialog: 'outline' }) },
+    { label: t('Revise the outline…'), title: t('Tell Claude what to change in the whole outline: add, move, merge or remove chapters, change what happens. You tick the changes to keep.'), disabled: !book.chapters.length, onClick: () => useOutline.setState({ revising: true }) },
+    { label: t('Detail all'), title: t('Claude details every chapter that has no beats yet, one after the other. Each comes back as a proposal.'), disabled: !!busy, onClick: detailAll },
+    { separator: true },
+    { label: t('Check the outline'), title: t('Claude reads the whole outline and lists gaps, dropped threads, contradictions with the bible and chapters with no turn.'), disabled: !!busy || !book.chapters.length, onClick: checkOutline },
+    { label: t('Missing entries'), title: t('Claude finds the characters, places, objects and rules the outline uses but the bible lacks, and writes full entries for them (personality, arc, voice…), in Bible → To review.'), disabled: !!busy || !book.chapters.length, onClick: createEntriesFromOutline },
+  ])
   const more = (e: React.MouseEvent) => showMenu(e, [
     { label: t('Copy the outline as Markdown'), onClick: copy },
     { label: t('Export the outline…'), disabled: !book.chapters.length, onClick: () => useStore.setState({ dialog: 'export', dialogArg: 'outline' }) },
@@ -75,18 +84,10 @@ export default function OutlineView() {
   return (
     <div className="pl-ol">
       <div className="pl-ol-bar">
-        <nav className="pl-switch" aria-label={t('Layout')}>
-          <button type="button" aria-pressed={!list} onClick={() => useStore.getState().setPrefs({ outlineList: false })}>{t('Cards')}</button>
-          <button type="button" aria-pressed={list} onClick={() => useStore.getState().setPrefs({ outlineList: true })}>{t('List')}</button>
-        </nav>
         {!list && <input className="sk-input pl-ol-search" placeholder={t('Search the outline')} value={query} onChange={e => setQuery(e.target.value)} />}
-        <button type="button" className="sk-btn sk-btn-sm" disabled={!!busy} onClick={() => useStore.setState({ dialog: 'outline' })}><Sparkles size={13} /> {t('Outline from a premise')}</button>
-        <button type="button" className="sk-btn sk-btn-sm" disabled={!book.chapters.length} onClick={() => useOutline.setState({ revising: true })} title={t('Tell Claude what to change in the whole outline: add, move, merge or remove chapters, change what happens. You tick the changes to keep.')}><PencilRuler size={13} /> {t('Revise the outline…')}</button>
-        <button type="button" className="sk-btn sk-btn-sm" disabled={!!busy} onClick={detailAll} title={t('Claude details every chapter that has no beats yet, one after the other. Each comes back as a proposal.')}><Wand2 size={13} /> {t('Detail all')}</button>
-        <button type="button" className="sk-btn sk-btn-sm" disabled={!!busy || !book.chapters.length} onClick={checkOutline} title={t('Claude reads the whole outline and lists gaps, dropped threads, contradictions with the bible and chapters with no turn.')}><SearchCheck size={13} /> {busy === 'check' ? t('Reading…') : t('Check the outline')}</button>
         {busy === 'entries'
           ? <button type="button" className="sk-btn sk-btn-sm sk-btn-danger" onClick={stopEntries}><X size={13} /> {t('Stop creating entries')}</button>
-          : <button type="button" className="sk-btn sk-btn-sm" disabled={!!busy || !book.chapters.length} onClick={createEntriesFromOutline} title={t('Claude finds the characters, places, objects and rules the outline uses but the bible lacks, and writes full entries for them (personality, arc, voice…), in Bible → To review.')}><BookPlus size={13} /> {t('Missing entries')}</button>}
+          : <button type="button" className={`sk-btn sk-btn-sm ${book.chapters.length ? '' : 'sk-btn-primary'}`} aria-haspopup="menu" onClick={claude}><Sparkles size={13} /> {busy === 'check' ? t('Reading…') : 'Claude'} <ChevronDown size={13} /></button>}
         {pending > 1 && <button type="button" className="sk-btn sk-btn-sm sk-btn-primary" onClick={acceptAll}><CheckCheck size={13} /> {t('Accept all ({n})', { n: pending })}</button>}
         <button type="button" className="sk-btn sk-btn-sm sk-btn-ghost sk-btn-icon" onClick={more} aria-label={t('More')}><MoreHorizontal size={14} /></button>
       </div>

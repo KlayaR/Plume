@@ -28,7 +28,7 @@ function Panel({ items, x, y, nested }: { items: MenuItem[]; x: number; y: numbe
         if (it.header) return <div key={i} className="pl-ctx-head">{it.header}</div>
         return (
           <div key={i} className="pl-ctx-wrap" onMouseEnter={() => setOpenSub(it.sub ? i : null)}>
-            <button type="button" role="menuitem" className={`pl-ctx-item ${it.danger ? 'pl-ctx-danger' : ''}`} disabled={it.disabled}
+            <button type="button" role="menuitem" className={`pl-ctx-item ${it.danger ? 'pl-ctx-danger' : ''}`} disabled={it.disabled} title={it.title}
               onClick={() => { if (it.sub) return; closeMenu(); it.onClick?.() }}>
               <span className="pl-ctx-tick">{it.checked && <Check size={12} />}</span>
               <span className="pl-grow">{it.label}</span>
