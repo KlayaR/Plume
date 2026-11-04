@@ -104,6 +104,8 @@ body { background: var(--bg); }
 .pl-settings { display: grid; grid-template-columns: 11.5rem minmax(0, 1fr); gap: 20px; min-height: 26rem; }
 .pl-settings-nav { display: flex; flex-direction: column; gap: 2px; border-right: 1px solid var(--border); padding-right: 12px; }
 .pl-settings-nav button { display: flex; align-items: center; gap: 9px; padding: 8px 10px; font: inherit; font-size: 13px; color: var(--text-dim); background: none; border: 0; border-left: 3px solid transparent; border-radius: 0 6px 6px 0; text-align: left; cursor: pointer; }
+.pl-settings-search { width: 100%; margin-bottom: 8px; }
+.pl-settings-body [hidden] { display: none !important; }
 .pl-settings-nav button:hover { color: var(--text); background: var(--surface-2); }
 .pl-settings-nav button[aria-pressed="true"] { color: var(--accent); border-left-color: var(--accent); background: var(--surface-2); }
 .pl-settings-body { min-width: 0; max-height: 62vh; overflow-y: auto; padding-right: 6px; }
@@ -400,6 +402,11 @@ html[data-theme="light"] .pl-shelf-books { box-shadow: 0 10px 14px -12px rgba(0,
 .pl-plan-cards { display: flex; flex-wrap: wrap; gap: 12px; align-items: stretch; }
 .pl-plan-title { width: 100%; font-size: 12px; letter-spacing: 3px; text-transform: uppercase; color: var(--text-muted); }
 .pl-card { width: 13rem; min-height: 8rem; display: flex; flex-direction: column; gap: 6px; padding: 0 0 10px; text-align: left; font: inherit; color: #1c1c1c; background: #f4f1e8; border: 0; border-radius: 3px; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35); cursor: pointer; overflow: hidden; }
+.pl-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.pl-gripkey { display: inline-flex; flex: none; border-radius: 3px; }
+.pl-gripkey:focus-visible { outline: 2px solid var(--accent); }
+.pl-gripkey:focus-visible .pl-grip { opacity: 1; }
+.pl-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .pl-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4); }
 .pl-card-head { display: flex; align-items: center; gap: 6px; padding: 8px 12px 6px; background: #fbfaf7; border-bottom: 1px solid #e3c9c9; font-weight: 600; font-size: 13px; }
 .pl-card-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -41,6 +41,15 @@ const GROUPS: [string, [string, string][]][] = [
     ['Ctrl+/', 'This list'],
     ['F1', 'Help: how to use Plume'],
   ]],
+  ['Board', [
+    ['Arrows', 'Go to the next card'],
+    ['Alt+arrows', 'Move the card; up and down carry on into the next chapter'],
+    ['Enter', 'Show the card’s details'],
+    ['Ctrl+Enter', 'Write the scene'],
+    ['Alt+Left / Right', 'On a chapter’s handle: move the chapter'],
+    ['Alt+Right', 'In a loose idea: make it a scene of the first chapter'],
+    ['Shift+F10', 'What you can do with the card'],
+  ]],
   ['Grid', [
     ['Double-click', 'A new tile; on a tile, edit its text'],
     ['Enter or F2 / Esc', 'Edit the selected tile / stop editing'],
@@ -89,7 +98,7 @@ function CommandKeys({ query, setQuery }: { query: string; setQuery: (q: string)
   const keys = useStore(s => s.prefs.commandKeys)
   const set = useStore(s => s.setPrefs)
   const [problem, setProblem] = useState<{ id: string; text: string } | null>(null)
-  const all = useMemo(() => commands(), [])
+  const all = useMemo(() => commands().filter(c => !c.menu), [])
   const q = foldText(query.trim())
   const shown = all.filter(c => !q || foldText(`${c.label} ${names[c.id] ?? ''}`).includes(q))
   const without = (map: Record<string, string>, id: string) => Object.fromEntries(Object.entries(map).filter(([k]) => k !== id))

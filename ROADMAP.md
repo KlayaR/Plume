@@ -25,7 +25,6 @@ or changes features.
 - UK single quotes as an option for English books. *help wanted*
 - More interface languages (the interface is English and French). *help wanted*
 - macOS build (Tauri supports it; Plume has only been tested on Windows). *help wanted*
-- Keyboard-only use of the Plan board. *help wanted*
 
 ## Not planned
 - A Plume account or cloud: books stay files on your disk.

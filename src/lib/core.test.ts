@@ -1,3 +1,4 @@
+import { boardMove, boardNeighbour } from './board'
 import { hunksOf } from './hunks'
 import { waitingInBook } from './waiting'
 import { describe, expect, it } from 'vitest'
@@ -1861,5 +1862,26 @@ describe('what waits in the book', () => {
     expect(list[1]).toMatchObject({ text: 'décrire la salle', sceneId: 's', from: 5, to: 23 })
     expect(list[2]).toMatchObject({ text: 'Trop tôt', from: 31, to: 39 })
     expect(list[3]).toMatchObject({ text: 'Perdu', lost: true })
+  })
+})
+
+describe('board keys', () => {
+  const ch = (id: string, ...scenes: string[]) => ({ id, scenes: scenes.map(s => ({ id: s })) }) as unknown as Chapter
+  const book = [ch('a', '1', '2'), ch('empty'), ch('b', '3')]
+  it('arrows go to the next card, over empty chapters', () => {
+    expect(boardNeighbour(book, '1', 'down')).toBe('2')
+    expect(boardNeighbour(book, '1', 'up')).toBeNull()
+    expect(boardNeighbour(book, '2', 'right')).toBe('3')
+    expect(boardNeighbour(book, '3', 'left')).toBe('1')
+    expect(boardNeighbour(book, '3', 'right')).toBeNull()
+  })
+  it('Alt+arrows say where the card lands', () => {
+    expect(boardMove(book, '2', 'up')).toEqual({ chapterId: 'a', index: 0 })
+    expect(boardMove(book, '1', 'down')).toEqual({ chapterId: 'a', index: 1 })
+    expect(boardMove(book, '2', 'down')).toEqual({ chapterId: 'empty', index: 0 })
+    expect(boardMove(book, '3', 'up')).toEqual({ chapterId: 'empty', index: 0 })
+    expect(boardMove(book, '2', 'right')).toEqual({ chapterId: 'empty', index: 0 })
+    expect(boardMove(book, '1', 'up')).toBeNull()
+    expect(boardMove(book, '3', 'right')).toBeNull()
   })
 })

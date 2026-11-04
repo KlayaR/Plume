@@ -7,6 +7,13 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.45.0
+Last of the six interface releases: reach and comfort.
+- **Everything in Ctrl+K.** View choices, switches, every Settings tab, the panes, side-by-side views, and whatever right-click offers on the scene, chapter or entry you are in. Type a few letters.
+- **The Plan's board by keyboard.** Arrows go from card to card, Alt+arrows move a card (up and down carry on into the next chapter), Enter shows its details, Ctrl+Enter writes it. Chapters move from their handle; a loose idea becomes a scene with Alt+Right. Ctrl+Z takes back any of it.
+- **Find a setting.** A search box at the top of Settings shows only the rows that match, across all tabs. **Show everything** is now under Writing.
+- **What moved.** If you knew the old layout, a note says where things went, once.
+
 ## 0.44.0
 Fifth of the six interface releases: the Bible, built like the Plan.
 - **Entries, To review, AI check, Analysis.** Entries switch between List, Table and Gallery. Presence, Map, Relations and Contradictions are under Analysis, the same word as in the Plan; "More" is gone.

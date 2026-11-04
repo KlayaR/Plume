@@ -2,12 +2,13 @@
 // Board (drag cards and chapters, loose ideas, zoom), Structure (a template's
 // beats, the pacing view, beats suggested from the bible), Timeline (story time
 // and dated facts, with what doesn't add up), Story lines (which scene moves which line).
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { ask as askDialog } from '@tauri-apps/plugin-dialog'
 import { AlertTriangle, GripVertical, Lightbulb, PenLine, Plus, Sparkles, Trash2, X } from 'lucide-react'
 import { useStore, type PlanTab } from '../store'
 import { WORLD_TYPES, type Chapter, type LooseCard, type Scene, type SceneStatus } from '../lib/types'
 import { chapterLabels } from '../lib/chapters'
+import { boardMove, boardNeighbour, type BoardDir } from '../lib/board'
 import { countWords, newId } from '../lib/text'
 import { parseStoryTime, scenePositions, templateBeats, TEMPLATES, timeFlags } from '../lib/structures'
 import { ask, parseJSON } from '../ai'
@@ -84,12 +85,17 @@ export default function PlanView() {
 
 type Drag = { kind: 'scene' | 'chapter' | 'loose'; id: string } | null
 
+const ARROWS: Record<string, BoardDir> = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' }
+
 function Board() {
   const book = useStore(s => s.book)!
   const t = useT()
   const [zoom, setZoom] = useState(1)
   const [drag, setDrag] = useState<Drag>(null)
   const [selected, setSelected] = useState<string | null>(null)
+  const [focusId, setFocusId] = useState<string | null>(null)
+  const [said, setSaid] = useState('')
+  const boardRef = useRef<HTMLDivElement>(null)
   const [colorBy, setColorBy] = useState<'none' | 'pov' | 'line' | 'tension'>('none')
   const [fPov, setFPov] = useState('')
   const [fLine, setFLine] = useState('')
@@ -106,19 +112,52 @@ function Board() {
   const loose = book.meta.loose
   const setLoose = (list: LooseCard[]) => st().updateMeta({ loose: list })
 
+  const placeLoose = (card: LooseCard, chapter: Chapter) => {
+    const id = st().addScene(chapter.id, card.title || (fr ? 'Scène' : 'Scene'), { stay: true, note: card.note })
+    setLoose(loose.filter(l => l.id !== card.id))
+    return id
+  }
   const dropOn = (chapter: Chapter, index: number) => {
     if (drag?.kind === 'scene') st().moveScene(drag.id, chapter.id, index)
     if (drag?.kind === 'loose') {
       const card = loose.find(l => l.id === drag.id)
-      if (card) {
-        st().addScene(chapter.id, card.title || (fr ? 'Scène' : 'Scene'), { stay: true, note: card.note })
-        setLoose(loose.filter(l => l.id !== card.id))
-      }
+      if (card) placeLoose(card, chapter)
     }
     if (drag?.kind === 'chapter') st().moveChapter(drag.id, book.chapters.indexOf(chapter))
     setDrag(null)
   }
   const scene = book.chapters.flatMap(c => c.scenes).find(s => s.id === selected) ?? null
+  // Tab enters the board once, at the card you were on; arrows do the rest.
+  const allScenes = book.chapters.flatMap(c => c.scenes)
+  const tabStop = allScenes.some(s => s.id === focusId) ? focusId : allScenes[0]?.id
+  const focusAfter = (selector: string) => requestAnimationFrame(() => {
+    const el = boardRef.current?.querySelector<HTMLElement>(selector)
+    el?.focus()
+    el?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  })
+  const focusCard = (id: string) => { setFocusId(id); focusAfter(`[data-card="${id}"]`) }
+  const keyOnCard = (e: React.KeyboardEvent, s: Scene) => {
+    if (e.target !== e.currentTarget) return
+    const dir = ARROWS[e.key]
+    if (dir) {
+      e.preventDefault()
+      if (!e.altKey) { const next = boardNeighbour(book.chapters, s.id, dir); if (next) focusCard(next); return }
+      const to = boardMove(book.chapters, s.id, dir)
+      if (!to) return
+      st().moveScene(s.id, to.chapterId, to.index)
+      setSaid(t('{title}: {chapter}, card {n}', { title: s.title, chapter: labels[book.chapters.findIndex(c => c.id === to.chapterId)].label, n: to.index + 1 }))
+      focusCard(s.id)
+    } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); st().selectScene(s.id) }
+    else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelected(selected === s.id ? null : s.id) }
+  }
+  const keyOnChapter = (e: React.KeyboardEvent, c: Chapter, i: number) => {
+    const to = e.altKey ? i + (e.key === 'ArrowLeft' ? -1 : e.key === 'ArrowRight' ? 1 : 0) : i
+    if (to === i || to < 0 || to >= book.chapters.length) return
+    e.preventDefault()
+    st().moveChapter(c.id, to)
+    setSaid(t('{title}: position {n}', { title: c.title || labels[i].label, n: to + 1 }))
+    focusAfter(`[data-chapter="${c.id}"]`)
+  }
 
   return (
     <div className="pl-board-wrap">
@@ -129,7 +168,7 @@ function Board() {
         </div>
       )}
       <div className="pl-row pl-board-bar">
-        <span className="sk-hint pl-grow">{t('Drag cards to reorder: the text moves with them. Double-click a card to write it.')}</span>
+        <span className="sk-hint pl-grow">{t('Drag cards to reorder, or Alt+arrows: the text moves with them. Double-click a card, or Ctrl+Enter, to write it.')}</span>
         <select className="sk-select sk-btn-sm" value={colorBy} onChange={e => setColorBy(e.target.value as typeof colorBy)} aria-label={t('Colour the cards by')}>
           <option value="none">{t('No colour')}</option><option value="pov">{t('Colour by POV')}</option><option value="line">{t('Colour by story line')}</option><option value="tension">{t('Colour by tension')}</option>
         </select>
@@ -147,13 +186,15 @@ function Board() {
             style={{ ['--sk-fill' as string]: `${((zoom - 0.4) / 0.8) * 100}%` }} />
         </label>
       </div>
-      <div className="pl-board" onContextMenu={e => { if (e.target === e.currentTarget) showMenu(e, [...newThingsMenu(), { label: t('New idea'), onClick: () => setLoose([...loose, { id: newId(), title: '', note: '' }]) }]) }} style={{ ['--pl-card-zoom' as string]: zoom }}>
+      <span className="pl-sr-only" role="status">{said}</span>
+      <div className="pl-board" ref={boardRef} onContextMenu={e => { if (e.target === e.currentTarget) showMenu(e, [...newThingsMenu(), { label: t('New idea'), onClick: () => setLoose([...loose, { id: newId(), title: '', note: '' }]) }]) }} style={{ ['--pl-card-zoom' as string]: zoom }}>
         <section className="pl-col pl-col-loose">
           <div className="pl-col-head"><Lightbulb size={14} /> <span className="pl-grow">{t('Loose ideas')}</span>
             <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm sk-btn-icon" title={t('New idea')} onClick={() => setLoose([...loose, { id: newId(), title: '', note: '' }])}><Plus size={13} /></button>
           </div>
           {loose.map(l => (
-            <div key={l.id} className="pl-card pl-card-loose" draggable onDragStart={() => setDrag({ kind: 'loose', id: l.id })} onDragEnd={() => setDrag(null)}>
+            <div key={l.id} className="pl-card pl-card-loose" draggable onDragStart={() => setDrag({ kind: 'loose', id: l.id })} onDragEnd={() => setDrag(null)}
+              onKeyDown={e => { if (e.altKey && e.key === 'ArrowRight' && book.chapters[0]) { e.preventDefault(); focusCard(placeLoose(l, book.chapters[0])) } }}>
               <input data-lt className="pl-card-input" value={l.title} placeholder={t('Idea')} onChange={e => setLoose(loose.map(x => x.id === l.id ? { ...x, title: e.target.value } : x))} />
               <textarea className="pl-card-note" rows={3} value={l.note} placeholder={t('What happens…')} onChange={e => setLoose(loose.map(x => x.id === l.id ? { ...x, note: e.target.value } : x))} />
               <button type="button" className="pl-quiet pl-card-x" aria-label={t('Delete')} onClick={() => setLoose(loose.filter(x => x.id !== l.id))}><X size={12} /></button>
@@ -166,14 +207,15 @@ function Board() {
           <section key={c.id} className={`pl-col ${drag?.kind === 'chapter' && drag.id !== c.id ? 'pl-col-target' : ''}`}
             onDragOver={e => e.preventDefault()} onDrop={() => dropOn(c, c.scenes.length)}>
             <div className="pl-col-head" onContextMenu={e => { e.stopPropagation(); showMenu(e, chapterMenu(c.id)) }} draggable onDragStart={e => { e.stopPropagation(); setDrag({ kind: 'chapter', id: c.id }) }} onDragEnd={() => setDrag(null)}>
-              <GripVertical size={13} className="pl-grip" />
+              <span className="pl-gripkey" role="button" tabIndex={0} data-chapter={c.id} aria-label={t('Move this chapter: Alt+Left or Alt+Right')} title={t('Move this chapter: Alt+Left or Alt+Right')} onKeyDown={e => keyOnChapter(e, c, ci)}><GripVertical size={13} className="pl-grip" /></span>
               <span className="pl-col-num">{c.kind === 'chapter' ? labels[ci].number : labels[ci].label}</span>
               <input data-lt className="pl-col-title" value={c.title} placeholder={t('Untitled')} onChange={e => st().updateChapter(c.id, { title: e.target.value })} />
             </div>
             <input data-lt className="pl-col-part" value={c.part ?? ''} placeholder={book.meta.kind === 'serial' ? t('Starts a volume: its title') : t('Starts a part: its title')} title={book.meta.kind === 'serial' ? t('Volumes group arcs; a volume can be exported as a book of its own') : t('A part page goes before this chapter in exports')} onChange={e => st().updateChapter(c.id, { part: e.target.value })} />
             {book.meta.kind === 'serial' && <input data-lt className="pl-col-part" value={c.arc ?? ''} placeholder={t('Starts an arc: its title')} onChange={e => st().updateChapter(c.id, { arc: e.target.value })} />}
             {c.scenes.map((s, si) => (
-              <Card key={s.id} scene={s} active={selected === s.id} tint={tintOf(s)} dim={dimmed(s)}
+              <Card key={s.id} scene={s} active={selected === s.id} tint={tintOf(s)} dim={dimmed(s)} tabStop={tabStop === s.id}
+                onKeyDown={e => keyOnCard(e, s)} onFocus={() => setFocusId(s.id)}
                 onSelect={() => setSelected(selected === s.id ? null : s.id)}
                 onDragStart={() => setDrag({ kind: 'scene', id: s.id })}
                 onDrop={() => dropOn(c, si)} />
@@ -190,14 +232,14 @@ function Board() {
   )
 }
 
-function Card({ scene, active, tint, dim, onSelect, onDragStart, onDrop }: { scene: Scene; active: boolean; tint?: string; dim?: boolean; onSelect: () => void; onDragStart: () => void; onDrop: () => void }) {
+function Card({ scene, active, tint, dim, tabStop, onKeyDown, onFocus, onSelect, onDragStart, onDrop }: { scene: Scene; active: boolean; tint?: string; dim?: boolean; tabStop: boolean; onKeyDown: (e: React.KeyboardEvent) => void; onFocus: () => void; onSelect: () => void; onDragStart: () => void; onDrop: () => void }) {
   const book = useStore(s => s.book)!
   const t = useT()
   const pov = book.entries.find(e => e.slug === scene.pov)?.name
   const place = book.entries.find(e => e.slug === scene.place)?.name
   const text = scene.note?.trim() || scene.summary?.trim() || scene.text.split('\n').find(l => l.trim())?.trim() || ''
   return (
-    <div onContextMenu={e => { e.stopPropagation(); showMenu(e, sceneMenu(scene.id, { card: true })) }} className={`pl-card ${active ? 'pl-card-active' : ''} ${dim ? 'pl-card-dim' : ''}`} style={tint ? { borderLeft: `4px solid ${tint}` } : undefined} draggable onDragStart={e => { e.stopPropagation(); onDragStart() }}
+    <div role="button" aria-pressed={active} tabIndex={tabStop ? 0 : -1} data-card={scene.id} onKeyDown={onKeyDown} onFocus={onFocus} onContextMenu={e => { e.stopPropagation(); showMenu(e, sceneMenu(scene.id, { card: true })) }} className={`pl-card ${active ? 'pl-card-active' : ''} ${dim ? 'pl-card-dim' : ''}`} style={tint ? { borderLeft: `4px solid ${tint}` } : undefined} draggable onDragStart={e => { e.stopPropagation(); onDragStart() }}
       onDragOver={e => e.preventDefault()} onDrop={e => { e.stopPropagation(); onDrop() }}
       onClick={onSelect} onDoubleClick={() => useStore.getState().selectScene(scene.id)}>
       <span className="pl-card-head">

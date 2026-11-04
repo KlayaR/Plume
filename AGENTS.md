@@ -9,7 +9,8 @@ things are) and `CONTRIBUTING.md` (house rules).
 - `npm install`, `npm test` (vitest, core logic), `npm run build:renderer`
   (type-check and build), `npm run check` (French strings, versions).
 - Try the UI without Tauri: `npm run dev:vite`, open `http://localhost:5178/?mock`
-  (sample book and a fake `claude`, `src/dev/mockTauri.ts`). In the mock,
+  (sample book and a fake `claude`, `src/dev/mockTauri.ts`; `?mock=long` is a
+  full-length book of 120 scenes). In the mock,
   `window.__mockFiles` holds the book's files, `window.__lastClaude` the last request and
   `window.__store` the app's store.
 - Interface text is English in the code, wrapped in `t('…')`; every new phrase

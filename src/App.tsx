@@ -101,7 +101,8 @@ export default function App() {
         const s = all[all.findIndex(x => x.id === st.sceneId) + (e.key === 'PageUp' ? -1 : 1)]
         if (s) st.selectScene(s.id)
       }
-      if (e.altKey && !e.ctrlKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight') && useStore.getState().book) {
+      // On the Plan board, Alt+arrows move the card.
+      if (e.altKey && !e.ctrlKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight') && useStore.getState().book && !(e.target as HTMLElement).closest?.('.pl-board')) {
         e.preventDefault(); e.stopPropagation()
         if (e.key === 'ArrowLeft') useStore.getState().goBack(); else useStore.getState().goForward()
       }
@@ -193,6 +194,7 @@ export default function App() {
       {book && dialog === 'agents' && <AgentDialog onClose={() => useStore.setState({ dialog: null })} />}
       {book && printing && <PrintView />}
       {book && !prefs.seen?.includes('basics') && <TipCard />}
+      {book && prefs.seen?.includes('basics') && !prefs.seen.includes('moved-045') && <MovedCard />}
       {book && scratchOpen && <ScratchPad />}
       {book && <EditChapterDialog />}
       <ContextMenuHost />
@@ -205,7 +207,8 @@ export default function App() {
 /** Shown once: the three things nobody guesses. */
 function TipCard() {
   const t = useT()
-  const done = () => useStore.getState().setPrefs({ seen: [...(useStore.getState().prefs.seen ?? []), 'basics'] })
+  // A new writer has nothing to relearn: the note about what moved is skipped too.
+  const done = () => useStore.getState().setPrefs({ seen: [...(useStore.getState().prefs.seen ?? []), 'basics', 'moved-045'] })
   return (
     <div className="pl-tipcard" role="note">
       <b>{t('Three things worth knowing')}</b>
@@ -214,6 +217,25 @@ function TipCard() {
       <span>{t('When Claude proposes text: Tab accepts it, Esc discards it.')}</span>
       <div className="pl-row">
         <button type="button" className="sk-btn sk-btn-sm sk-btn-ghost" onClick={() => { done(); useStore.setState({ dialog: 'help' }) }}>{t('Open the help (F1)')}</button>
+        <button type="button" className="sk-btn sk-btn-sm sk-btn-primary" onClick={done}>{t('Got it')}</button>
+      </div>
+    </div>
+  )
+}
+
+/** Shown once to those who knew the old layout: where things went. */
+function MovedCard() {
+  const t = useT()
+  const done = () => useStore.getState().setPrefs({ seen: [...(useStore.getState().prefs.seen ?? []), 'moved-045'] })
+  return (
+    <div className="pl-tipcard" role="note">
+      <b>{t('What moved')}</b>
+      <span>{t('Manuscript: the View menu above the page holds the switches and fonts.')}</span>
+      <span>{t('Plan: Outline has Cards, List and Board; Analysis has the reports, Structure included.')}</span>
+      <span>{t('Bible: Entries has List, Table and Gallery; Analysis replaces More.')}</span>
+      <span>{t('Scratch pad: “In the book” lists the ideas, placeholders and comments waiting in the text.')}</span>
+      <span>{t('Lost something? Ctrl+K finds it by name.')}</span>
+      <div className="pl-row">
         <button type="button" className="sk-btn sk-btn-sm sk-btn-primary" onClick={done}>{t('Got it')}</button>
       </div>
     </div>

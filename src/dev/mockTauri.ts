@@ -11,6 +11,25 @@ const put = (rel: string, text: string) => files.set(rel, text)
 // The sample book is the example book offered in New book.
 for (const [rel, text] of Object.entries(exampleFiles('fr'))) put(rel, text)
 
+// ?mock=long: a full-length book instead, to see how the screens hold up. 40
+// chapters of 3 scenes, about 180,000 words.
+if (new URLSearchParams(location.search).get('mock') === 'long') {
+  const meta = JSON.parse(files.get('plume.json')!)
+  for (const k of [...files.keys()]) if (k.startsWith('manuscript/')) files.delete(k)
+  const para = 'Élise traversa la cour sans se retourner. Marc l’attendait près des grilles, la main sur la garde, et personne ne parlait de Valombre. La pluie tombait sur les pavés, le vent portait une odeur de cendres, et chaque pas la rapprochait de ce qu’elle avait juré de ne plus revoir.'
+  const text = Array.from({ length: 30 }, () => para).join('\n\n')
+  meta.order = Array.from({ length: 40 }, (_, c) => {
+    const folder = `ch-${c + 1}`
+    put(`manuscript/${folder}/chapter.md`, `---\nid: c${c + 1}\ntitle: Chapitre ${c + 1}\n---\n`)
+    const scenes = [1, 2, 3].map(s => {
+      put(`manuscript/${folder}/sc-${s}.md`, `---\nid: c${c + 1}s${s}\ntitle: Scène ${c + 1}.${s}\npov: ${s === 2 ? 'marc' : 'elise'}\nstatus: draft\nnote: Ce qui arrive dans cette scène.\n---\n\n${text}`)
+      return `sc-${s}.md`
+    })
+    return { folder, scenes }
+  })
+  put('plume.json', JSON.stringify(meta))
+}
+
 const REPLY = 'Les lustres tremblaient au rythme des violons. Elle sentit la chaleur d\'Aube contre sa hanche, comme un avertissement... "Pas ce soir", murmura-t-elle. Marc, de l\'autre côté de la salle, ne la quittait pas des yeux !'
 
 type Cb = (e: unknown) => void

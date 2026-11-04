@@ -1,6 +1,6 @@
 // Settings, as tabs on the left: Appearance, Manuscript, Writing, Claude,
 // This book (when one is open), About.
-import { useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { BookMarked, Bot, Feather, Info, Palette, PenLine, Type, Settings as Gear } from 'lucide-react'
 import { Dialog, SettingRow, SettingsSection, Switch, ThemePicker } from '../studio-kit/shell.js'
 import { useStore } from '../store'
@@ -15,15 +15,47 @@ import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { useEffect } from 'react'
 import { backupNow, joinSeries, listBackups, seriesName } from '../library'
 import { LT_DEFAULT, ltTest } from '../lib/languagetool'
+import { foldText } from '../lib/text'
 
 const ACTIONS: [ActionId, string][] = [['continue', 'Continue'], ['rewrite', 'Rewrite selection'], ['beats', 'Beats to prose']]
 type Tab = 'appearance' | 'manuscript' | 'writing' | 'voice' | 'claude' | 'book' | 'about'
+
+/** While searching: keeps the sections and rows whose words match, hides the others. Says whether any is left. */
+function filterSettings(body: HTMLElement, query: string) {
+  const words = foldText(query).split(/\s+/).filter(Boolean)
+  const matches = (el: Element) => { const text = foldText(el.textContent ?? ''); return words.every(w => text.includes(w)) }
+  let found = false
+  // What a tab draws outside its sections goes by the same rule.
+  for (const el of Array.from(body.children) as HTMLElement[]) {
+    if (!el.matches('.sk-settings-section, .pl-settings-none')) el.hidden = !matches(el)
+    if (el.matches('details') && words.length) (el as HTMLDetailsElement).open = !el.hidden
+  }
+  body.querySelectorAll<HTMLElement>('.sk-settings-section').forEach(section => {
+    const head = section.querySelector('.sk-settings-head')
+    const whole = !!head && matches(head)
+    let shown = whole
+    for (const child of Array.from(section.children) as HTMLElement[]) {
+      if (child === head) continue
+      child.hidden = !whole && !matches(child)
+      if (!child.hidden) shown = true
+    }
+    section.hidden = !shown
+    if (shown) found = true
+  })
+  return found
+}
 
 export default function SettingsView({ version }: { version: string }) {
   const book = useStore(s => s.book)
   const t = useT()
   const [tab, setTab] = useState<Tab>(() => (useStore.getState().settingsTab as Tab | null) ?? 'appearance')
   const close = () => useStore.setState({ showSettings: false, settingsTab: null })
+  const [query, setQuery] = useState('')
+  const [nothing, setNothing] = useState(false)
+  const bodyRef = useRef<HTMLDivElement>(null)
+  const searching = !!query.trim()
+  // The rows are drawn by each tab, with their conditions: searching reads what is really there.
+  useLayoutEffect(() => { if (bodyRef.current) setNothing(!filterSettings(bodyRef.current, query)) })
   const tabs: [Tab, string, typeof Palette][] = [
     ['appearance', 'Appearance', Palette],
     ['manuscript', 'Manuscript', Type],
@@ -39,24 +71,26 @@ export default function SettingsView({ version }: { version: string }) {
       footer={<button type="button" className="sk-btn sk-btn-primary" onClick={close}>{t('Close')}</button>}>
       <div className="pl-settings">
         <nav className="pl-settings-nav" aria-label={t('Settings')}>
+          <input type="search" autoFocus className="sk-input pl-settings-search" value={query} placeholder={t('Find a setting')} aria-label={t('Find a setting')} onChange={e => setQuery(e.target.value)} />
           {tabs.map(([id, label, Icon]) => (
-            <button key={id} type="button" aria-pressed={tab === id} onClick={() => setTab(id)}>
+            <button key={id} type="button" aria-pressed={tab === id && !searching} onClick={() => { setTab(id); setQuery('') }}>
               <Icon size={15} /> {t(label)}
             </button>
           ))}
         </nav>
-        <div className="pl-settings-body">
-          {tab === 'appearance' && <AppearanceTab />}
-          {tab === 'manuscript' && (
+        <div className="pl-settings-body" ref={bodyRef}>
+          {searching && nothing && <p className="sk-hint pl-settings-none">{t('No setting matches “{query}”.', { query: query.trim() })}</p>}
+          {(searching || tab === 'appearance') && <AppearanceTab />}
+          {(searching || tab === 'manuscript') && (
             <SettingsSection title={t('Manuscript')} description={t('How the manuscript looks on this computer. The quick ones are also in the View menu above the page.')}>
               <ManuscriptOptions full />
             </SettingsSection>
           )}
-          {tab === 'writing' && <WritingTab />}
-          {tab === 'voice' && book && <VoiceSettings />}
-          {tab === 'claude' && <ClaudeTab />}
-          {tab === 'book' && book && <BookTab />}
-          {tab === 'about' && (
+          {(searching || tab === 'writing') && <WritingTab />}
+          {(searching || tab === 'voice') && book && <VoiceSettings />}
+          {(searching || tab === 'claude') && <ClaudeTab />}
+          {(searching || tab === 'book') && book && <BookTab />}
+          {(searching || tab === 'about') && (
             <SettingsSection title={t('About')}>
               <dl className="sk-about">
                 <dt>Plume</dt><dd>{version ? `v${version}` : '-'}</dd>
@@ -84,9 +118,6 @@ function AppearanceTab() {
           <button type="button" aria-pressed={prefs.ui === 'en'} onClick={() => setPrefs({ ui: 'en' })}>English</button>
         </div>
       </SettingRow>
-      <SettingRow label={t('Show everything')} description={t('Every tab and report: the Plan’s timeline, story lines, dashboard and revision, the bible’s More tab, and all the Review reports. Off, Plume shows what most writers use.')}>
-        <Switch checked={!prefs.simple} onChange={v => setPrefs({ simple: !v })} label={t('Show everything')} />
-      </SettingRow>
     </SettingsSection>
   )
 }
@@ -98,6 +129,9 @@ function WritingTab() {
   return (
     <>
     <SettingsSection title={t('Writing')}>
+      <SettingRow label={t('Show everything')} description={t('Every tab and report: the Plan’s grid and analysis, the bible’s table, gallery and analysis, and all the Review reports. Off, Plume shows what most writers use.')}>
+        <Switch checked={!prefs.simple} onChange={v => setPrefs({ simple: !v })} label={t('Show everything')} />
+      </SettingRow>
       <SettingRow label={t('Focus mode')} description={t('The controls fade while you type and come back when the mouse moves')}>
         <Switch checked={prefs.focus} onChange={v => setPrefs({ focus: v })} label={t('Focus mode')} />
       </SettingRow>

@@ -502,7 +502,7 @@ function Portrait({ entry, update }: { entry: Entry; update: (patch: Partial<Ent
 export function ShowEverything() {
   const t = useT()
   return (
-    <button type="button" className="pl-quiet pl-showall" title={t('Shows every tab and report. Settings → Appearance turns it back off.')}
+    <button type="button" className="pl-quiet pl-showall" title={t('Shows every tab and report. Settings → Writing turns it back off.')}
       onClick={() => useStore.getState().setPrefs({ simple: false })}>{t('Show everything')}</button>
   )
 }

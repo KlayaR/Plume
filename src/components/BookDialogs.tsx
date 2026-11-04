@@ -265,6 +265,7 @@ const TOUR: [string, string][] = [
   ['Brainstorm', 'The chat tab thinks with you and knows your bible. "Turn into entries" drafts entries for the review list; the clock button brings back old conversations.'],
   ['Make the panes yours', 'Drag the edge of the side panes to resize them; double-click the edge to reset.'],
   ['Your voice', 'Settings (Ctrl+,) → Voice: your prompts, your rules, your style. Every proposal is checked against your rules.'],
+  ['Everything by keyboard', 'Ctrl+K finds any scene, entry or action by name. On the Plan’s board, arrows go from card to card and Alt+arrows move the card.'],
   ['Nothing is lost', 'A history of every scene, a daily backup, and removed files go to the book\'s trash folder. The ⋯ menu has export, agent tasks and this tour.'],
 ]
 
