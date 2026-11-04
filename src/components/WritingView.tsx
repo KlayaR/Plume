@@ -180,14 +180,16 @@ function SheetScene({ scene, first, solo, active, characters, update, t }: {
   const started = useRef(false)
   if (!scene.text.trim()) started.current = true
   else if (!active) started.current = false
+  // POV, time, place and status: the current scene's only, and none in the whole book.
+  const details = prefs.scope !== 'book' && (prefs.showPov || prefs.showStatus || prefs.showWhere)
   return (
           <section className={`pl-scene-block ${first ? 'pl-dropcap' : ''} ${active ? 'pl-scene-active' : ''}`}>
             {!first && !solo && <div className="pl-break" aria-label={t('Scene break')}>* * *</div>}
-            {(prefs.showSceneTitle || prefs.showPov || prefs.showStatus || prefs.showWhere) && (
+            {(prefs.showSceneTitle || details) && (
               <div className="pl-scene-head">
                 {prefs.showSceneTitle && <input data-lt className="pl-head-scene" value={scene.title} onChange={e => update(scene.id, { title: e.target.value })} aria-label={t('Scene title')} />}
-                {(prefs.showPov || prefs.showStatus || prefs.showWhere) && (
-                  <div className="pl-head-meta">
+                {details && (
+                  <div className={`pl-head-meta ${active ? '' : 'pl-head-meta-idle'}`}>
                     {prefs.showPov && (
                       <select value={scene.pov ?? ''} onChange={e => update(scene.id, { pov: e.target.value || null })} aria-label={t('POV')} title={t('POV')}>
                         <option value="">{t('POV')} : {t('None')}</option>

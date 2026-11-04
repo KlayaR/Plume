@@ -48,7 +48,7 @@ export default function SettingsView({ version }: { version: string }) {
         <div className="pl-settings-body">
           {tab === 'appearance' && <AppearanceTab />}
           {tab === 'manuscript' && (
-            <SettingsSection title={t('Manuscript')} description={t('How the manuscript looks on this computer. The quick ones are also under Aa in the bottom bar.')}>
+            <SettingsSection title={t('Manuscript')} description={t('How the manuscript looks on this computer. The quick ones are also in the View menu above the page.')}>
               <ManuscriptOptions full />
             </SettingsSection>
           )}

@@ -1,4 +1,4 @@
-// How the manuscript looks: in the "Aa" panel (the quick part) and in
+// How the manuscript looks: in the View menu (the quick part) and in
 // Settings → Manuscript (all of it). Changes show on the page at once.
 import { SettingRow, Switch } from '../studio-kit/shell.js'
 import { DEFAULT_PREFS, useStore, type FontId, type PageSize, type Paper } from '../store'
@@ -12,6 +12,10 @@ function Slider({ value, min, max, step, onChange }: { value: number; min: numbe
     <input type="range" className="sk-slider" min={min} max={max} step={step} value={value}
       style={{ ['--sk-fill' as string]: `${((value - min) / (max - min)) * 100}%` }} onChange={e => onChange(Number(e.target.value))} />
   )
+}
+
+function Fold({ full, label, children }: { full: boolean; label: string; children: React.ReactNode }) {
+  return full ? <>{children}</> : <details className="pl-viewfold"><summary>{label}</summary>{children}</details>
 }
 
 export default function ManuscriptOptions({ full = false }: { full?: boolean }) {
@@ -43,6 +47,7 @@ export default function ManuscriptOptions({ full = false }: { full?: boolean }) 
         </div>
       </SettingRow>
 
+      <Fold full={full} label={t('What the page shows')}>
       <div className="pl-opt-group">{t('Above the text')}</div>
       <SettingRow label={t('Scene title')}>
         <Switch checked={prefs.showSceneTitle} onChange={v => set({ showSceneTitle: v })} label={t('Scene title')} />
@@ -66,6 +71,7 @@ export default function ManuscriptOptions({ full = false }: { full?: boolean }) 
       <SettingRow label={t('Page numbers')} description={t('Not on a chapter’s opening page, as in printed books')}>
         <Switch checked={prefs.pageNumbers} onChange={v => set({ pageNumbers: v })} label={t('Page numbers')} />
       </SettingRow>
+      </Fold>
 
       {full && (
         <>

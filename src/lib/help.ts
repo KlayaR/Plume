@@ -61,7 +61,7 @@ export const HELP: HelpTopic[] = [
     title: { en: 'Writing', fr: 'Écrire' },
     lines: {
       en: [
-        '**Sheet** is a wide page for writing; **Page** shows real book pages. **Scene / Chapter / Book** chooses how much you see at once.',
+        '**Sheet** is a wide page for writing; **Page** shows real book pages. **Scene / Chapter / Book** chooses how much you see at once. All three are in the **View** menu above the page, with the font and the paper.',
         'At the end of a scene, press **Enter twice** for a new scene, **three times** for a new chapter.',
         'Typography fixes itself as you type (quotes, dashes, ellipses, French spaces) and sentences start with a capital. **Ctrl+Z right after** gives back what you typed.',
         '**Ctrl+I** italic, **Ctrl+B** bold. Pasting from Word or the web keeps only italics and bold.',
@@ -74,7 +74,7 @@ export const HELP: HelpTopic[] = [
         'A scene with a card note or beats but no text yet shows them in its place, never printed, with **Write it** to have Claude write it from the plan.',
       ],
       fr: [
-        '**Feuille** est une page large pour écrire ; **Page** montre de vraies pages de livre. **Scène / Chapitre / Livre** choisit ce que vous voyez d\'un coup.',
+        '**Feuille** est une page large pour écrire ; **Page** montre de vraies pages de livre. **Scène / Chapitre / Livre** choisit ce que vous voyez d\'un coup. Les trois sont dans le menu **Vue**, au-dessus de la page, avec la police et le papier.',
         'En fin de scène, **Entrée deux fois** crée une scène, **trois fois** un chapitre.',
         'La typographie se corrige en tapant (guillemets, tirets, points de suspension, espaces français) et les phrases commencent par une majuscule. **Ctrl+Z juste après** redonne ce que vous aviez tapé.',
         '**Ctrl+I** italique, **Ctrl+B** gras. Coller depuis Word ou le web ne garde que l\'italique et le gras.',

@@ -7,6 +7,14 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.40.0
+The first of six releases that tidy the interface after 0.39 (the plan is in docs/UI_PLAN.md). Nothing about your books changes.
+- **A screen that fails no longer leaves a blank window.** Plume says whether your text reached the disk and offers a way back to your books.
+- **One View menu above the page.** Sheet or Page, Scene, Chapter or Book, font, size and paper are together; its button shows what you're looking at. It replaces the two switches and Aa.
+- **Scene details are quieter.** POV, time, place and status show for the current scene only, and not at all in Book view (right-click a scene or use the Plan there).
+- **Calmer bars.** Fewer lines, a quieter space switch, no text under 12px apart from book covers, and bigger click areas.
+- **Moved:** Synonyms and New bible entry leave the toolbar. They stay on the selection (right-click, or the bar above it) and on Ctrl+Shift+Y and Ctrl+Shift+B.
+
 ## 0.39.1
 - **French:** the Outline and the help now call a plan card a "carte" everywhere. Older labels and messages still said "fiche", which is the word for a bible entry.
 

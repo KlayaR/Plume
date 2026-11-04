@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import './studio-kit/index.css'
 import { getTheme, initTheme, onThemeChange } from './studio-kit/theme.js'
 import App from './App'
+import ErrorScreen from './components/ErrorScreen'
 import './styles.css'
 
 initTheme()
@@ -19,7 +20,7 @@ function start() {
   }
   ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
-      <App />
+      <ErrorScreen><App /></ErrorScreen>
     </React.StrictMode>,
   )
 }

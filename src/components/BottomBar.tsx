@@ -1,10 +1,11 @@
 // The thin bar at the bottom of the room: the three spaces in the middle; on
 // the left the book (or, in the Manuscript, its counters and goals); on the
 // right your plan's usage, the Claude status, a "more" menu and Settings.
-// The manuscript's own controls (Write / Review, Sheet / Page, Scene / Chapter /
-// Book, split, Aa) live in a toolbar above the page: ManuscriptToolbar.
+// The manuscript's own controls (Write / Review and the View menu) live in a
+// toolbar above the page: ManuscriptToolbar.
 import { useEffect, useRef, useState } from 'react'
-import { Bot, BookPlus, Camera, ChevronsRight, CircleHelp, Keyboard, PanelRight, ChevronLeft, Columns2, Compass, Ellipsis, FileOutput, NotebookPen, Replace, Search, Settings } from 'lucide-react'
+import { Bot, Camera, ChevronDown, ChevronsRight, CircleHelp, Keyboard, PanelRight, ChevronLeft, Columns2, Compass, Ellipsis, FileOutput, NotebookPen, Search, Settings } from 'lucide-react'
+import { SettingRow } from '../studio-kit/shell.js'
 import ManuscriptOptions from './ManuscriptOptions'
 import GoalsPanel from './GoalsPanel'
 import { findScene, useStore, type Scope, type View } from '../store'
@@ -220,34 +221,42 @@ export function ManuscriptToolbar() {
         <button type="button" aria-pressed={prefs.mode === 'write'} onClick={() => st().setPrefs({ mode: 'write' })} title={t('Write: the AI panel, no spellcheck')}>{t('Write')}</button>
         <button type="button" aria-pressed={prefs.mode === 'review'} onClick={() => st().setPrefs({ mode: 'review' })} title={t('Review: spellcheck and text figures')}>{t('Review')}</button>
       </span>
-      <span className="pl-switch" role="group" aria-label={t('View')}>
-        <button type="button" aria-pressed={!prefs.page} onClick={() => st().setPrefs({ page: false })} title={t('Sheet: a wide page, left-aligned, for writing')}>{t('Sheet')}</button>
-        <button type="button" aria-pressed={prefs.page} onClick={() => st().setPrefs({ page: true })} title={t('Page: as a printed book (read-only)')}>{t('Page')}</button>
-      </span>
-      <span className="pl-switch" role="group" aria-label={t('Show')}>
-        {scopes.map(([id, label, tip]) => (
-          <button key={id} type="button" aria-pressed={prefs.scope === id} onClick={() => st().setPrefs({ scope: id })} title={t(tip)}>{t(label)}</button>
-        ))}
-      </span>
+      <ViewMenu />
       <button type="button" className="pl-quiet pl-splitbtn" aria-pressed={drafting} onMouseDown={e => e.preventDefault()} onClick={toggleDraft} title={t('Draft mode: write forward only, no going back')}><ChevronsRight size={15} /></button>
       <button type="button" className="pl-quiet pl-splitbtn" aria-pressed={prefs.dual === 'bible'} onClick={() => st().setPrefs({ dual: prefs.dual === 'bible' ? null : 'bible' })} title={t('The bible beside the text')}><Columns2 size={15} /></button>
       <button type="button" className="pl-quiet" onClick={() => useStore.setState({ dialog: 'find' })} title={t('Find and replace in the book') + ' (Ctrl+Shift+F)'}><Search size={15} /></button>
-      <button type="button" className="pl-quiet" onMouseDown={e => e.preventDefault()} onClick={() => useStore.setState({ dialog: 'synonyms' })} title={t('Synonyms for the selected word') + ' (Ctrl+Shift+Y)'}><Replace size={15} /></button>
-      <button type="button" className="pl-quiet" onMouseDown={e => e.preventDefault()} onClick={() => useStore.setState({ dialog: 'entry' })} title={t('New bible entry from the selected name') + ' (Ctrl+Shift+B)'}><BookPlus size={15} /></button>
-      <DisplayPanel />
     </div>
   )
 }
 
-/** "Aa": the manuscript's look, opened below the toolbar, applied live. */
-function DisplayPanel() {
+/** The View menu: Sheet or Page, how much of the book, and the manuscript's look, applied live. Its button says what is showing. */
+function ViewMenu() {
   const { open, setOpen, box } = usePopover()
+  const page = useStore(s => s.prefs.page)
+  const scope = useStore(s => s.prefs.scope)
+  const set = useStore(s => s.setPrefs)
   const t = useT()
+  const scopeName = scopes.find(([id]) => id === scope)![1]
   return (
     <span className="pl-aa" ref={box}>
-      <button type="button" className="pl-aa-btn" aria-pressed={open} aria-expanded={open} onClick={() => setOpen(o => !o)} title={t('Display: font, size, justify, what the page shows')}>Aa</button>
+      <button type="button" className="pl-viewbtn" aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(o => !o)} title={t('View: Sheet or Page, how much of the book, font and paper')}>
+        {t(page ? 'Page' : 'Sheet')} · {t(scopeName)} <ChevronDown size={13} />
+      </button>
       {open && (
-        <div className="pl-pop pl-pop-down" role="dialog" aria-label={t('Display')}>
+        <div className="pl-pop pl-pop-down" role="dialog" aria-label={t('View')}>
+          <SettingRow label={t('View')} description={t(page ? 'As a printed book (read-only)' : 'A wide page, for writing')}>
+            <div className="sk-segmented" role="group" aria-label={t('View')}>
+              <button type="button" aria-pressed={!page} onClick={() => set({ page: false })}>{t('Sheet')}</button>
+              <button type="button" aria-pressed={page} onClick={() => set({ page: true })}>{t('Page')}</button>
+            </div>
+          </SettingRow>
+          <SettingRow label={t('Show')}>
+            <div className="sk-segmented" role="group" aria-label={t('Show')}>
+              {scopes.map(([id, label, tip]) => (
+                <button key={id} type="button" aria-pressed={scope === id} onClick={() => set({ scope: id })} title={t(tip)}>{t(label)}</button>
+              ))}
+            </div>
+          </SettingRow>
           <ManuscriptOptions />
           <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm pl-pop-more"
             onClick={() => { setOpen(false); useStore.setState({ showSettings: true }) }}>{t('More in Settings…')}</button>

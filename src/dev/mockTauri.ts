@@ -104,5 +104,7 @@ async function invoke(cmd: string, args: any = {}): Promise<unknown> {
 }
 ;(window as any).__TAURI_EVENT_PLUGIN_INTERNALS__ = { unregisterListener: () => {} }
 ;(window as any).__mockFiles = files
+// window.__store: the app's store, to set up a state by hand.
+import('../store').then(m => { (window as any).__store = m.useStore })
 
 export {}

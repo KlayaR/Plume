@@ -10,7 +10,8 @@ things are) and `CONTRIBUTING.md` (house rules).
   (type-check and build), `npm run check` (French strings, versions).
 - Try the UI without Tauri: `npm run dev:vite`, open `http://localhost:5178/?mock`
   (sample book and a fake `claude`, `src/dev/mockTauri.ts`). In the mock,
-  `window.__mockFiles` holds the book's files and `window.__lastClaude` the last request.
+  `window.__mockFiles` holds the book's files, `window.__lastClaude` the last request and
+  `window.__store` the app's store.
 - Interface text is English in the code, wrapped in `t('…')`; every new phrase
   needs its French in `src/i18n.ts`.
 

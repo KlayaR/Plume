@@ -333,7 +333,8 @@ interface State {
   detectClaude: () => Promise<void>
   recordUsage: (u: Usage) => void
   notify: (kind: Toast['kind'], msg: string, action?: Toast['action']) => void
-  flush: () => Promise<void>
+  /** Writes whatever is waiting; false if a write failed. */
+  flush: () => Promise<boolean>
   bumpEditor: () => void
 }
 
@@ -820,7 +821,9 @@ export const useStore = create<State>((set, get) => {
     flush: async () => {
       const all = [...pending.values()]
       pending.clear()
-      for (const p of all) { clearTimeout(p.timer); await p.run().catch(() => {}) }
+      let ok = true
+      for (const p of all) { clearTimeout(p.timer); await p.run().catch(() => { ok = false }) }
+      return ok
     },
     bumpEditor: () => set(s => ({ editorTick: s.editorTick + 1 })),
   }
