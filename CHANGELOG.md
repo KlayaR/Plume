@@ -7,6 +7,11 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.43.0
+Fourth of the six interface releases: one place to look.
+- **The scratch pad has an "In the book" tab.** It lists the Board's loose ideas, the placeholders ⟦…⟧ and the comments, with filters; a click goes to the spot. Nothing moves: each stays where it was.
+- **One way to open a second view.** The button that put the bible beside the text is gone from the toolbar, since the second view in the bottom bar does the same. "Bible beside the text" stays in Ctrl+K.
+
 ## 0.42.0
 Third of the six interface releases: one Plan.
 - **Outline, Grid, Analysis.** Five tabs of the same outline become one: the Outline switches between Cards, List and Board. Structure moves under Analysis (web novels keep Arcs and Release beside it). In simple mode, Structure now comes with Show everything.

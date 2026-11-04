@@ -1,4 +1,5 @@
 import { hunksOf } from './hunks'
+import { waitingInBook } from './waiting'
 import { describe, expect, it } from 'vitest'
 import { locate } from '../edit'
 import { parseEntry, serializeEntry, parseScene, serializeScene, factApplies, parseFact } from './bible'
@@ -1845,5 +1846,20 @@ describe('hunksOf', () => {
     let out = a
     for (const h of hunksOf(diffWords(a, b)).reverse()) out = out.slice(0, h.from) + h.insert + out.slice(h.to)
     expect(out).toBe(b)
+  })
+})
+
+describe('what waits in the book', () => {
+  const book = {
+    meta: { loose: [{ id: 'i', title: 'Duel', note: 'sur le toit' }] },
+    chapters: [{ scenes: [{ id: 's', title: 'Le bal', text: 'Elle ⟦décrire la salle⟧ entra. Marc rit.', comments: [{ id: 'c', quote: 'Marc rit', text: 'Trop tôt', date: '', at: 0 }, { id: 'd', quote: 'plus là', text: 'Perdu', date: '', at: 0 }] }] }],
+  } as unknown as Book
+  it('lists ideas, placeholders and comments, with where each one is', () => {
+    const list = waitingInBook(book)
+    expect(list.map(w => w.kind)).toEqual(['idea', 'placeholder', 'comment', 'comment'])
+    expect(list[0]).toMatchObject({ text: 'Duel : sur le toit' })
+    expect(list[1]).toMatchObject({ text: 'décrire la salle', sceneId: 's', from: 5, to: 23 })
+    expect(list[2]).toMatchObject({ text: 'Trop tôt', from: 31, to: 39 })
+    expect(list[3]).toMatchObject({ text: 'Perdu', lost: true })
   })
 })

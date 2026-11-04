@@ -10,7 +10,7 @@ import { getEditorView } from './editor/actions'
 import { noteOnGrid } from './grids'
 import { t } from './i18n'
 
-export type ScratchTab = 'inbox' | 'notes' | 'tasks'
+export type ScratchTab = 'inbox' | 'notes' | 'tasks' | 'book'
 export interface ScratchItem {
   id: string
   kind: 'note' | 'task'

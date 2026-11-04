@@ -4,7 +4,7 @@
 // The manuscript's own controls (Write / Review and the View menu) live in a
 // toolbar above the page: ManuscriptToolbar.
 import { useEffect, useRef, useState } from 'react'
-import { Bot, Camera, ChevronDown, ChevronsRight, CircleHelp, Keyboard, PanelRight, ChevronLeft, Columns2, Compass, Ellipsis, FileOutput, NotebookPen, Search, Settings } from 'lucide-react'
+import { Bot, Camera, ChevronDown, ChevronsRight, CircleHelp, Keyboard, PanelRight, ChevronLeft, Compass, Ellipsis, FileOutput, NotebookPen, Search, Settings } from 'lucide-react'
 import { SettingRow } from '../studio-kit/shell.js'
 import ManuscriptOptions from './ManuscriptOptions'
 import GoalsPanel from './GoalsPanel'
@@ -223,7 +223,6 @@ export function ManuscriptToolbar() {
       </span>
       <ViewMenu />
       <button type="button" className="pl-quiet pl-splitbtn" aria-pressed={drafting} onMouseDown={e => e.preventDefault()} onClick={toggleDraft} title={t('Draft mode: write forward only, no going back')}><ChevronsRight size={15} /></button>
-      <button type="button" className="pl-quiet pl-splitbtn" aria-pressed={prefs.dual === 'bible'} onClick={() => st().setPrefs({ dual: prefs.dual === 'bible' ? null : 'bible' })} title={t('The bible beside the text')}><Columns2 size={15} /></button>
       <button type="button" className="pl-quiet" onClick={() => useStore.setState({ dialog: 'find' })} title={t('Find and replace in the book') + ' (Ctrl+Shift+F)'}><Search size={15} /></button>
     </div>
   )

@@ -1452,6 +1452,12 @@ const FR: Record<string, string> = {
   'Click a square to tick or untick that scene. Right-click it to open the scene.': 'Cliquez sur une case pour cocher ou décocher cette scène. Clic droit pour ouvrir la scène.',
   'Click a square to choose the scenes of that chapter.': 'Cliquez sur une case pour choisir les scènes de ce chapitre.',
   'Open a scene': 'Ouvrir une scène',
+  'All': 'Tout',
+  'In the book': 'Dans le livre',
+  'Placeholders': 'Espaces réservés',
+  '(empty)': '(vide)',
+  'its passage is gone': 'son passage a disparu',
+  'Nothing waiting. Loose ideas from the Board, placeholders ⟦…⟧ and comments show here, and stay where they are.': 'Rien en attente. Les idées en vrac du Tableau, les espaces réservés ⟦…⟧ et les commentaires s’affichent ici, et restent à leur place.',
 }
 
 const SHELL = {

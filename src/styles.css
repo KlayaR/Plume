@@ -1025,6 +1025,8 @@ body.pl-zen .pl-scratch { bottom: 16px; }
 .pl-scratch-main .sk-check { margin-top: 3px; flex: none; }
 .pl-scratch-text { min-width: 0; padding: 0; border: 0; outline: 0; resize: none; overflow: hidden; background: none; color: var(--text); font: inherit; font-size: 13px; line-height: 1.45; }
 .pl-scratch-done { color: var(--text-muted); text-decoration: line-through; }
+.pl-scratch-link { display: flex; flex-direction: column; gap: 1px; width: 100%; font: inherit; font-size: 13px; color: var(--text); text-align: left; background: none; border: 0; cursor: pointer; }
+.pl-scratch-link:hover { background: var(--surface-2); }
 .pl-scratch-tool { flex: none; opacity: 0; }
 .pl-scratch-item:hover .pl-scratch-tool, .pl-scratch-item:focus-within .pl-scratch-tool, .pl-scratch-tool.pl-on { opacity: 1; }
 .pl-scratch-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12px; color: var(--text-muted); }
