@@ -152,6 +152,8 @@ export interface Prefs {
   /** The Assistant's two folds, left as they were. */
   assistQuick: boolean
   assistDetails: boolean
+  /** Bible entries read on a sheet of paper instead of the dark room. */
+  entryPaper: boolean
   dimPara: boolean
   advOpen: string[]
   /** A second view shown beside the main one (Bible, Plan or Manuscript), and its width in px. */
@@ -216,6 +218,7 @@ export const DEFAULT_PREFS: Prefs = {
   directions: [],
   assistQuick: false,
   assistDetails: false,
+  entryPaper: false,
   dimPara: false,
   advOpen: [],
   dual: null,

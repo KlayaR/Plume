@@ -442,6 +442,13 @@ html[data-theme="light"] .pl-shelf-books { box-shadow: 0 10px 14px -12px rgba(0,
 .pl-chat-input { flex: none; resize: vertical; }
 .pl-chat-review { color: var(--accent); font-size: var(--fs-sm); text-align: left; }
 .pl-bible-tabs { margin-bottom: 22px; flex-wrap: wrap; }
+/* An entry on paper: the kit's own controls follow, through the light theme's colours. */
+.pl-entry-paper {
+  --bg: #fbfaf8; --surface-1: #f5f3ef; --surface-2: #fbfaf8; --surface-3: #e6e2da; --border: #ddd8ce; --border-strong: #cfcac0;
+  --text: #2b2926; --text-dim: #4a463f; --text-muted: #6a665e; --accent: #7c5d26; --accent-hover: #6a4f20; --accent-tint: rgba(124, 93, 38, 0.1); --on-accent: #fbfaf7;
+  padding: 32px 40px 48px; background: #fbfaf7; color: var(--text); box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+}
+html[data-theme="light"] .pl-entry-paper { box-shadow: 0 2px 18px rgba(0, 0, 0, 0.12); }
 .pl-bible-more { margin: -12px 0 22px; flex-wrap: wrap; font-size: var(--fs-sm); }
 .pl-advanced { border-top: 1px solid var(--border); padding-top: 10px; }
 .pl-advanced > summary { cursor: pointer; color: var(--text-dim); font-size: var(--fs-sm); padding: 4px 0; }

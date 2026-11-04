@@ -91,11 +91,6 @@ export default function BibleTable() {
           ))}
         </select>
         <button type="button" className="sk-btn sk-btn-sm sk-btn-ghost" onClick={() => newField(type)}><Plus size={13} /> {t('Add a field')}</button>
-        <span className="pl-grow" />
-        <nav className="pl-switch" aria-label={t('Layout')}>
-          <button type="button" aria-pressed={layout !== 'gallery'} onClick={() => useStore.getState().setPrefs({ bibleLayout: 'table' })}>{t('Table')}</button>
-          <button type="button" aria-pressed={layout === 'gallery'} onClick={() => useStore.getState().setPrefs({ bibleLayout: 'gallery' })}>{t('Gallery')}</button>
-        </nav>
       </div>
       {rows.length === 0 && <div className="sk-empty">{t('Nothing of this type yet.')}</div>}
       {rows.length > 0 && layout === 'gallery' && <div className="pl-gallery">{rows.map(e => <GalleryCard key={e.slug} entry={e} />)}</div>}

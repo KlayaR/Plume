@@ -1458,6 +1458,7 @@ const FR: Record<string, string> = {
   '(empty)': '(vide)',
   'its passage is gone': 'son passage a disparu',
   'Nothing waiting. Loose ideas from the Board, placeholders ⟦…⟧ and comments show here, and stay where they are.': 'Rien en attente. Les idées en vrac du Tableau, les espaces réservés ⟦…⟧ et les commentaires s’affichent ici, et restent à leur place.',
+  'Read entries on paper': 'Lire les fiches sur papier',
 }
 
 const SHELL = {

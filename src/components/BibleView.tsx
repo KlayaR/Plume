@@ -1,7 +1,7 @@
 // Research & Bible: every entry by type, and the entry editor.
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { ask } from '@tauri-apps/plugin-dialog'
-import { ChevronDown, ChevronRight, History, ImagePlus, MessagesSquare, Plus, Search, Sparkles, Trash2, X } from 'lucide-react'
+import { ChevronDown, ChevronRight, FileText, History, ImagePlus, MessagesSquare, Plus, Search, Sparkles, Trash2, X } from 'lucide-react'
 import { MORE_TABS, useStore, type BibleTab } from '../store'
 import { EMPTY_VOICE, FAMILIES, RANKS, typeInfo, VOICE_TYPES, type Entry, type EntryType, type Include, type Rank, type Stat, type VoiceCard } from '../lib/types'
 import { isLitRPG } from '../lib/serial'
@@ -23,7 +23,9 @@ import { startInterview, useChat } from '../chat'
 import { pickImage, useImage } from '../lib/images'
 
 const TABS: [BibleTab, string][] = [['entry', 'Entries'], ['review', 'To review'], ['aicheck', 'AI check']]
-const MORE: [BibleTab, string][] = [['table', 'Table'], ['tracker', 'Presence'], ['map', 'Map'], ['relations', 'Relations'], ['contradictions', 'Contradictions']]
+/** Same word as in the Plan: what you read about the book rather than write in it. */
+const ANALYSIS: [BibleTab, string][] = [['tracker', 'Presence'], ['map', 'Map'], ['relations', 'Relations'], ['contradictions', 'Contradictions']]
+const isAnalysis = (x: BibleTab) => ANALYSIS.some(([id]) => id === x)
 
 /** A family's entries split by character rank, once any has one; unranked ones last. A '' label means no heading. */
 function byRank(items: Entry[]): [string, Entry[]][] {
@@ -38,6 +40,9 @@ export default function BibleView() {
   const simple = useStore(s => s.prefs.simple)
   const chosen = useStore(s => s.bibleTab)
   const tab = simple && MORE_TABS.includes(chosen) ? 'entry' : chosen
+  const inEntries = tab === 'entry' || tab === 'table'
+  const layout = useStore(s => s.prefs.bibleLayout)
+  const showTable = (bibleLayout: 'table' | 'gallery') => { useStore.setState({ bibleTab: 'table' }); useStore.getState().setPrefs({ bibleLayout }) }
   const pinned = useStore(s => s.prefs.chatOpen)
   const closed = useStore(s => s.prefs.famClosed)
   const drafts = useChat(s => s.proposals.length)
@@ -136,15 +141,22 @@ export default function BibleView() {
         <div className="pl-bible-main">
           <nav className="pl-switch pl-bible-tabs" aria-label={t('Bible')}>
             {TABS.map(([id, label]) => (
-              <button key={id} type="button" aria-pressed={tab === id} onClick={() => useStore.setState({ bibleTab: id })}>
+              <button key={id} type="button" aria-pressed={tab === id || (id === 'entry' && inEntries)} onClick={() => useStore.setState({ bibleTab: id })}>
                 {t(label)}{id === 'review' && drafts > 0 ? ` (${drafts})` : ''}
               </button>
             ))}
-            {simple ? <ShowEverything /> : <button type="button" aria-pressed={MORE_TABS.includes(tab)} onClick={() => !MORE_TABS.includes(tab) && useStore.setState({ bibleTab: 'table' })}>{t('More')}</button>}
+            {simple ? <ShowEverything /> : <button type="button" aria-pressed={isAnalysis(tab)} onClick={() => !isAnalysis(tab) && useStore.setState({ bibleTab: ANALYSIS[0][0] })}>{t('Analysis')}</button>}
           </nav>
-          {MORE_TABS.includes(tab) && (
-            <nav className="pl-switch pl-bible-more" aria-label={t('More')}>
-              {MORE.map(([id, label]) => <button key={id} type="button" aria-pressed={tab === id} onClick={() => useStore.setState({ bibleTab: id })}>{t(label)}</button>)}
+          {inEntries && !simple && (
+            <nav className="pl-switch pl-bible-more" aria-label={t('Layout')}>
+              <button type="button" aria-pressed={tab === 'entry'} onClick={() => useStore.setState({ bibleTab: 'entry' })}>{t('List')}</button>
+              <button type="button" aria-pressed={tab === 'table' && layout !== 'gallery'} onClick={() => showTable('table')}>{t('Table')}</button>
+              <button type="button" aria-pressed={tab === 'table' && layout === 'gallery'} onClick={() => showTable('gallery')}>{t('Gallery')}</button>
+            </nav>
+          )}
+          {isAnalysis(tab) && (
+            <nav className="pl-switch pl-bible-more" aria-label={t('Analysis')}>
+              {ANALYSIS.map(([id, label]) => <button key={id} type="button" aria-pressed={tab === id} onClick={() => useStore.setState({ bibleTab: id })}>{t(label)}</button>)}
             </nav>
           )}
           {tab === 'entry' && (selected ? <EntryEditor key={selected.slug} entry={selected} /> : book.entries.some(e => !['style', 'wordlist', 'excerpt'].includes(e.type)) ? <div className="sk-empty">{t('Pick an entry, or add one with New entry.')}</div> : (
@@ -183,6 +195,7 @@ export function EntryEditor({ entry }: { entry: Entry }) {
   const t = useT()
   const [writing, setWriting] = useState(false)
   const advList = useStore(s => s.prefs.advOpen)
+  const onPaper = useStore(s => s.prefs.entryPaper)
   const advOpen = advList.includes(entry.type)
   const [aliases, setAliases] = useState(entry.aliases.join(', '))
   const [tags, setTags] = useState((entry.tags ?? []).join(', '))
@@ -222,11 +235,12 @@ export function EntryEditor({ entry }: { entry: Entry }) {
   const linkedFrom = book.entries.filter(e => e.links.includes(entry.slug))
 
   return (
-    <div className="pl-entryedit">
+    <div className={`pl-entryedit ${onPaper ? 'pl-entry-paper' : ''}`}>
       <div className="pl-row">
         <input className="pl-entryname" value={entry.name} onChange={e => update({ name: e.target.value })} aria-label={t('Name')} />
         <span className="sk-badge">{t(typeInfo(entry.type).label)}</span>
         {!plain && <button type="button" className="sk-btn sk-btn-sm" title={t('Claude asks you questions to fill the gaps of this entry')} onClick={() => startInterview(entry.slug)}><MessagesSquare size={14} /> {t('Interview me')}</button>}
+        <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm sk-btn-icon" aria-pressed={onPaper} title={t('Read entries on paper')} aria-label={t('Read entries on paper')} onClick={() => useStore.getState().setPrefs({ entryPaper: !onPaper })}><FileText size={14} /></button>
         <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm sk-btn-icon" title={t('Earlier versions…')} aria-label={t('Earlier versions…')} onClick={() => useStore.setState({ dialog: 'history', dialogArg: entry.slug })}><History size={14} /></button>
         {!isStyle && <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm sk-btn-icon" title={t('Remove entry')} onClick={remove}><Trash2 size={14} /></button>}
       </div>

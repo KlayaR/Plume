@@ -7,6 +7,11 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.44.0
+Fifth of the six interface releases: the Bible, built like the Plan.
+- **Entries, To review, AI check, Analysis.** Entries switch between List, Table and Gallery. Presence, Map, Relations and Contradictions are under Analysis, the same word as in the Plan; "More" is gone.
+- **Entries on paper.** A button at the top of an entry shows it on a light sheet, like the manuscript. It applies to every entry until you turn it off.
+
 ## 0.43.0
 Fourth of the six interface releases: one place to look.
 - **The scratch pad has an "In the book" tab.** It lists the Board's loose ideas, the placeholders ⟦…⟧ and the comments, with filters; a click goes to the spot. Nothing moves: each stays where it was.
