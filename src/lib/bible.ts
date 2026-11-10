@@ -3,13 +3,15 @@ import YAML from 'yaml'
 import type { Entry, EntryType, ExcerptKind, Fact, Include, Rank, Scene, SceneStatus, VoiceCard } from './types'
 import { EMPTY_VOICE, ENTRY_TYPES, RANKS } from './types'
 
-export function splitFrontmatter(text: string): { data: Record<string, unknown>; body: string } {
+/** `broken`: the header is there but isn't valid YAML (edited by hand, a sync conflict): its fields read as empty. */
+export function splitFrontmatter(text: string): { data: Record<string, unknown>; body: string; broken?: boolean } {
   const t = text.replace(/^﻿/, '').replace(/\r\n/g, '\n')
   const m = /^---\n([\s\S]*?)\n---\n?/.exec(t)
   if (!m) return { data: {}, body: t }
   let data: unknown = {}
-  try { data = YAML.parse(m[1]) ?? {} } catch { data = {} }
-  return { data: (typeof data === 'object' && data ? data : {}) as Record<string, unknown>, body: t.slice(m[0].length) }
+  let broken = false
+  try { data = YAML.parse(m[1]) ?? {} } catch { data = {}; broken = true }
+  return { data: (typeof data === 'object' && data ? data : {}) as Record<string, unknown>, body: t.slice(m[0].length), ...(broken ? { broken } : {}) }
 }
 
 export function joinFrontmatter(data: Record<string, unknown>, body: string): string {

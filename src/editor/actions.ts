@@ -321,10 +321,26 @@ export async function alternatives(action: ActionId, instruction: string, overri
   const s = assistantChoice(action)
   useAI.setState({ running: 'alternatives', last: { action, instruction, overrides } })
   try {
-    const texts = await Promise.all(Array.from({ length: n }, () => ask({ model: s.model, effort: s.effort, orModel: s.orModel, system: ctx.system, message: ctx.message }).catch(() => '')))
-    return { texts: texts.map(x => x.trim()).filter(Boolean), from: ctx.from, to: ctx.to }
+    // One request for three takes that differ on purpose: three copies of the same request tend to come back alike, and cost three times the context.
+    const fr = st.book.meta.language === 'fr'
+    const ask3 = fr
+      ? `
+
+<versions>
+Écris ${n} versions vraiment différentes de ce texte : pas la même phrase reformulée, mais des choix différents (par où entrer, ce qu’on montre, le rythme, l’image). Sépare-les par une ligne qui ne contient que ===.
+</versions>`
+      : `
+
+<versions>
+Write ${n} truly different versions of this text: not the same sentences reworded, but different choices (where to start, what is shown, the rhythm, the image). Separate them with a line holding only ===.
+</versions>`
+    const reply = await ask({ model: s.model, effort: s.effort, orModel: s.orModel, system: ctx.system, message: ctx.message + ask3 })
+    return { texts: splitVersions(reply), from: ctx.from, to: ctx.to }
   } finally { useAI.setState({ running: null }) }
 }
+
+/** Claude's versions, split on the === lines it was asked to put between them. */
+export const splitVersions = (reply: string) => reply.split(/^\s*={3,}\s*$/m).map(x => x.trim()).filter(Boolean)
 
 /** Puts the chosen alternative on the page as the proposal. */
 export function pickAlternative(text: string, from: number, to: number) {

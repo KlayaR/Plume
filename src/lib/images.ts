@@ -7,6 +7,9 @@ import { open } from '@tauri-apps/plugin-dialog'
 const cache = new Map<string, string>()
 const MIME: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif' }
 
+/** The media type of a picture, from its file name. */
+export const imageType = (path: string) => MIME[(path.split('.').pop() ?? '').toLowerCase()] ?? 'image/jpeg'
+
 /** Asks for a picture and copies it into the book as `<base>.<ext>`; returns its path in the book. */
 export async function pickImage(root: string, base: string, title: string): Promise<string | null> {
   const src = await open({ title, filters: [{ name: 'Images', extensions: Object.keys(MIME) }] })

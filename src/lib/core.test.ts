@@ -1975,3 +1975,17 @@ describe('the plan, connected', () => {
     expect(outlineRules('fr', { kind: 'one' })).toContain('environ 3')
   })
 })
+
+describe('EPUB identity and cover', () => {
+  it('keeps the book’s UUID and puts the cover first', async () => {
+    const { toEpub } = await import('./export')
+    const { readZip, fromUtf8 } = await import('./zip')
+    const b = bookOf([scene('a', 'Il pleuvait.')], [])
+    const zip = await readZip(await toEpub(b, { format: 'epub', layout: 'book', titlePage: true, sceneBreak: '* * *', uuid: '0b8f6f2e-6c0a-4d3e-9a59-0d3c1f7e2a11', cover: { data: new Uint8Array([1, 2, 3]), type: 'image/png' } }))
+    const opf = fromUtf8(zip.get('OEBPS/content.opf')!)
+    expect(opf).toContain('urn:uuid:0b8f6f2e-6c0a-4d3e-9a59-0d3c1f7e2a11')
+    expect(opf).toContain('properties="cover-image"')
+    expect(opf.indexOf('idref="cover"')).toBeLessThan(opf.indexOf('idref="title"'))
+    expect(zip.has('OEBPS/cover.png')).toBe(true)
+  })
+})

@@ -442,6 +442,7 @@ const VOICE_FIELDS: [keyof VoiceCard, string, string][] = [
   ['gesture', 'Signature gesture', 'what their hands or body do when they talk'],
   ['never', 'Never says', 'words or topics they avoid'],
   ['inner', 'Inner voice', 'how their thoughts sound, if they are a POV'],
+  ['address', 'Forms of address', 'who they call tu or vous, by name or title (tutoie Marc, vouvoie la reine)'],
   ['lines', 'Sample lines', '3 to 5 lines they could say, one per line'],
 ]
 

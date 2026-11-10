@@ -18,7 +18,15 @@ export type ExportFormat = 'epub' | 'docx' | 'md' | 'pdf' | 'html'
 export type DocxLayout = 'book' | 'submission'
 
 /** `range`: only chapters from..to (indexes, `to` excluded), keeping their numbers. */
-export interface ExportOptions { format: ExportFormat; layout: DocxLayout; titlePage: boolean; sceneBreak: string; range?: [number, number] }
+export interface ExportOptions {
+  format: ExportFormat; layout: DocxLayout; titlePage: boolean; sceneBreak: string; range?: [number, number]
+  /** EPUB: the book's identifier (a UUID) and its cover picture. */
+  uuid?: string
+  cover?: { data: Uint8Array; type: string }
+}
+
+/** A random version 4 UUID, as EPUB identifiers are written. */
+export const newUuid = () => (globalThis.crypto?.randomUUID?.() ?? 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = (Math.random() * 16) | 0; return (c === 'x' ? r : (r & 3) | 8).toString(16) }))
 
 /** A scene's text as it should be published: no placeholders, clean typography, paragraphs. */
 export function cleanParagraphs(text: string, book: Book): string[] {
@@ -165,7 +173,8 @@ ${body}
 
 export async function toEpub(book: Book, o: ExportOptions): Promise<Uint8Array> {
   const lang = book.meta.language
-  const id = `urn:uuid:${newId()}${newId()}-${newId()}`
+  const id = `urn:uuid:${o.uuid ?? newUuid()}`
+  const coverExt = o.cover ? (o.cover.type === 'image/png' ? 'png' : o.cover.type === 'image/webp' ? 'webp' : o.cover.type === 'image/gif' ? 'gif' : 'jpg') : ''
   const ps = parts(book, o)
   const page = (title: string, body: string) => `<?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE html>
@@ -213,8 +222,11 @@ p.break { text-align: center; text-indent: 0; margin: 1em 0; }
 .matter h1 { font-style: normal; margin-top: 0; }
 .partpage { text-align: center; margin-top: 35%; }
 .partpage h1 { font-size: 2em; letter-spacing: .1em; }
+.cover { margin: 0; padding: 0; text-align: center; }
+.cover img { max-width: 100%; max-height: 100%; }
 .system { margin: 1em 0; padding: .5em .8em; border: 1px solid #888; font-family: monospace; }
 .system p { text-indent: 0; text-align: left; }`) },
+    ...(o.cover ? [{ name: `OEBPS/cover.${coverExt}`, data: o.cover.data, store: true }, { name: 'OEBPS/cover.xhtml', data: utf8(page(book.meta.title, `<section class="cover" epub:type="cover"><img src="cover.${coverExt}" alt="${esc(book.meta.title)}"/></section>`)) }] : []),
     ...(o.titlePage ? [{ name: 'OEBPS/title.xhtml', data: utf8(page(book.meta.title, `<section class="titlepage" epub:type="titlepage"><h1>${esc(book.meta.title)}</h1>${book.meta.author ? `<p class="first">${esc(book.meta.author)}</p>` : ''}</section>`)) }] : []),
     ...chapters.map(c => ({ name: `OEBPS/${c.file}`, data: utf8(c.html) })),
     { name: 'OEBPS/nav.xhtml', data: utf8(page(toc, `<nav epub:type="toc" id="toc"><h1>${toc}</h1><ol>
@@ -233,15 +245,19 @@ ${chapters.filter(c => c.toc).map((c, i) => `<navPoint id="n${i + 1}" playOrder=
 ${book.meta.author ? `<dc:creator>${esc(book.meta.author)}</dc:creator>` : ''}
 <dc:language>${lang}</dc:language>
 <meta property="dcterms:modified">${new Date().toISOString().slice(0, 19)}Z</meta>
+${o.cover ? '<meta name="cover" content="cover-img"/>' : ''}
 </metadata>
 <manifest>
 <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
 <item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>
 <item id="css" href="style.css" media-type="text/css"/>
+${o.cover ? `<item id="cover-img" href="cover.${coverExt}" media-type="${o.cover.type}" properties="cover-image"/>
+<item id="cover" href="cover.xhtml" media-type="application/xhtml+xml"/>` : ''}
 ${o.titlePage ? '<item id="title" href="title.xhtml" media-type="application/xhtml+xml"/>' : ''}
 ${chapters.map((c, i) => `<item id="c${i + 1}" href="${c.file}" media-type="application/xhtml+xml"/>`).join('\n')}
 </manifest>
 <spine toc="ncx">
+${o.cover ? '<itemref idref="cover"/>' : ''}
 ${o.titlePage ? '<itemref idref="title"/>' : ''}
 <itemref idref="nav" linear="no"/>
 ${chapters.map((_, i) => `<itemref idref="c${i + 1}"/>`).join('\n')}

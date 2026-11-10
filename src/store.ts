@@ -6,7 +6,7 @@ import { DEFAULT_PRESETS, type Fallback, type Preset } from './lib/presets'
 import { DEFAULT_ROLES, MODELS, type Model, type Role, type RoleModel } from './lib/types'
 import { findClaude, setLimitsListener } from './lib/claude'
 import { chapterLabels } from './lib/chapters'
-import { Conflict, loadBook, makeChapter, makeEntry, makeScene, reread, saveChapter, saveEntry, saveMeta, saveScene, saveSeriesPlan, seriesRootOf, trash } from './lib/project'
+import { Conflict, takeBroken, loadBook, makeChapter, makeEntry, makeScene, reread, saveChapter, saveEntry, saveMeta, saveScene, saveSeriesPlan, seriesRootOf, trash } from './lib/project'
 import { parseEntry, parseScene } from './lib/bible'
 import { t } from './i18n'
 import { bookCounts } from './lib/stats'
@@ -549,6 +549,10 @@ export const useStore = create<State>((set, get) => {
       // Changes and proposals kept for the scenes of the last book don't follow you into this one.
       import('./edit').then(m => m.useEdit.setState({ pending: {} }))
       import('./editor/actions').then(m => m.forgetProposals())
+      import('./llm').then(m => m.loadMeter(book.meta.language))
+      // Headers that couldn't be read: their copy is kept, and you are told which files.
+      const unreadable = takeBroken()
+      if (unreadable.length) setTimeout(() => get().notify('warn', t('Plume couldn’t read the header of {list}: its plan and settings show as empty. A copy of each file as it was is in the book’s .plume/broken folder.', { list: unreadable.join(', ') })), 1500)
       import('./chat').then(m => m.loadChat(book))
       import('./writing').then(m => m.loadNotes(book))
       import('./scratch').then(m => m.loadScratch(book))

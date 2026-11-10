@@ -16,6 +16,7 @@ import { useEffect } from 'react'
 import { backupNow, joinSeries, listBackups, seriesName } from '../library'
 import { LT_DEFAULT, ltTest } from '../lib/languagetool'
 import { foldText } from '../lib/text'
+import { pickImage } from '../lib/images'
 
 type Tab = 'appearance' | 'manuscript' | 'writing' | 'voice' | 'claude' | 'book' | 'about'
 
@@ -321,6 +322,12 @@ function BookTab() {
     <SeriesSection />
     <BackupSection />
     <SettingsSection title={t('This book')} description={t("Saved in the book's plume.json.")}>
+      <SettingRow label={t('Cover')} description={book.meta.cover ? book.meta.cover : t('A picture put at the front of the EPUB. Stores ask for 1600 × 2560 pixels or more.')}>
+        <span className="pl-row">
+          <button type="button" className="sk-btn sk-btn-sm" onClick={async () => { const rel = await pickImage(book.root, 'images/cover', t('Choose the cover')); if (rel) useStore.getState().updateMeta({ cover: rel }) }}>{book.meta.cover ? t('Change…') : t('Choose…')}</button>
+          {book.meta.cover && <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm" onClick={() => useStore.getState().updateMeta({ cover: undefined })}>{t('Remove')}</button>}
+        </span>
+      </SettingRow>
       <SettingRow label={t('Language of the book')} description={t('Chapter headings, typography (« » and spaces in French), the spellcheck dictionary and the language Claude writes in')}>
         <div className="sk-segmented" role="group" aria-label={t('Language of the book')}>
           <button type="button" aria-pressed={book.meta.language === 'fr'} onClick={() => useStore.getState().updateMeta({ language: 'fr' })}>Français</button>

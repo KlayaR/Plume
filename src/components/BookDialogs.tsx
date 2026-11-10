@@ -7,13 +7,14 @@ import { invoke } from '@tauri-apps/api/core'
 import { Bot, Check, Compass, FileOutput, ListChecks, Search, Square, Undo2 } from 'lucide-react'
 import { Dialog } from '../studio-kit/shell.js'
 import { useStore } from '../store'
-import { bibleMarkdown, markdownToDocx, toDocx, toEpub, toHtml, toMarkdown, volumeBook, type DocxLayout, type ExportFormat } from '../lib/export'
+import { bibleMarkdown, markdownToDocx, newUuid, toDocx, toEpub, toHtml, toMarkdown, volumeBook, type DocxLayout, type ExportFormat, type ExportOptions } from '../lib/export'
 import { outlineMarkdown } from '../lib/outline'
 import { VOICE_TYPES } from '../lib/types'
 import { isSerial, volumesOf } from '../lib/serial'
 import { chapterLabels } from '../lib/chapters'
 import { volumeToBook } from '../library'
-import { toBase64, utf8 } from '../lib/zip'
+import { fromBase64, toBase64, utf8 } from '../lib/zip'
+import { imageType } from '../lib/images'
 import { pageSizeFor } from '../lib/fonts'
 import { clearDone, estimate, goTo, markDone, missingSummaries, runTask, stopTask, toBible, useAgents, type AgentTask } from '../agents'
 import { updateSummaries, useNotes } from '../writing'
@@ -53,6 +54,13 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
 
   const go = async () => {
     const { out, range } = chosen()
+  // The EPUB keeps one identifier from export to export, and carries the cover chosen in Settings → This book.
+  const epubExtras = async (o: ExportOptions): Promise<ExportOptions> => {
+    let uuid = book.meta.uuid
+    if (!uuid) { uuid = newUuid(); useStore.getState().updateMeta({ uuid }) }
+    const cover = book.meta.cover ? await invoke<string>('read_base64', { root: book.root, rel: book.meta.cover }).then(b => ({ data: fromBase64(b), type: imageType(book.meta.cover!) })).catch(() => undefined) : undefined
+    return { ...o, uuid, cover }
+  }
     const o = { format, layout, titlePage, sceneBreak, range }
     if (format === 'pdf') { onClose(); useStore.setState({ printing: true }); return }
     const name = what === 'book' ? out.meta.title : `${book.meta.title} - ${(what === 'bible' ? t('Bible') : t('Outline')).toLowerCase()}`
@@ -62,7 +70,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
     try {
       const working = what === 'bible' ? bibleMarkdown(book, { secret, notes: privateNotes }, s => translate(book.meta.language, s)) : what === 'outline' ? outlineMarkdown(book) : null
       const data = working !== null ? (format === 'docx' ? await markdownToDocx(working, book) : utf8(working))
-        : format === 'epub' ? await toEpub(out, o) : format === 'docx' ? await toDocx(out, o) : format === 'html' ? utf8(toHtml(out, o)) : utf8(toMarkdown(out, o))
+        : format === 'epub' ? await toEpub(out, await epubExtras(o)) : format === 'docx' ? await toDocx(out, o) : format === 'html' ? utf8(toHtml(out, o)) : utf8(toMarkdown(out, o))
       await invoke('write_file_base64', { path, data: toBase64(data) })
       useStore.getState().notify('ok', t('Exported: {path}', { path }))
       onClose()

@@ -6,7 +6,7 @@ import { useStore } from './store'
 import { cancelClaude, runClaude, type Result } from './lib/claude'
 import { chatBody, httpMessage, isLimitError, presetFor, readEvent, readModels, splitSSE, type ModelInfo, type Preset } from './lib/presets'
 import type { Effort, Model } from './lib/types'
-import { newId } from './lib/text'
+import { learnCharsPerToken, newId, setCharsPerToken } from './lib/text'
 import { t } from './i18n'
 
 const BASE = 'https://openrouter.ai/api/v1'
@@ -120,6 +120,28 @@ export async function testOpenRouterKey(key: string): Promise<string> {
   return t('Key accepted.')
 }
 
+// --- The size meter --------------------------------------------------------------------
+// The meter counts characters; how many make a token depends on the language. Each request to the
+// claude command line reports its real input, so the ratio is learned per book language.
+
+/** The claude command line's own instructions, measured: what a request costs before Plume sends anything. */
+const CLI_OVERHEAD = 830
+const meterKey = (lang: string) => `plume.chars-per-token.${lang}`
+export function loadMeter(lang: string) {
+  try { const v = Number(localStorage.getItem(meterKey(lang))); setCharsPerToken(v > 0 ? v : 3.6) } catch { setCharsPerToken(3.6) }
+}
+function learnMeter(req: LlmRequest, r: Result) {
+  const lang = useStore.getState().book?.meta.language
+  if (!lang || !r.ok || !r.usage || req.tools) return
+  const tokens = r.usage.input + r.usage.cacheWrite + r.usage.cacheRead - CLI_OVERHEAD
+  let was: number | null = null
+  try { const v = Number(localStorage.getItem(meterKey(lang))); was = v > 0 ? v : null } catch { /* private mode */ }
+  const next = learnCharsPerToken(was, req.system.length + req.message.length, tokens)
+  if (next === null) return
+  try { localStorage.setItem(meterKey(lang), String(next)) } catch { /* private mode */ }
+  setCharsPerToken(next)
+}
+
 // --- Routing ----------------------------------------------------------------------------
 
 interface Active { kind: 'claude' | 'openrouter'; inner: string; stop: boolean }
@@ -158,6 +180,7 @@ export async function runLLM(req: LlmRequest, onText: (t: string) => void, onDon
           useStore.getState().notify('warn', t('Claude’s usage limit is reached: continuing with {name} on OpenRouter.', { name: fb.name }))
           return startOR(fb)
         }
+        learnMeter(req, r)
         finish(r)
       },
     )

@@ -51,8 +51,19 @@ export function slugify(s: string): string {
 
 export const newId = () => Math.random().toString(36).slice(2, 8)
 
-/** Rough token count: there is no tokenizer offline, ~3.6 characters a token for prose. */
-export const estimateTokens = (s: string) => Math.ceil(s.length / 3.6)
+/** Characters per token: 3.6 to start, then learned from what the claude command line reports for your requests (llm.ts). */
+let charsPerToken = 3.6
+export const setCharsPerToken = (x: number) => { if (Number.isFinite(x) && x > 1.5 && x < 8) charsPerToken = x }
+
+/** Rough token count: there is no tokenizer offline. */
+export const estimateTokens = (s: string) => Math.ceil(s.length / charsPerToken)
+
+/** One request's measure, folded into the running one (each new request counts for a fifth). */
+export const learnCharsPerToken = (was: number | null, chars: number, tokens: number): number | null => {
+  if (tokens < 300) return was
+  const now = chars / tokens
+  return was === null ? now : was * 0.8 + now * 0.2
+}
 
 /** Where `quote` is in `text`: the occurrence nearest to `at` when the words repeat, or -1. */
 export function locateQuote(text: string, quote: string, at = 0): number {

@@ -52,6 +52,18 @@ async function guarded(root: string, rel: string, content: string) {
 
 /** Reads one file again after a conflict, so the newer version is the one shown. */
 export const reread = (root: string, rel: string) => read(root, rel)
+
+// Files whose header couldn't be read: a copy as it was goes to .plume/broken before Plume
+// writes the file again with an empty header, and the book says which ones when it opens.
+let broken: string[] = []
+async function keepIfBroken(root: string, rel: string, text: string) {
+  if (!splitFrontmatter(text).broken) return
+  const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')
+  await write(root, `.plume/broken/${stamp}-${rel.replace(/\//g, '__')}`, text).catch(() => {})
+  broken.push(rel)
+}
+/** The files of the book just opened whose header couldn't be read (once). */
+export function takeBroken(): string[] { const out = broken; broken = []; return out }
 const exists = (root: string, rel: string) => invoke<boolean>('path_exists', { root, rel })
 const list = (root: string, rel: string) => invoke<string[]>('list_files', { root, rel })
 export const trash = (root: string, rel: string) => invoke<void>('move_to_trash', { root, rel })
@@ -74,6 +86,8 @@ function normalizeMeta(raw: Partial<BookMeta>): BookMeta {
   return {
     format: 1,
     id: typeof raw.id === 'string' && raw.id ? raw.id : undefined,
+    uuid: typeof raw.uuid === 'string' && raw.uuid ? raw.uuid : undefined,
+    cover: typeof raw.cover === 'string' && raw.cover ? raw.cover : undefined,
     title: raw.title ?? 'Untitled',
     author: raw.author ?? '',
     language: raw.language === 'en' ? 'en' : 'fr',
@@ -130,7 +144,12 @@ async function readChapter(root: string, folder: string, files: string[]): Promi
   } catch { /* chapter.md missing: keep the folder name */ }
   const scenes: Scene[] = []
   for (const f of files) {
-    try { scenes.push(parseScene(`manuscript/${folder}/${f}`, await read(root, `manuscript/${folder}/${f}`))) } catch { /* moved away */ }
+    try {
+      const rel = `manuscript/${folder}/${f}`
+      const text = await read(root, rel)
+      await keepIfBroken(root, rel, text)
+      scenes.push(parseScene(rel, text))
+    } catch { /* moved away */ }
   }
   return { id, folder, kind, title, notes, summary, summaryOf, part, goal, ending, hook, promise, arc, published, hookCheck, scenes }
 }
@@ -139,7 +158,9 @@ export async function loadBook(root: string): Promise<Book> {
   const meta = normalizeMeta(JSON.parse(await read(root, 'plume.json')))
   const entries: Entry[] = []
   for (const p of await list(root, 'bible')) {
-    entries.push(parseEntry(p, await read(root, p)))
+    const text = await read(root, p)
+    await keepIfBroken(root, p, text)
+    entries.push(parseEntry(p, text))
   }
   // A series' shared bible: its entries come with the book, unless the book has its own of that name.
   const sroot = seriesRootOf(root, meta.series)

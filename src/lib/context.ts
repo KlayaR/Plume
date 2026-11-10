@@ -107,14 +107,14 @@ export interface Built {
 }
 
 export const VOICE_LABELS: Record<Lang, Record<string, string>> = {
-  fr: { register: 'Registre', sentences: 'Phrases', tic: 'Tic de langage', gesture: 'Geste signature', never: 'Ne dit jamais', inner: 'Voix intérieure', lines: 'Répliques types' },
-  en: { register: 'Register', sentences: 'Sentences', tic: 'Verbal tic', gesture: 'Signature gesture', never: 'Never says', inner: 'Inner voice', lines: 'Sample lines' },
+  fr: { register: 'Registre', sentences: 'Phrases', tic: 'Tic de langage', gesture: 'Geste signature', never: 'Ne dit jamais', inner: 'Voix intérieure', lines: 'Répliques types', address: 'Tutoie / vouvoie' },
+  en: { register: 'Register', sentences: 'Sentences', tic: 'Verbal tic', gesture: 'Signature gesture', never: 'Never says', inner: 'Inner voice', lines: 'Sample lines', address: 'Forms of address' },
 }
 
 /** A character's voice card: sent whenever the character is, in short or full. */
 function voiceBlock(e: Entry, lang: Lang): string {
   if (!e.voice) return ''
-  const rows = Object.entries(e.voice).filter(([, v]) => v.trim()).map(([k, v]) => `${VOICE_LABELS[lang][k] ?? k} : ${v.trim()}`)
+  const rows = Object.entries(e.voice).filter(([, v]) => (v ?? '').trim()).map(([k, v]) => `${VOICE_LABELS[lang][k] ?? k} : ${v.trim()}`)
   return rows.length ? `<voice>\n${rows.join('\n')}\n</voice>` : ''
 }
 

@@ -93,9 +93,11 @@ export interface VoiceCard {
   never: string
   inner: string
   lines: string
+  /** How they address the others: tu or vous, titles, nicknames ("tutoie Marc, vouvoie la reine"). */
+  address?: string
 }
 
-export const EMPTY_VOICE: VoiceCard = { register: '', sentences: '', tic: '', gesture: '', never: '', inner: '', lines: '' }
+export const EMPTY_VOICE: VoiceCard = { register: '', sentences: '', tic: '', gesture: '', never: '', inner: '', lines: '', address: '' }
 
 export type ExcerptKind = 'any' | 'dialogue' | 'action' | 'description' | 'introspection'
 
@@ -361,6 +363,10 @@ export interface BookMeta {
   format: 1
   /** Stays the same when the book is renamed or moved: its backups are kept under it. */
   id?: string
+  /** The EPUB's identifier, kept so each new export is the same book to a store or a reader. */
+  uuid?: string
+  /** A cover picture in the book folder (images/cover.jpg), put at the front of the EPUB. */
+  cover?: string
   title: string
   author: string
   language: Lang
