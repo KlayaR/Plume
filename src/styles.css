@@ -950,7 +950,7 @@ body.pl-dimpara .cm-focused .cm-line.cm-activeLine { opacity: 1; }
 .pl-ol-read { cursor: text; border-left-color: transparent; background: transparent; border-color: transparent; padding: 10px 14px; }
 .pl-ol-read:hover { background: var(--surface-1); border-color: var(--border); }
 .pl-ol-form { box-shadow: var(--shadow); }
-.pl-ol-tools { display: inline-flex; align-items: center; gap: 2px; opacity: 0; transition: opacity 0.15s; }
+.pl-ol-tools { display: inline-flex; align-items: center; gap: 2px; opacity: 0.45; transition: opacity 0.15s; }
 .pl-ol-read:hover .pl-ol-tools, .pl-ol-form .pl-ol-tools, .pl-ol-chhead:hover .pl-ol-tools, .pl-ol-tools:focus-within { opacity: 1; }
 .pl-ol-lock { opacity: 0; color: var(--text-muted); }
 .pl-ol-read:hover .pl-ol-lock, .pl-ol-form .pl-ol-lock, .pl-ol-lock.pl-on { opacity: 1; }

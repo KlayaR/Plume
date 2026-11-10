@@ -30,10 +30,13 @@ are kept as they are, so a file edited by hand or by another tool survives.
 - `claude -p --safe-mode --tools "" --strict-mcp-config --disable-slash-commands
   --no-session-persistence --system-prompt-file …`: about 830 tokens of CLI
   overhead instead of ~54,000 with Claude Code's defaults (measured, CLI 2.1.296).
-- Rules, style guide and bible go in the system prompt, which the CLI caches
-  for an hour; story text and the task go in the message. Only the system
-  prompt is reused from the cache (tested), so its content is kept stable
-  between calls (entries sorted by id, the same rules for every action).
+- The rules, your prompt, the style guide and samples of your voice go in the
+  system prompt, which the CLI caches for an hour; the bible entries picked for
+  this request, the story so far, the scene's plan and the task go in the
+  message. Only the system prompt is reused from the cache (tested), so its
+  content is kept stable between calls (the same rules for every action).
+- Which model answers depends on the kind of work (Settings → Claude → Models):
+  writing, editing and planning, small jobs (`src/lib/types.ts`, `Role`).
 - Short entry versions by default, a bible budget (3,000 tokens), a story
   window (1,500 words before the cursor), word targets on every reply.
 - Runs from an empty folder in Plume's app data, so no CLAUDE.md is read.
