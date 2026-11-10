@@ -13,34 +13,56 @@ const SIMILE: Record<Lang, RegExp> = {
   en: /\b(?:like|as if) (?:a|an|the|some) [\p{L}’'-]+(?: [\p{L}’'-]{4,})?/giu,
 }
 
-/** Phrases of four words found in at least `min` scenes, the most repeated first. */
+/** Where a repeated phrase sits in one scene: its words (by index) and its characters. */
+interface Spot { wi: number; wj: number; from: number; to: number }
+
+/**
+ * Phrases repeated in at least `min` scenes, the most repeated first. Four-word pieces
+ * found in the same scenes and next to each other are one passage, quoted as written.
+ */
 function phrases(book: Book, lang: Lang, min: number): Repeat[] {
-  const at = new Map<string, Map<string, string>>()
-  for (const s of book.chapters.flatMap(c => c.scenes)) {
-    const ws = words(s.text)
+  const texts = new Map(book.chapters.flatMap(c => c.scenes.map(s => [s.id, s.text] as const)))
+  const at = new Map<string, Map<string, Spot>>()
+  for (const [id, text] of texts) {
+    const ws = words(text)
     for (let i = 0; i + 4 <= ws.length; i++) {
       const gram = ws.slice(i, i + 4).map(x => foldText(x.w))
       if (gram.filter(w => w.length >= 4 && !STOPWORDS[lang].has(w)).length < 2) continue
       const key = gram.join(' ')
-      const m = at.get(key) ?? new Map<string, string>()
-      if (!m.has(s.id)) m.set(s.id, s.text.slice(ws[i].from, ws[i + 3].to))
+      const m = at.get(key) ?? new Map<string, Spot>()
+      if (!m.has(id)) m.set(id, { wi: i, wj: i + 3, from: ws[i].from, to: ws[i + 3].to })
       at.set(key, m)
     }
   }
-  const found = [...at].filter(([, m]) => m.size >= min).sort((a, b) => b[1].size - a[1].size)
-  // "the back of his" and "back of his hand" in the same scenes are one phrase.
-  const kept: [string, Map<string, string>][] = []
-  for (const [key, m] of found) {
-    const ids = [...m.keys()].sort().join()
-    const w = key.split(' ')
-    const overlaps = kept.some(([k, km]) => {
-      if ([...km.keys()].sort().join() !== ids) return false
-      const v = k.split(' ')
-      return w.slice(1).join(' ') === v.slice(0, 3).join(' ') || v.slice(1).join(' ') === w.slice(0, 3).join(' ')
-    })
-    if (!overlaps) kept.push([key, m])
+  // Pieces in the same scenes, grouped, then joined where they touch in the first scene.
+  const groups = new Map<string, Map<string, Spot>[]>()
+  for (const m of at.values()) {
+    if (m.size < min) continue
+    const sig = [...m.keys()].sort().join()
+    groups.set(sig, [...groups.get(sig) ?? [], m])
   }
-  return kept.slice(0, 15).map(([text, m]) => ({ kind: 'phrase', text, scenes: [...m].map(([id, quote]) => ({ id, quote })) }))
+  const out: Repeat[] = []
+  for (const pieces of groups.values()) {
+    const first = [...pieces[0].keys()][0]
+    pieces.sort((x, y) => x.get(first)!.wi - y.get(first)!.wi)
+    let run: Map<string, Spot> | null = null
+    const flush = () => {
+      if (!run) return
+      const scenes = [...run].map(([id, sp]) => ({ id, quote: texts.get(id)!.slice(sp.from, sp.to) }))
+      out.push({ kind: 'phrase', text: scenes[0].quote, scenes })
+    }
+    for (const m of pieces) {
+      const touches = run && m.get(first)!.wi <= run.get(first)!.wj + 1
+      if (run && touches) {
+        for (const [id, sp] of m) {
+          const r = run.get(id)
+          if (r) run.set(id, { wi: Math.min(r.wi, sp.wi), wj: Math.max(r.wj, sp.wj), from: Math.min(r.from, sp.from), to: Math.max(r.to, sp.to) })
+        }
+      } else { flush(); run = new Map(m) }
+    }
+    flush()
+  }
+  return out.sort((x, y) => y.scenes.length - x.scenes.length || y.text.length - x.text.length).slice(0, 15)
 }
 
 /** The same image in two scenes or more. */
@@ -55,7 +77,7 @@ function images(book: Book, lang: Lang): Repeat[] {
     }
   }
   return [...at].filter(([, m]) => m.size >= 2).sort((a, b) => b[1].size - a[1].size).slice(0, 15)
-    .map(([text, m]) => ({ kind: 'image', text, scenes: [...m].map(([id, quote]) => ({ id, quote })) }))
+    .map(([, m]) => { const scenes = [...m].map(([id, quote]) => ({ id, quote })); return { kind: 'image' as const, text: scenes[0].quote, scenes } })
 }
 
 /** Scenes whose first (or last) sentence starts with the same two words, in at least `min` scenes. */
@@ -71,7 +93,7 @@ function edges(book: Book, kind: 'opening' | 'ending', min: number): Repeat[] {
     at.set(key, [...at.get(key) ?? [], { id: s.id, quote: one.s.slice(0, 80) }])
   }
   return [...at].filter(([, l]) => l.length >= min).sort((a, b) => b[1].length - a[1].length)
-    .map(([text, scenes]) => ({ kind, text, scenes }))
+    .map(([, scenes]) => ({ kind, text: words(scenes[0].quote).slice(0, 2).map(x => x.w).join(' '), scenes }))
 }
 
 /** Everything the book repeats across scenes, the most repeated first within each kind. */

@@ -224,7 +224,11 @@ export const changesField = StateField.define<Change[]>({
   create: () => [],
   update: (v, tr) => {
     // A list set by the same transaction that changes the text (accepting one) moves with the text too.
-    const moved = (list: Change[]) => tr.docChanged ? list.map(c => ({ ...c, from: tr.changes.mapPos(c.from, 1), to: tr.changes.mapPos(c.to, -1) })).filter(c => c.to >= c.from) : list
+    // New text waiting at one point (no width) moves as one point, so text typed or accepted there doesn't drop it.
+    const moved = (list: Change[]) => tr.docChanged ? list.map(c => {
+      if (c.from === c.to) { const at = tr.changes.mapPos(c.from, 1); return { ...c, from: at, to: at } }
+      return { ...c, from: tr.changes.mapPos(c.from, 1), to: tr.changes.mapPos(c.to, -1) }
+    }).filter(c => c.to >= c.from) : list
     let out = moved(v)
     for (const e of tr.effects) if (e.is(setChanges)) out = moved(e.value)
     return out

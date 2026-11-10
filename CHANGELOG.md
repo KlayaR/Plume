@@ -7,6 +7,25 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.47.0
+The third part of the November audit: one place for what to fix, a book-wide look at repetitions and promises, and safer, smaller calls.
+- **One list of findings.** Agent tasks is now the book's list of things to look at. Findings point to the scene itself (not to a title that every chapter shares), and "→ scene" opens it with the quoted words selected. The outline check's points can be kept there with **Keep in the list**, instead of vanishing when you close them.
+- **Repetitions across the book.** A new task in Agent tasks, free and run on your computer: the same passages, the same images ("like a wounded wolf"), and scenes that open or end the same way, from one scene to another.
+- **Promises to the reader.** Plan → Story lines starts with one list of every promise the book makes: story lines, a web novel's threads and seeds for later books, with where each was made, where it last moved, and the ones dropped or never set up first.
+- **Planning knows your characters.** Detailing or regenerating a chapter now sends the full entries of the main characters and of those in the chapter, and the later chapters in one line each, so a plan doesn't take over what comes after. Settings → This book → **How you plan** takes your own way of planning, in your words; it goes with every planning request and wins over Plume's rules.
+- **Take Claude's new text a paragraph at a time.** A proposal of new text has **By paragraph**: each paragraph becomes a change to accept or reject, in any order. **Edit** puts the proposal in your text with the cursor at its start, to rework it there (one Ctrl+Z takes it all back).
+- **Smaller snapshots.** The snapshot taken before Claude changes a chapter keeps that chapter only, and the list says so. The list opens without reading every snapshot. Old versions of each scene are thinned out: all of the last week, then one a day for three months, then one a month.
+- **Replies that always read.** Every task that expects a list or an object from Claude asks the command line for that shape, so "Claude's reply could not be read" should no longer happen; when it does, Plume asks once more.
+- **Safer by default.** The window has a content policy, Plume only ever starts Claude's own command line, and agent tasks (which read your book folder or the web) run in Claude's restricted mode.
+- **Forms of address.** A character's voice card has a line for how they address others and are addressed (tu or vous, titles, nicknames), sent with the card.
+- **×3 alternatives in one request** instead of three, so it costs about a third.
+- **An honest size meter.** The estimate of a request's size learns from what Claude actually counted, per language; French estimates were 23 to 32 % low.
+- **A damaged file header is kept.** When a scene or entry file's header can't be read, a copy of the file as it was goes to `.plume/broken` before anything is written, and Plume says which files.
+- **EPUB export** keeps the same book identifier from one export to the next, and takes a cover picture (Settings → This book).
+- **Proofreading for publication.** The help explains how to run LanguageTool on your own computer, for a long book without limits and without sending the text anywhere. **Copy for Antidote or Word**, in a chapter's menu, puts the chapter on the clipboard with its italics.
+- **A calmer first open:** one tip instead of a tour. Claude's buttons on the plan's cards stay visible (dimmed) instead of appearing on hover.
+- **Fixed:** accepting one change no longer drops other new text waiting at the same spot.
+
 ## 0.46.0
 The second part of the November audit: Claude knows more of your book and fewer rules, you choose its models, and editing works one way.
 - **The story memory keeps itself up to date.** When you leave a scene you changed, a small job summarises it, then its chapter. Claude reads these summaries to know what already happened; the Assistant shows how many scenes are in it. Settings → Claude can turn it off.

@@ -1992,7 +1992,7 @@ describe('repetitions across the book', () => {
     const image = found.find(r => r.kind === 'image')!
     expect(image.text).toBe('like a wounded wolf')
     expect(image.scenes).toHaveLength(2)
-    expect(found.find(r => r.kind === 'opening')?.text).toBe('night fell')
+    expect(found.find(r => r.kind === 'opening')?.text).toBe('Night fell')
   })
 })
 
