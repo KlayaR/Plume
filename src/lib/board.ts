@@ -40,3 +40,10 @@ export function boardMove(chapters: Chapter[], sceneId: string, dir: BoardDir): 
   const to = chapters[at.c + (dir === 'left' ? -1 : 1)]
   return to ? { chapterId: to.id, index: Math.min(at.i, to.scenes.length) } : null
 }
+
+/** A steady colour per story line. */
+export function lineColor(slug: string) {
+  let h = 0
+  for (const c of slug) h = (h * 31 + c.charCodeAt(0)) >>> 0
+  return `hsl(${h % 360} 45% 52%)`
+}

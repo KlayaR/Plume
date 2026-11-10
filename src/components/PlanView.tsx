@@ -6,13 +6,12 @@ import { useMemo, useRef, useState } from 'react'
 import { ask as askDialog } from '@tauri-apps/plugin-dialog'
 import { AlertTriangle, GripVertical, Lightbulb, PenLine, Plus, Sparkles, Trash2, X } from 'lucide-react'
 import { useStore, type PlanTab } from '../store'
-import { WORLD_TYPES, type Chapter, type LooseCard, type Scene, type SceneStatus } from '../lib/types'
+import { type Chapter, type LooseCard, type Scene } from '../lib/types'
 import { chapterLabels } from '../lib/chapters'
-import { boardMove, boardNeighbour, type BoardDir } from '../lib/board'
+import { boardMove, boardNeighbour, lineColor, type BoardDir } from '../lib/board'
 import { newId } from '../lib/text'
 import { sceneCounts } from '../lib/stats'
 import { parseStoryTime, scenePositions, templateBeats, TEMPLATES, timeFlags } from '../lib/structures'
-import { ask, parseJSON } from '../ai'
 import { numLocale, useT } from '../i18n'
 import { ChatDock } from './ChatPanel'
 import { showMenu } from '../contextMenu'
@@ -20,7 +19,7 @@ import { chapterMenu, newThingsMenu, sceneMenu } from '../menus'
 import Dashboard from './Dashboard'
 import Tension from './Tension'
 import { ShowEverything } from './BibleView'
-import OutlineView from './OutlineView'
+import OutlineView, { CardEditor } from './OutlineView'
 import GridView from './GridView'
 import { Arcs, Release, Threads } from './SerialPlan'
 
@@ -257,72 +256,15 @@ function Card({ scene, active, tint, dim, tabStop, onKeyDown, onFocus, onSelect,
   )
 }
 
-/** A steady colour per story line. */
-export function lineColor(slug: string) {
-  let h = 0
-  for (const c of slug) h = (h * 31 + c.charCodeAt(0)) >>> 0
-  return `hsl(${h % 360} 45% 52%)`
-}
+export { lineColor }
 
+/** Beside the board: the same card editor as in the Outline, every field of the scene's plan. */
 function Inspector({ scene, onClose }: { scene: Scene; onClose: () => void }) {
-  const book = useStore(s => s.book)!
   const t = useT()
-  const update = (patch: Partial<Scene>) => useStore.getState().updateScene(scene.id, patch)
-  const characters = book.entries.filter(e => e.type === 'character').sort((a, b) => a.name.localeCompare(b.name))
-  const places = book.entries.filter(e => e.type === 'place').sort((a, b) => a.name.localeCompare(b.name))
-  const lines = book.entries.filter(e => e.type === 'storyline').sort((a, b) => a.name.localeCompare(b.name))
   return (
     <aside className="pl-inspector">
-      <div className="pl-row">
-        <input data-lt className="pl-entryname pl-grow" value={scene.title} onChange={e => update({ title: e.target.value })} aria-label={t('Scene title')} />
-        <button type="button" className="sk-btn sk-btn-sm" onClick={() => useStore.getState().selectScene(scene.id)}><PenLine size={13} /> {t('Write it')}</button>
-        <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm sk-btn-icon" onClick={onClose} aria-label={t('Close')}><X size={14} /></button>
-      </div>
-      <div className="sk-field">
-        <label>{t('Card note')}</label>
-        <textarea className="sk-input" rows={4} value={scene.note ?? ''} placeholder={t('What happens in this scene. Shown in grey in the manuscript; Beats to prose writes from it.')} onChange={e => update({ note: e.target.value })} />
-      </div>
-      <div className="pl-grid2">
-        <div className="sk-field">
-          <label>{t('POV')}</label>
-          <select className="sk-select" value={scene.pov ?? ''} onChange={e => update({ pov: e.target.value || null })}>
-            <option value="">{t('None')}</option>
-            {characters.map(c => <option key={c.slug} value={c.slug}>{c.name}</option>)}
-          </select>
-        </div>
-        <div className="sk-field">
-          <label>{t('Status')}</label>
-          <select className="sk-select" value={scene.status} onChange={e => update({ status: e.target.value as SceneStatus })}>
-            <option value="draft">{t('Draft')}</option><option value="revised">{t('Revised')}</option><option value="done">{t('Done')}</option>
-          </select>
-        </div>
-        <div className="sk-field">
-          <label>{t('Story time')}</label>
-          <input className="sk-input" value={scene.time ?? ''} placeholder={book.meta.language === 'fr' ? 'Jour 3, 22:00' : 'Day 3, 22:00'} onChange={e => update({ time: e.target.value || undefined })} />
-        </div>
-        <div className="sk-field">
-          <label>{t('Place')}</label>
-          <select className="sk-select" value={scene.place ?? ''} onChange={e => update({ place: e.target.value || null })}>
-            <option value="">{t('None')}</option>
-            {places.map(p => <option key={p.slug} value={p.slug}>{p.name}</option>)}
-          </select>
-        </div>
-      </div>
-      <div className="sk-field">
-        <label>{t('Story lines it moves forward')}</label>
-        <div className="pl-chips">
-          {lines.length === 0 && <span className="sk-hint">{t('Add story lines in the bible first.')}</span>}
-          {lines.map(l => {
-            const on = scene.lines?.includes(l.slug)
-            return (
-              <button key={l.slug} type="button" className={`pl-chip ${on ? 'pl-chip-on' : ''}`} style={on ? { borderColor: lineColor(l.slug) } : undefined}
-                onClick={() => update({ lines: on ? scene.lines!.filter(x => x !== l.slug) : [...(scene.lines ?? []), l.slug] })}>
-                {l.name}
-              </button>
-            )
-          })}
-        </div>
-      </div>
+      <CardEditor sceneId={scene.id} onDone={onClose}
+        tools={<button type="button" className="sk-btn sk-btn-sm" onClick={() => useStore.getState().selectScene(scene.id)}><PenLine size={13} /> {t('Write it')}</button>} />
     </aside>
   )
 }
@@ -334,7 +276,6 @@ function Structure() {
   const t = useT()
   const lang = book.meta.language
   const { template, beats } = book.meta.structure
-  const [busy, setBusy] = useState(false)
   const set = (patch: Partial<typeof book.meta.structure>) => useStore.getState().updateMeta({ structure: { ...useStore.getState().book!.meta.structure, ...patch } })
   const scenes = book.chapters.flatMap(c => c.scenes)
   const pos = useMemo(() => scenePositions(book), [book])
@@ -343,23 +284,6 @@ function Structure() {
     if (beats.some(b => b.note.trim() || b.sceneId) && !(await askDialog(t('Replace the current beats? Their notes will be lost.'), { title: t('Structure'), kind: 'warning' }))) return
     set({ template: id, beats: id && id !== 'custom' ? templateBeats(id, lang) : [] })
   }
-  const suggest = async () => {
-    setBusy(true)
-    try {
-      const bible = book.entries.filter(e => WORLD_TYPES.includes(e.type) && e.include !== 'secret').map(e => `- ${e.name} (${e.type}): ${e.short}`).join('\n')
-      const cards = scenes.map(s => `- ${s.title}: ${s.note ?? s.summary ?? ''}`).join('\n')
-      const reply = await ask({
-        role: 'edit',
-        system: lang === 'fr' ? 'Tu aides un romancier à structurer son livre. Réponds uniquement en JSON valide, en français.' : 'You help a novelist structure their book. Reply with valid JSON only.',
-        message: `<bible>\n${bible}\n</bible>\n<scenes>\n${cards || '-'}\n</scenes>\n<beats>\n${beats.map(b => `- ${b.name} (${b.at} %)`).join('\n')}\n</beats>\n\n${lang === 'fr' ? 'Pour chaque temps fort, propose en une ou deux phrases ce qui pourrait s’y passer dans CE livre, à partir de la bible et des scènes.' : 'For each beat, suggest in one or two sentences what could happen there in THIS book, from the bible and the scenes.'}\nJSON: [{"name": "...", "note": "..."}]`,
-      })
-      const list = parseJSON<{ name: string; note: string }[]>(reply)
-      if (!list) throw new Error(t('Claude’s reply could not be read. Try again.'))
-      set({ beats: beats.map((b, i) => ({ ...b, note: b.note.trim() ? b.note : (list.find(x => x.name === b.name) ?? list[i])?.note ?? '' })) })
-    } catch (e) { useStore.getState().notify('error', (e as Error).message) }
-    setBusy(false)
-  }
-
   return (
     <div className="pl-structure">
       <div className="pl-row">
@@ -370,7 +294,7 @@ function Structure() {
         </select>
         {template === 'custom' && <button type="button" className="sk-btn sk-btn-sm" onClick={() => set({ beats: [...beats, { name: t('New beat'), at: 50, note: '', sceneId: null }] })}><Plus size={13} /> {t('Beat')}</button>}
         <span className="pl-grow" />
-        {beats.length > 0 && <button type="button" className="sk-btn sk-btn-sm" disabled={busy} onClick={suggest}><Sparkles size={13} /> {busy ? t('Thinking…') : t('Suggest from my bible')}</button>}
+        {/* What happens at each beat: Plan → Outline, The story, Propose. */}
       </div>
 
       <Tension />

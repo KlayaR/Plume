@@ -8,8 +8,9 @@ import { FOUNDATION_KEYS, SERIES_KEYS, type SeriesPlan, type Book, type Chapter,
 export type { SceneMode } from './types'
 
 /** What a scene and a chapter are, said once to Claude. */
-export function outlineRules(lang: Lang, mode: SceneMode): string {
+export function outlineRules(lang: Lang, mode: SceneMode, words: [number, number] = [3000, 4500]): string {
   const fr = lang === 'fr'
+  const [a, b] = words
   const count = mode.kind === 'one'
     ? (fr ? '- La plupart des chapitres sont une seule scène : au moins trois chapitres sur quatre en ont exactement une. Une deuxième scène seulement pour un saut dans le temps ou un changement de point de vue ; jamais plus de deux. Un changement de lieu ne suffit pas.' : '- Most chapters are a single scene: at least three chapters in four have exactly one. A second scene only for a jump in time or a change of point of view; never more than two. A change of place is not enough.')
     : mode.kind === 'range'
@@ -21,7 +22,7 @@ export function outlineRules(lang: Lang, mode: SceneMode): string {
 ${count}
 - Un moment de réaction plus calme (émotion, dilemme, décision) peut clore un chapitre ou ouvrir le suivant ; il n’a pas besoin de sa propre scène.
 
-Ce qu’est un chapitre (environ 3 000 à 4 500 mots) :
+Ce qu’est un chapitre (environ ${a.toLocaleString('fr-FR')} à ${b.toLocaleString('fr-FR')} mots) :
 - Un but concret et immédiat pour le personnage du point de vue, pas la grande quête.
 - Il monte en tension : chaque tentative donne « oui, mais… » ou « non, et en plus… ».
 - Il finit sur un tournant : un problème pire, une révélation qui change le plan, une image ou une prise de conscience pour un chapitre calme, ou une question pour le suivant.` : `What a scene is:
@@ -30,7 +31,7 @@ Ce qu’est un chapitre (environ 3 000 à 4 500 mots) :
 ${count}
 - A quieter reaction moment (feeling, dilemma, decision) can close a chapter or open the next; it doesn’t need its own scene.
 
-What a chapter is (about 3,000 to 4,500 words):
+What a chapter is (about ${a.toLocaleString('en-US')} to ${b.toLocaleString('en-US')} words):
 - A concrete, immediate goal for the point-of-view character, not the big quest.
 - It escalates: each attempt gives “yes, but…” or “no, and what’s more…”.
 - It ends on a turn: a worse problem, a revelation that changes the plan, an image or a realisation for a quiet chapter, or a question for the next one.`
@@ -42,11 +43,11 @@ export function cardSpec(lang: Lang, series = false): string {
     ? ' Et "seeds" : les indices posés ici pour les tomes suivants d’après <series>, montrés en passant, jamais expliqués (vide si aucun).'
     : ' And "seeds": clues planted here for later books, from <series>, shown in passing, never explained (empty if none).'
   return (lang === 'fr'
-    ? `Pour chaque scène : "summary" (2 à 3 phrases : qui veut quoi, l’obstacle, ce qui change), "pov" et "place" (noms de la bible si possible), "beats" (5 à 10 étapes concrètes, dans l’ordre, chacune une phrase : ce qui se passe, pas des intentions), "cast" (les personnages présents), "reveals" (ce que le lecteur apprend, les indices posés ou repris), "arc" (l’état du point de vue au début → à la fin), "pace" (rythme et ton, quelques mots).`
-    : `For each scene: "summary" (2 to 3 sentences: who wants what, the obstacle, what changes), "pov" and "place" (bible names when possible), "beats" (5 to 10 concrete steps, in order, one sentence each: what happens, not intentions), "cast" (characters present), "reveals" (what the reader learns, clues planted or paid off), "arc" (the point-of-view character's state at the start → at the end), "pace" (pace and tone, a few words).`) + seeds
+    ? `Pour chaque scène : "summary" (2 à 3 phrases : qui veut quoi, l’obstacle, ce qui change), "pov" et "place" (noms de la bible si possible), "beats" (5 à 10 étapes concrètes, dans l’ordre, chacune une phrase : ce qui se passe, pas des intentions), "cast" (les personnages présents), "reveals" (ce que le lecteur apprend, les indices posés ou repris), "arc" (l’état du point de vue au début → à la fin), "pace" (rythme et ton, quelques mots), "time" (le moment dans l’histoire, court : « Jour 3, soir »), "lines" (les noms des intrigues de la bible que la scène fait avancer).`
+    : `For each scene: "summary" (2 to 3 sentences: who wants what, the obstacle, what changes), "pov" and "place" (bible names when possible), "beats" (5 to 10 concrete steps, in order, one sentence each: what happens, not intentions), "cast" (characters present), "reveals" (what the reader learns, clues planted or paid off), "arc" (the point-of-view character's state at the start → at the end), "pace" (pace and tone, a few words), "time" (when it happens in story time, short: "Day 3, evening"), "lines" (the names of the bible's story lines the scene moves forward).`) + seeds
 }
 
-export const SCENE_JSON = '{"id": "…", "title": "…", "summary": "…", "pov": "…", "place": "…", "beats": ["…"], "cast": ["…"], "reveals": "…", "arc": "… → …", "pace": "…"}'
+export const SCENE_JSON = '{"id": "…", "title": "…", "summary": "…", "pov": "…", "place": "…", "time": "…", "beats": ["…"], "cast": ["…"], "lines": ["…"], "reveals": "…", "arc": "… → …", "pace": "…"}'
 export const CHAPTER_JSON = `{"goal": "…", "ending": "…", "scenes": [${SCENE_JSON}]}`
 
 const nameOf = (book: Book, slug: string | null | undefined) => (slug ? book.entries.find(e => e.slug === slug)?.name ?? slug : '')
@@ -122,8 +123,9 @@ export const chapterBeats = (book: Book, c: Chapter) => book.meta.structure.beat
 /** One scene's card as compact text (what Claude reads of the outline). */
 export function sceneText(book: Book, s: Scene, withId = false): string {
   return [
-    `- ${withId ? `[${s.id}]${s.locked ? ' [locked]' : ''} ` : ''}${s.title}${s.pov ? ` (POV ${nameOf(book, s.pov)})` : ''}${s.place ? ` @ ${nameOf(book, s.place)}` : ''}: ${s.note?.trim() ?? ''}`,
+    `- ${withId ? `[${s.id}]${s.locked ? ' [locked]' : ''} ` : ''}${s.title}${s.pov ? ` (POV ${nameOf(book, s.pov)})` : ''}${s.place ? ` @ ${nameOf(book, s.place)}` : ''}${s.time ? ` [${s.time}]` : ''}: ${s.note?.trim() ?? ''}`,
     ...(s.beats ?? []).map((b, i) => `    ${i + 1}. ${b}`),
+    s.lines?.length ? `    Lines: ${s.lines.map(l => nameOf(book, l)).join(', ')}` : '',
     s.reveals?.trim() ? `    Reveals: ${s.reveals.trim()}` : '',
     s.seeds?.trim() ? `    Seeds: ${s.seeds.trim()}` : '',
     s.pace?.trim() ? `    Pace: ${s.pace.trim()}` : '',
@@ -162,6 +164,9 @@ export interface CardDraft {
   place: string | null
   beats: string[]
   cast: string[]
+  /** Story time ("Day 3, evening") and the story lines it moves forward (bible slugs). */
+  time?: string
+  lines?: string[]
   reveals: string
   seeds?: string
   arc: string
@@ -190,6 +195,8 @@ export function readCard(book: Book, chapter: Chapter, raw: Record<string, unkno
     place: findEntrySlug(book, raw.place, ['place']),
     beats: list(raw.beats),
     cast: list(raw.cast),
+    time: str(raw.time) || undefined,
+    lines: list(raw.lines).map(n => findEntrySlug(book, n, ['storyline'])).filter((x): x is string => !!x),
     reveals: str(raw.reveals),
     seeds: str(raw.seeds) || undefined,
     arc: str(raw.arc),
@@ -343,7 +350,7 @@ export function revisionOrder(book: Book, rev: OutlineRevision, on: (key: string
 
 /** The outline fields of a scene, to compare, apply or put back. */
 export const cardOf = (s: Scene): Omit<CardDraft, 'id'> => ({
-  title: s.title, note: s.note ?? '', pov: s.pov, place: s.place ?? null, beats: s.beats ?? [], cast: s.cast ?? [], reveals: s.reveals ?? '', seeds: s.seeds || undefined, arc: s.arc ?? '', pace: s.pace ?? '',
+  title: s.title, note: s.note ?? '', pov: s.pov, place: s.place ?? null, beats: s.beats ?? [], cast: s.cast ?? [], time: s.time ?? '', lines: s.lines ?? [], reveals: s.reveals ?? '', seeds: s.seeds || undefined, arc: s.arc ?? '', pace: s.pace ?? '',
 })
 
 /** The patch that gives a scene a draft's outline (keeping what the draft leaves empty). */
@@ -355,6 +362,8 @@ export function cardPatch(d: CardDraft, s?: Scene): Partial<Scene> {
     place: d.place ?? s?.place ?? null,
     beats: d.beats.length ? d.beats : s?.beats,
     cast: d.cast.length ? d.cast : s?.cast,
+    time: d.time || s?.time,
+    lines: d.lines?.length ? d.lines : s?.lines,
     reveals: d.reveals || s?.reveals,
     seeds: d.seeds || s?.seeds,
     arc: d.arc || s?.arc,

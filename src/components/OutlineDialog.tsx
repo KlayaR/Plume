@@ -6,9 +6,10 @@ import { foldText } from '../lib/text'
 import { ListTree, Sparkles } from 'lucide-react'
 import { Dialog } from '../studio-kit/shell.js'
 import { useStore } from '../store'
+import { FOUNDATION_KEYS } from '../lib/types'
 import { findEntrySlug, outlineRules, type SceneMode } from '../lib/outline'
 import { ask, parseJSON } from '../ai'
-import { grounding } from '../outline'
+import { grounding, interviewFoundation } from '../outline'
 import { useT } from '../i18n'
 
 interface Outline { title: string; goal?: string; ending?: string; beat?: string; scenes: { title: string; summary?: string; note?: string; pov?: string; place?: string }[] }
@@ -19,7 +20,9 @@ export default function OutlineDialog({ onClose }: { onClose: () => void }) {
   const lang = book.meta.language
   const fr = lang === 'fr'
   const [premise, setPremise] = useState(book.meta.summary ?? '')
-  const [chapters, setChapters] = useState(12)
+  // As many chapters as the book's length needs at its usual chapter length.
+  const [chapters, setChapters] = useState(() => { const [a, b] = book.meta.ai.chapterWords; return Math.max(3, Math.min(60, Math.round((book.meta.goal.book || 90000) / ((a + b) / 2)))) })
+  const emptyFoundation = !FOUNDATION_KEYS.some(k => book.meta.foundation?.[k]?.trim())
   // Scenes per chapter: mostly one (the default), as each chapter needs, or within a range you set.
   const [mode, setMode] = useState<SceneMode>(book.meta.sceneMode ?? { kind: 'one' })
   const [words, setWords] = useState(book.meta.goal.book || 90000)
@@ -43,7 +46,7 @@ export default function OutlineDialog({ onClose }: { onClose: () => void }) {
         system: fr
           ? 'Tu aides un romancier à bâtir le plan de son livre. Réponds uniquement en JSON valide, en français.'
           : 'You help a novelist build the outline of their book. Reply with valid JSON only.',
-        message: `${grounding(fresh)}\n\n${outlineRules(lang, mode)}\n\n${fr
+        message: `${grounding(fresh)}\n\n${outlineRules(lang, mode, fresh.meta.ai.chapterWords)}\n\n${fr
           ? `Propose ${chapters} chapitres pour un livre d’environ ${words.toLocaleString('fr-FR')} mots. Chaque chapitre a son but immédiat (goal) et sa fin (ending : le tournant ou la question sur lesquels il se termine). Chaque scène a un titre court, un résumé de 2 à 3 phrases (qui veut quoi, ce qui l’en empêche, ce qui change à la fin), son personnage de point de vue et son lieu, avec les noms de la bible quand ils y sont. Pas encore d’étapes détaillées : elles viendront chapitre par chapitre.${points ? ' Place chaque tournant de <turning_points> dans le chapitre où il se produit, en respectant sa position (en % du livre) : ce chapitre reçoit "beat" avec le nom du tournant.' : ''}`
           : `Propose ${chapters} chapters for a book of about ${words.toLocaleString('en-US')} words. Each chapter gets its immediate goal (goal) and its ending (the turn or question it lands on). Each scene gets a short title, a 2-to-3-sentence summary (who wants what, what stands in the way, what changes by the end), its point-of-view character and its place, using the bible's names when they are there. No detailed beats yet: they come chapter by chapter.${points ? ' Place each turning point of <turning_points> in the chapter where it happens, at its position (% of the book): that chapter gets "beat" with the turning point\'s name.' : ''}`}\nJSON: [{"title": "...", "goal": "...", "ending": "...", "beat": "", "scenes": [{"title": "...", "summary": "...", "pov": "...", "place": "..."}]}]`,
       })
@@ -137,6 +140,12 @@ export default function OutlineDialog({ onClose }: { onClose: () => void }) {
             <Sparkles size={14} /> {busy ? t('Thinking…') : outline.length ? t('Again') : t('Propose an outline')}
           </button>
         </div>
+        {emptyFoundation && (
+          <div className="pl-row sk-hint pl-warn">
+            <span className="pl-grow">{t('The story’s foundation is empty: Claude will invent the stakes, the antagonist and the rules of the world. Fill it first in Plan → The story, or let Claude ask you questions.')}</span>
+            <button type="button" className="sk-btn sk-btn-sm" onClick={() => { onClose(); useStore.setState({ view: 'plan', planTab: 'outline' }); interviewFoundation() }}>{t('Ask me questions')}</button>
+          </div>
+        )}
         <span className="sk-hint">{t('Untick the scenes you don’t want. Chapters are added after yours; a chapter with the same title as one of yours receives its scenes. Nothing you wrote is changed. Then detail each chapter in Plan → Outline.')}</span>
         <div className="pl-find-list">
           {outline.map((c, i) => (

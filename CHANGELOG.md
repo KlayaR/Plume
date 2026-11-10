@@ -7,6 +7,22 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.46.0
+The second part of the November audit: Claude knows more of your book and fewer rules, you choose its models, and editing works one way.
+- **The story memory keeps itself up to date.** When you leave a scene you changed, a small job summarises it, then its chapter. Claude reads these summaries to know what already happened; the Assistant shows how many scenes are in it. Settings → Claude can turn it off.
+- **More of the book when Claude writes.** A scene written from its plan gets the whole chapter so far in full and the end of the previous chapter; Continue and Beats get the whole scene so far, up to 3,000 words. When summaries run out of room, the book's own summary stands in for the rest.
+- **The chat knows the story.** It now reads the premise, the foundation, the outline, what each written chapter became, and the end of the scene you are in, besides the bible. The interview about the foundation sees what is already filled in.
+- **Samples of your voice, by your choice.** Right-click a scene, or a chapter, and tick "Sample of my voice": Claude reads it first as an example of how you write, even a scene it drafted and you reworked. Untick it and it is never used. "Describe my voice" reads the same prose.
+- **Models by kind of work.** Settings → Claude → Models sets the model and effort for writing, for editing and planning, and for small jobs. Fable is available, and efforts go up to "maximum". Editing and planning start on Opus with high effort; the Assistant keeps the model you had. The old presets and per-action settings, which no longer did anything, are gone; your OpenRouter models stay.
+- **Each rule once.** The fantasy voice no longer repeats what the scene rules and the chapter's place already say, and no longer asks for contradictory endings. Banned words are checked on the reply instead of being listed in the prompt. French prompts say "Écris en français" (they said "Écris en French"). Prompts outside the fantasy voice no longer assume a fantasy book.
+- **Reports are information.** Review shows how many reports are over their target instead of a score. "Retry fixing these" and "Fix what's flagged" only ask Claude to fix banned words, AI habits, dialogue dashes and your longest sentence and line; passive voice, adverbs and the other rates are yours to judge.
+- **One engine for Claude's edits.** Line edit now writes in your voice, takes a snapshot first, finds the words even when spaces or apostrophes differ, says how many it couldn't place, and keeps the changes already waiting. Edit this chapter finds its words the same way.
+- **A bar for waiting changes.** When tracked changes wait in a scene, a bar says how many, with Next (F8), Accept all and Reject all.
+- **One card editor.** The Board opens the same card as the Outline, with every field; the Outline's card gains the status and the story lines. Claude's cards now carry story time and story lines, so the Timeline and the story-line tracker fill in. The outline rules use your book's chapter length. "Suggest from my bible" (a second way to fill the turning points) is gone: Propose, in The story, does it. Changing the structure template there asks before replacing notes.
+- **Outline from a premise** starts with as many chapters as your book's length needs, and warns when the foundation is empty, with a button to be asked questions instead.
+- **Backups that can't run out.** The last ten are always kept, then one a week for half a year. They are filed under the book's id, so renaming a book keeps its backups (backups made before 0.46 stay in their old folder).
+- **Faster typing in long books.** On a 180,000-word book in the development build, a keystroke went from about 80 ms of work to about 25, and from 130 ms to 20 in Review.
+
 ## 0.45.1
 Fixes from the November audit: nothing you write is lost at the edges of a session, and scenes written from the plan are better informed.
 - **Switching books no longer loses changes.** Everything still waiting to be saved is written before the book closes. If a save fails, Plume asks before closing the book or the window instead of closing anyway, and a red bar stays at the top until the save succeeds.

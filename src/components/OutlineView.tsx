@@ -8,7 +8,8 @@ import { create } from 'zustand'
 import { ask as askDialog } from '@tauri-apps/plugin-dialog'
 import { ArrowDown, ArrowUp, Check, CheckCheck, ChevronDown, ChevronRight, Combine, History, Lock, LockOpen, MessagesSquare, MoreHorizontal, PenLine, Plus, Scissors, Sparkles, Wand2, X } from 'lucide-react'
 import { useStore } from '../store'
-import { FOUNDATION_KEYS, SERIES_KEYS, type Book, type Chapter, type Foundation, type Scene } from '../lib/types'
+import { FOUNDATION_KEYS, SERIES_KEYS, type Book, type Chapter, type Foundation, type Scene, type SceneStatus } from '../lib/types'
+import { lineColor } from '../lib/board'
 import { TEMPLATES, templateBeats } from '../lib/structures'
 import { chapterLabels } from '../lib/chapters'
 import { foldText } from '../lib/text'
@@ -293,13 +294,14 @@ function SceneCard({ book, c, s, k }: { book: Book; c: Chapter; s: Scene; k: num
 }
 
 /** The open card: every field to edit, and Done to read it again. */
-function SceneForm({ book, c, s, k, update, lock, tools }: { book: Book; c: Chapter; s: Scene; k: number; update: (p: Partial<Scene>) => void; lock: React.ReactNode; tools: React.ReactNode }) {
+function SceneForm({ book, c, s, k, update, lock, tools, onDone }: { book: Book; c: Chapter; s: Scene; k: number; update: (p: Partial<Scene>) => void; lock: React.ReactNode; tools: React.ReactNode; onDone?: () => void }) {
   const t = useT()
   const st = useStore.getState
   const beats = s.beats ?? []
   const setBeats = (b: string[]) => update({ beats: b })
   const characters = book.entries.filter(e => e.type === 'character').sort((a, b) => a.name.localeCompare(b.name))
   const places = book.entries.filter(e => e.type === 'place').sort((a, b) => a.name.localeCompare(b.name))
+  const lines = book.entries.filter(e => e.type === 'storyline').sort((a, b) => a.name.localeCompare(b.name))
   const [beat, setBeat] = useState('')
   const move = (i: number, d: -1 | 1) => { const b = [...beats]; const j = i + d; if (j < 0 || j >= b.length) return; [b[i], b[j]] = [b[j], b[i]]; setBeats(b) }
   // Split the card at a beat: the beats from there go to a new scene right after (the text stays here).
@@ -314,7 +316,7 @@ function SceneForm({ book, c, s, k, update, lock, tools }: { book: Book; c: Chap
       <div className="pl-row pl-ol-cardhead">
         <input data-lt className="pl-ol-scenetitle pl-grow" value={s.title} onChange={e => update({ title: e.target.value })} aria-label={t('Scene title')} />
         {lock}{tools}
-        <button type="button" className="sk-btn sk-btn-sm sk-btn-primary" onClick={() => edit(null)}><Check size={13} /> {t('Done')}</button>
+        <button type="button" className="sk-btn sk-btn-sm sk-btn-primary" onClick={() => (onDone ? onDone() : edit(null))}><Check size={13} /> {t('Done')}</button>
       </div>
       <div className="pl-ol-meta">
         <select className="sk-select sk-btn-sm" value={s.pov ?? ''} onChange={e => update({ pov: e.target.value || null })} aria-label={t('POV')}>
@@ -327,6 +329,9 @@ function SceneForm({ book, c, s, k, update, lock, tools }: { book: Book; c: Chap
         </select>
         <input className="sk-input sk-btn-sm pl-ol-time" value={s.time ?? ''} placeholder={t('Story time')} onChange={e => update({ time: e.target.value || undefined })} />
         <input className="sk-input sk-btn-sm pl-grow" value={(s.cast ?? []).join(', ')} placeholder={t('Who is there')} onChange={e => update({ cast: e.target.value.split(',').map(x => x.trim()).filter(Boolean) })} />
+        <select className="sk-select sk-btn-sm" value={s.status} onChange={e => update({ status: e.target.value as SceneStatus })} aria-label={t('Status')}>
+          <option value="draft">{t('Draft')}</option><option value="revised">{t('Revised')}</option><option value="done">{t('Done')}</option>
+        </select>
       </div>
       <Grow autoFocus value={s.note ?? ''} placeholder={t('What happens: who wants what, what stands in the way, what changes')} onChange={v => update({ note: v })} />
       <ol className="pl-ol-beats">
@@ -346,6 +351,15 @@ function SceneForm({ book, c, s, k, update, lock, tools }: { book: Book; c: Chap
             onKeyDown={e => { if (e.key === 'Enter' && beat.trim()) { setBeats([...beats, beat.trim()]); setBeat('') } }} />
         </li>
       </ol>
+      {lines.length > 0 && (
+        <div className="pl-chips" aria-label={t('Story lines it moves forward')}>
+          {lines.map(l => {
+            const on = !!s.lines?.includes(l.slug)
+            return <button key={l.slug} type="button" className={`pl-chip ${on ? 'pl-chip-on' : ''}`} style={on ? { borderColor: lineColor(l.slug) } : undefined} title={t('Story lines it moves forward')}
+              onClick={() => update({ lines: on ? s.lines!.filter(x => x !== l.slug) : [...(s.lines ?? []), l.slug] })}>{l.name}</button>
+          })}
+        </div>
+      )}
       <div className="pl-ol-extra">
         <label><span className="sk-label">{t('What the reader learns')}</span><Grow value={s.reveals ?? ''} placeholder={t('Revelations, clues planted or paid off')} onChange={v => update({ reveals: v })} /></label>
         {book.meta.series && <label><span className="sk-label">{t('Seeds for later books')}</span><Grow value={s.seeds ?? ''} placeholder={t('Clues planted for later books, shown in passing')} onChange={v => update({ seeds: v })} /></label>}
@@ -354,6 +368,21 @@ function SceneForm({ book, c, s, k, update, lock, tools }: { book: Book; c: Chap
       </div>
     </article>
   )
+}
+
+/**
+ * The one card editor: the Outline opens it in place, the Board beside its columns.
+ * Every field of a scene's plan is here, whichever view you are in.
+ */
+export function CardEditor({ sceneId, onDone, tools }: { sceneId: string; onDone: () => void; tools?: React.ReactNode }) {
+  const book = useStore(s => s.book)!
+  const t = useT()
+  const c = book.chapters.find(x => x.scenes.some(s => s.id === sceneId))
+  const s = c?.scenes.find(x => x.id === sceneId)
+  if (!c || !s) return null
+  const update = (patch: Partial<Scene>) => useStore.getState().updateScene(s.id, patch)
+  const lock = <button type="button" className={`pl-quiet pl-ol-lock ${s.locked ? 'pl-on' : ''}`} onClick={() => update({ locked: s.locked ? undefined : true })} title={s.locked ? t('Locked: Claude leaves this card alone. Click to unlock.') : t('Lock: Claude leaves this card alone when it regenerates.')}>{s.locked ? <Lock size={13} /> : <LockOpen size={13} />}</button>
+  return <SceneForm book={book} c={c} s={s} k={c.scenes.indexOf(s)} update={update} lock={lock} tools={tools} onDone={onDone} />
 }
 
 /** One instruction for the whole outline; Claude's changes come back as a list to tick, applied together with one Undo. */
@@ -517,7 +546,10 @@ function StorySection({ book }: { book: Book }) {
   const st = useStore.getState
   const setF = (k: keyof Foundation, v: string) => st().updateMeta({ foundation: { ...(st().book!.meta.foundation ?? {}), [k]: v } })
   const setBeat = (i: number, note: string) => st().updateMeta({ structure: { ...st().book!.meta.structure, beats: st().book!.meta.structure.beats.map((b, j) => (j === i ? { ...b, note } : b)) } })
-  const choose = (id: string) => st().updateMeta({ structure: { template: id, beats: id ? templateBeats(id, lang) : [] } })
+  const choose = async (id: string) => {
+    if (beats.some(b => b.note.trim() || b.sceneId) && !(await askDialog(t('Replace the current beats? Their notes will be lost.'), { title: t('Structure'), kind: 'warning' }))) return
+    st().updateMeta({ structure: { template: id, beats: id ? templateBeats(id, lang) : [] } })
+  }
   const where = (id: string | null) => { const i = id ? book.chapters.findIndex(c => c.scenes.some(s => s.id === id)) : -1; return i >= 0 ? book.chapters[i].title || `#${i + 1}` : '' }
   const filled = FOUNDATION_KEYS.filter(k => f[k]?.trim()).length
   return (

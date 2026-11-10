@@ -12,6 +12,7 @@ import { checkBible } from './bibleCheck'
 import { jumpItems, rankJump } from './quickjump'
 import { aiBlocks, joinBlocks, parseBlocks, toBlocks } from './blocks'
 import { tidy } from '../contextMenu'
+import { readCard, sceneText } from './outline'
 import { addVersion, cardPatch, cardSpec, foundationText, hasPlan, seriesText, unwrittenPlaces, mergeCards, outlineRules, readChapterProposal, readRevision, revisionChanges, revisionOrder, revisionText, turningPointsText, versionOf, versionProposal } from './outline'
 import { sessionOf, worthShowing } from './session'
 import { addDirection, ordered, togglePin, type Direction } from './directions'
@@ -1954,5 +1955,23 @@ describe('backups', () => {
     expect(kept.slice(0, 10)).toEqual(daily.slice(0, 10))
     expect(kept.length).toBeLessThan(18)
     expect(gone).not.toContain('notes.txt')
+  })
+})
+
+describe('the plan, connected', () => {
+  const line = entry({ slug: 'heist', type: 'storyline', name: 'The heist', short: 'They rob the vault.' })
+  const b = bookOf([scene('a', '')], [line])
+  it('reads story time and story lines from Claude’s cards, and shows them back to it', () => {
+    const ch = b.chapters[0]
+    const card = readCard(b, ch, { id: 'a', title: 'Vault', summary: 'They break in.', time: 'Day 3, night', lines: ['The heist', 'Unknown line'] })
+    expect(card.time).toBe('Day 3, night')
+    expect(card.lines).toEqual(['heist'])
+    const patched = { ...ch.scenes[0], ...cardPatch(card, ch.scenes[0]) }
+    expect(sceneText(b, patched)).toContain('[Day 3, night]')
+    expect(sceneText(b, patched)).toContain('Lines: The heist')
+  })
+  it('tells Claude the book’s own chapter length', () => {
+    expect(outlineRules('en', { kind: 'one' }, [5000, 6000])).toContain('about 5,000 to 6,000 words')
+    expect(outlineRules('fr', { kind: 'one' })).toContain('environ 3')
   })
 })

@@ -79,6 +79,7 @@ const FR: Record<string, string> = {
   'Very high effort': 'Effort très élevé',
   'Maximum effort': 'Effort maximal',
   'Story memory': 'Mémoire du livre',
+  'The story’s foundation is empty: Claude will invent the stakes, the antagonist and the rules of the world. Fill it first in Plan → The story, or let Claude ask you questions.': 'Les fondations de l’histoire sont vides : Claude inventera les enjeux, l’antagoniste et les règles du monde. Remplissez-les d’abord dans Plan → L’histoire, ou laissez Claude vous poser des questions.',
   'Changes': 'Modifications',
   'Reject all': 'Tout rejeter',
   '1 change waiting': '1 modification en attente',
