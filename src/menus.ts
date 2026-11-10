@@ -24,7 +24,15 @@ import { boxOwner, dayOf, isLitRPG, isLocked, isSerial, mergeStats, readBox, sys
 import { chapterTitleFor, royalRoadHtml, royalRoadText } from './lib/export'
 
 /** A chapter on the clipboard as Royal Road's editor takes it: paragraphs, italics, scene breaks, system boxes as tables. */
-export async function copyForRoyalRoad(chapterId: string) {
+export const copyForRoyalRoad = (chapterId: string) => copyChapter(chapterId, t('Chapter copied: paste it into Royal Road’s editor.'))
+
+/**
+ * A chapter on the clipboard with its italics, for a proofreader outside Plume (Antidote, Word):
+ * paste it there, correct, and bring the corrections back by hand or paste the chapter back.
+ */
+export const copyForProofing = (chapterId: string) => copyChapter(chapterId, t('Chapter copied: paste it into Antidote or Word to proofread it.'))
+
+async function copyChapter(chapterId: string, done: string) {
   const st = useStore.getState()
   const book = st.book!
   const c = book.chapters.find(x => x.id === chapterId)
@@ -36,7 +44,7 @@ export async function copyForRoyalRoad(chapterId: string) {
     // No rich clipboard: plain text still pastes, without italics.
     try { await navigator.clipboard.writeText(text) } catch { st.notify('error', t('The system did not allow writing to the clipboard.')); return }
   }
-  st.notify('ok', t('Chapter copied: paste it into Royal Road’s editor.'))
+  st.notify('ok', done)
 }
 import { deleteMessage, turnIntoEntries, useChat } from './chat'
 
@@ -240,6 +248,7 @@ export function chapterMenu(chapterId: string): MenuItem[] {
     { label: t('New scene'), onClick: () => st.addScene(chapterId, `${t('Scene')} ${c.scenes.length + 1}`) },
     { label: t('Edit this chapter (Claude)…'), disabled: !c.scenes.some(s => s.text.trim()) || locked, onClick: () => openEdit(chapterId) },
     { label: t('Fix what’s flagged (Claude)…'), disabled: !c.scenes.some(s => s.text.trim()) || locked, onClick: () => fixFlagged(c.scenes.map(s => s.id)) },
+    { label: t('Copy for Antidote or Word'), disabled: !words, onClick: () => copyForProofing(chapterId) },
     ...(serial ? [
       { separator: true },
       c.published

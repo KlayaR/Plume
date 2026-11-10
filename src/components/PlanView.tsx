@@ -11,6 +11,7 @@ import { chapterLabels } from '../lib/chapters'
 import { boardMove, boardNeighbour, lineColor, type BoardDir } from '../lib/board'
 import { newId } from '../lib/text'
 import { sceneCounts } from '../lib/stats'
+import { promiseList, type BookPromise } from '../lib/promises'
 import { parseStoryTime, scenePositions, templateBeats, TEMPLATES, timeFlags } from '../lib/structures'
 import { numLocale, useT } from '../i18n'
 import { ChatDock } from './ChatPanel'
@@ -73,7 +74,7 @@ export default function PlanView() {
         {tab === 'release' && <Release />}
         {tab === 'threads' && <Threads />}
         {tab === 'timeline' && <Timeline />}
-        {tab === 'lines' && <Lines />}
+        {tab === 'lines' && <><Promises /><Lines /></>}
         {tab === 'dashboard' && <Dashboard />}
       </div>
       <ChatDock />
@@ -392,6 +393,42 @@ function Timeline() {
 }
 
 // --- Story lines -----------------------------------------------------------------
+
+/** Every promise to the reader in one list: story lines, threads and seeds, the ones to look at first. */
+function Promises() {
+  const book = useStore(s => s.book)!
+  const t = useT()
+  const [all, setAll] = useState(false)
+  const list = useMemo(() => promiseList(book), [book])
+  if (!list.length) return null
+  const labels = chapterLabels(book.chapters, book.meta.language)
+  const shown = all ? list : list.filter(p => p.state !== 'resolved')
+  const kind = { line: t('Story line'), thread: t('Thread'), seed: t('Seed for a later book') }
+  const where = (p: BookPromise) => p.first < 0 ? t('never moved forward') : p.first === p.last ? t('in {ch}', { ch: labels[p.first].label }) : t('from {a} to {b}', { a: labels[p.first].label, b: labels[p.last].label })
+  const state = (p: BookPromise) => p.state === 'resolved' ? t('resolved') : p.state === 'dropped' ? t('dropped for {n} chapters', { n: p.gap }) : p.state === 'never' ? t('not set up yet') : t('still open')
+  const open = (p: BookPromise) => {
+    const st = useStore.getState()
+    if (p.kind === 'line') st.selectEntry(p.key.slice(5))
+    else if (p.kind === 'seed') st.selectScene(p.key.slice(5))
+    else useStore.setState({ planTab: 'threads' })
+  }
+  return (
+    <section className="pl-promises">
+      <div className="pl-row">
+        <span className="pl-label pl-grow">{t('Promises to the reader')}</span>
+        <label className="pl-row pl-check-label"><input type="checkbox" className="sk-check" checked={all} onChange={e => setAll(e.target.checked)} />{t('Show the resolved ones')}</label>
+      </div>
+      {shown.length === 0 && <span className="sk-hint">{t('Every promise is resolved.')}</span>}
+      {shown.map(p => (
+        <div key={p.key} className="pl-row pl-promise">
+          <button type="button" className="pl-quiet pl-grow pl-promise-name" onClick={() => open(p)} style={p.kind === 'line' ? { color: lineColor(p.key.slice(5)) } : undefined}>{p.name}</button>
+          <span className="sk-hint">{kind[p.kind]} · {where(p)}</span>
+          <span className={p.state === 'dropped' || p.state === 'never' ? 'pl-warn' : 'sk-hint'}>{state(p)}</span>
+        </div>
+      ))}
+    </section>
+  )
+}
 
 function Lines() {
   const book = useStore(s => s.book)!

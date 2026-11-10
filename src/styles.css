@@ -538,6 +538,9 @@ button.pl-tracker-cell:not(:disabled):hover { box-shadow: inset 0 0 0 1px var(--
 .pl-chip-on { border-width: 2px !important; color: var(--text); }
 .pl-scene-note { margin: -8px 0 14px; font-family: var(--font); font-size: 12.5px; font-style: italic; color: var(--pl-ink-soft); text-align: center; white-space: pre-wrap; }
 .pl-structure, .pl-timeline, .pl-lines { max-width: 60rem; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
+.pl-promises { max-width: 60rem; margin: 0 auto 16px; display: flex; flex-direction: column; gap: 4px; }
+.pl-promise { gap: 12px; padding: 3px 0; border-bottom: 1px solid var(--border); }
+.pl-promise-name { text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pl-beat { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: 8px; background: var(--surface-1); border: 1px solid var(--border); }
 .pl-beat-name { font-weight: 600; }
 .pl-muted { color: var(--text-muted); }

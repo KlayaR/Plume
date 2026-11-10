@@ -30,6 +30,7 @@ import { DEFAULT_AI, DEFAULT_VOICE, ENTRY_TYPES, FAMILIES, VOICE_TYPES, familyOf
 import { adverbs, passives, echoes, sentences } from './analysis'
 import { backupsToRemove, versionsToRemove } from './backups'
 import { bookRepeats } from './repeats'
+import { promiseList } from './promises'
 import { aiTells, checkRules, expandVariables } from './voice'
 import { review, reviewChecks, topProblems } from './review'
 import { applyFixes, fixGuard, fixRequest, placeFixes } from './fixes'
@@ -1992,6 +1993,22 @@ describe('repetitions across the book', () => {
     expect(image.text).toBe('like a wounded wolf')
     expect(image.scenes).toHaveLength(2)
     expect(found.find(r => r.kind === 'opening')?.text).toBe('night fell')
+  })
+})
+
+describe('promises to the reader', () => {
+  it('puts story lines, threads and seeds in one list, dropped ones first', () => {
+    const line = entry({ slug: 'heist', type: 'storyline', name: 'The heist' })
+    const kept = entry({ slug: 'love', type: 'storyline', name: 'Love', resolved: true })
+    const ghost = entry({ slug: 'ghost', type: 'storyline', name: 'Ghost' })
+    const b = bookOf([scene('a', 'Text.', { lines: ['heist', 'love'], seeds: 'A coin from book 2' })], [line, kept, ghost])
+    for (let i = 2; i <= 6; i++) b.chapters.push({ ...b.chapters[0], id: `c${i}`, scenes: [scene(`s${i}`, 'More text.')] })
+    b.meta.threads = [{ id: 'w', text: 'Who wrote the letter?', kind: 'mystery' as never, planted: 'c5', touched: [], resolved: null }]
+    const list = promiseList(b)
+    expect(list.map(p => [p.name, p.state])).toEqual([
+      ['The heist', 'dropped'], ['Ghost', 'never'], ['A coin from book 2', 'open'], ['Who wrote the letter?', 'open'], ['Love', 'resolved'],
+    ])
+    expect(list[0].gap).toBe(5)
   })
 })
 
