@@ -29,6 +29,7 @@ import type { Book, Entry, Scene } from './types'
 import { DEFAULT_AI, DEFAULT_VOICE, ENTRY_TYPES, FAMILIES, VOICE_TYPES, familyOf } from './types'
 import { adverbs, passives, echoes, sentences } from './analysis'
 import { backupsToRemove, versionsToRemove } from './backups'
+import { bookRepeats } from './repeats'
 import { aiTells, checkRules, expandVariables } from './voice'
 import { review, reviewChecks, topProblems } from './review'
 import { applyFixes, fixGuard, fixRequest, placeFixes } from './fixes'
@@ -1971,6 +1972,26 @@ describe('planning reads more', () => {
     expect(planRules(b)).not.toContain('How the author plans')
     b.meta.ai = { ...b.meta.ai, planStyle: 'Every chapter ends on a cliffhanger.' }
     expect(planRules(b)).toContain('Every chapter ends on a cliffhanger.')
+  })
+})
+
+describe('repetitions across the book', () => {
+  it('finds the same words, images and openings in several scenes', () => {
+    const b = bookOf([
+      scene('a', 'Night fell. She clenched her jaw against the cold wind, angry like a wounded wolf.'),
+      scene('b', 'Night fell again. He clenched her jaw against nothing at all, quiet like a wounded wolf.'),
+      scene('c', 'Night fell. They clenched her jaw against the dark, then slept.'),
+      scene('d', 'Morning came. Nothing repeated here at all.'),
+    ])
+    const found = bookRepeats(b)
+    const phrase = found.find(r => r.kind === 'phrase')!
+    expect(phrase.text).toContain('clenched her jaw')
+    expect(phrase.scenes.map(s => s.id)).toEqual(['a', 'b', 'c'])
+    expect(found.filter(r => r.kind === 'phrase')).toHaveLength(1)
+    const image = found.find(r => r.kind === 'image')!
+    expect(image.text).toBe('like a wounded wolf')
+    expect(image.scenes).toHaveLength(2)
+    expect(found.find(r => r.kind === 'opening')?.text).toBe('night fell')
   })
 })
 

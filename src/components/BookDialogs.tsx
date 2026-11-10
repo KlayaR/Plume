@@ -16,7 +16,7 @@ import { volumeToBook } from '../library'
 import { fromBase64, toBase64, utf8 } from '../lib/zip'
 import { imageType } from '../lib/images'
 import { pageSizeFor } from '../lib/fonts'
-import { clearDone, estimate, goTo, markDone, missingSummaries, runTask, stopTask, toBible, useAgents, type AgentTask } from '../agents'
+import { clearDone, estimate, goTo, markDone, missingSummaries, runRepeats, runTask, stopTask, toBible, useAgents, type AgentTask } from '../agents'
 import { updateSummaries, useNotes } from '../writing'
 import BookView from './BookView'
 import { numLocale, translate, useT } from '../i18n'
@@ -203,6 +203,7 @@ const TASKS: { id: AgentTask; label: string; hint: string }[] = [
   { id: 'structure', label: 'Structure edit', hint: 'Reads the summaries (and your beats); suggests scenes to cut, move, merge or add.' },
   { id: 'audit', label: 'Deep audit, reading the files', hint: 'Claude reads the manuscript and bible files itself, read-only. The most thorough and the most expensive.' },
   { id: 'research', label: 'Research a real-world fact', hint: 'Searches the web and answers with sources; a finding can become a bible entry.' },
+  { id: 'repeats', label: 'Repetitions across the book', hint: 'Free, on this computer: the same words, images, scene openings and endings from one scene to another.' },
 ]
 
 export function AgentDialog({ onClose }: { onClose: () => void }) {
@@ -232,10 +233,10 @@ export function AgentDialog({ onClose }: { onClose: () => void }) {
               {task.id === 'research' && <input data-lt className="sk-input" value={question} placeholder={t('Your question, e.g. "How did a 1850 steam train brake?"')} onChange={e => setQuestion(e.target.value)} />}
             </div>
             <div className="pl-agent-run">
-              <span className="sk-hint">≈ {n(estimate(task.id))} {t('tokens')}</span>
+              <span className="sk-hint">{task.id === 'repeats' ? t('Free') : `≈ ${n(estimate(task.id))} ${t('tokens')}`}</span>
               {busy === task.id
                 ? <button type="button" className="sk-btn sk-btn-danger sk-btn-sm" onClick={stopTask}><Square size={13} /> {t('Stop')}</button>
-                : <button type="button" className="sk-btn sk-btn-sm" disabled={!!busy || (task.id === 'research' && !question.trim())} onClick={() => runTask(task.id, question)}>{task.id === 'research' ? <Search size={13} /> : <ListChecks size={13} />} {t('Run')}</button>}
+                : <button type="button" className="sk-btn sk-btn-sm" disabled={!!busy || (task.id === 'research' && !question.trim())} onClick={() => task.id === 'repeats' ? runRepeats() : runTask(task.id, question)}>{task.id === 'research' ? <Search size={13} /> : <ListChecks size={13} />} {t('Run')}</button>}
             </div>
           </div>
         ))}
@@ -252,7 +253,7 @@ export function AgentDialog({ onClose }: { onClose: () => void }) {
             <div className="pl-grow">
               <b>{i.title}</b>
               <div className="pl-finding-detail">{i.detail}</div>
-              {i.where && <button type="button" className="pl-quiet pl-chat-review" onClick={() => { goTo(i); onClose() }}>→ {i.where}</button>}
+              {(i.where || i.sceneId) && <button type="button" className="pl-quiet pl-chat-review" onClick={() => { goTo(i); onClose() }}>→ {i.where || t('The scene')}</button>}
             </div>
             <div className="pl-agent-run">
               {i.task === 'research' && !i.done && <button type="button" className="sk-btn sk-btn-sm" onClick={() => toBible(i)}>{t('To the bible')}</button>}

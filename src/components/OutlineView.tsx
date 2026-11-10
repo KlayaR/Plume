@@ -16,6 +16,7 @@ import { foldText } from '../lib/text'
 import { sceneCounts } from '../lib/stats'
 import { FOUNDATION_HINTS, FOUNDATION_LABELS, SERIES_LABELS, chapterBeats, mergeCards, outlineMarkdown, revisionChanges, revisionOrder, sameCard, type CardDraft, type RevisionChapter } from '../lib/outline'
 import { acceptAll, acceptFoundation, applyRevision, createEntriesFromOutline, stopEntries, acceptOutline, acceptTurningPoints, checkOutline, cleanOutline, detailAll, fixIssue, interviewFoundation, issueChapter, loadVersions, planChapter, planScene, proposeFoundation, proposeTurningPoints, rejectOutline, restoreVersion, reviseOutline, useOutline } from '../outline'
+import { addFindings } from '../agents'
 import { writeChapter, writeFromPlan } from '../editor/actions'
 import { askText, showMenu } from '../contextMenu'
 import { chapterMenu, sceneMenu } from '../menus'
@@ -39,6 +40,10 @@ export default function OutlineView() {
   const book = useStore(s => s.book)!
   const busy = useOutline(s => s.busy)
   const issues = useOutline(s => s.issues)
+  const keepIssues = () => {
+    addFindings('outline', (issues ?? []).map(x => { const c = issueChapter(book, x); return { title: x.issue, detail: `→ ${x.fix}`, where: c?.title || x.chapter, sceneId: c?.scenes[0]?.id } }))
+    useStore.getState().notify('ok', t('Kept in Agent tasks.'))
+  }
   const editing = useEditing(s => s.id)
   const pending = useOutline(s => Object.keys(s.proposals).length)
   const revising = useOutline(s => s.revising)
@@ -100,7 +105,7 @@ export default function OutlineView() {
 
       {issues && (
         <section className="pl-ol-issues">
-          <div className="pl-row"><b className="pl-grow">{issues.length ? t('What Claude would look at') : t('Claude found nothing to fix.')}</b><button type="button" className="sk-btn sk-btn-ghost sk-btn-sm sk-btn-icon" onClick={() => useOutline.setState({ issues: null })} aria-label={t('Close')}><X size={13} /></button></div>
+          <div className="pl-row"><b className="pl-grow">{issues.length ? t('What Claude would look at') : t('Claude found nothing to fix.')}</b>{issues.length > 0 && <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm" onClick={keepIssues} title={t('Keeps these points in Agent tasks, the book’s list of findings, to work through later')}>{t('Keep in the list')}</button>}<button type="button" className="sk-btn sk-btn-ghost sk-btn-sm sk-btn-icon" onClick={() => useOutline.setState({ issues: null })} aria-label={t('Close')}><X size={13} /></button></div>
           {issues.map((x, k) => (
             <div key={k} className="pl-ol-issue">
               <div className="pl-row"><span className="sk-label pl-grow">{issueChapter(book, x)?.title || x.chapter}</span>

@@ -1,19 +1,26 @@
 // Agent tasks on the whole book. Each shows its estimated cost first; results
 // go to a list (saved in .plume/agents.json) you work through: go to the scene,
 // mark done, or turn a research finding into a bible entry for review.
+// It is the book's one findings list: the free repetition check and the outline
+// check put theirs here too. Findings point to scenes by id, not by title.
 // The audit that reads the files itself gets read-only tools (Read, Grep, Glob)
 // in the book folder; research gets web search. Nothing here writes to the book.
 import { create } from 'zustand'
 import { invoke } from '@tauri-apps/api/core'
-import { useStore } from './store'
+import { findScene, useStore } from './store'
+import type { Book } from './lib/types'
 import { estimateTokens, newId } from './lib/text'
 import { ask, parseJSON, stopAsk } from './ai'
 import { staleScenes } from './writing'
 import { useChat, type Proposal } from './chat'
 import { t } from './i18n'
+import { locateQuote } from './lib/text'
+import { bookRepeats, type RepeatKind } from './lib/repeats'
 
-export type AgentTask = 'continuity' | 'structure' | 'audit' | 'research'
-export interface AgentItem { id: string; task: AgentTask; title: string; detail: string; where?: string; done?: boolean }
+export type AgentTask = 'continuity' | 'structure' | 'audit' | 'research' | 'repeats'
+/** Where a finding comes from: an agent task, or a check kept from elsewhere. */
+export type FindingSource = AgentTask | 'outline'
+export interface AgentItem { id: string; task: FindingSource; title: string; detail: string; where?: string; sceneId?: string; quote?: string; done?: boolean }
 
 interface AgentState { items: AgentItem[]; busy: AgentTask | null; progress: string }
 export const useAgents = create<AgentState>(() => ({ items: [], busy: null, progress: '' }))
@@ -34,7 +41,7 @@ const fr = () => useStore.getState().book?.meta.language === 'fr'
 /** The book through its summaries: chapter by chapter, scene by scene. */
 function summaries(): string {
   const book = useStore.getState().book!
-  return book.chapters.map((c, i) => `<chapter n="${i + 1}" title="${c.title}">\n${c.summary ? `${c.summary}\n` : ''}${c.scenes.map(s => `- ${s.title}: ${s.summary ?? (fr() ? '(pas de résumé)' : '(no summary)')}`).join('\n')}\n</chapter>`).join('\n')
+  return book.chapters.map((c, i) => `<chapter n="${i + 1}" title="${c.title}">\n${c.summary ? `${c.summary}\n` : ''}${c.scenes.map(s => `- [${s.id}] ${s.title}: ${s.summary ?? (fr() ? '(pas de résumé)' : '(no summary)')}`).join('\n')}\n</chapter>`).join('\n')
 }
 
 function bible(): string {
@@ -52,13 +59,51 @@ export function estimate(task: AgentTask): number {
     case 'structure': return estimateTokens(summaries()) + 1000
     case 'audit': return Math.round(bookTokens() * 1.3 + estimateTokens(bible()) + 3000)
     case 'research': return 6000
+    case 'repeats': return 0
   }
 }
 
 /** Scenes without an up-to-date summary: the summary-based tasks read past them. */
 export const missingSummaries = () => staleScenes(useStore.getState().book!).length
 
-const ITEMS = '[{"title": "...", "detail": "...", "where": "scene title, if any"}]'
+const ITEMS = '[{"title": "...", "detail": "...", "where": "scene title, if any", "scene": "the scene id in [brackets] or its file, if any", "quote": "a few exact words of the text, if any"}]'
+
+/** The scene a finding names: by id, by file, then by title. */
+export function sceneFor(book: Book, ref?: string, title?: string): string | undefined {
+  const scenes = book.chapters.flatMap(c => c.scenes)
+  const r = (ref ?? '').trim().replace(/^\[|\]$/g, '').split('\\').join('/')
+  const byRef = r ? scenes.find(s => s.id === r || s.path === r || (r.endsWith('.md') && s.path.endsWith(r))) : undefined
+  return (byRef ?? scenes.find(s => !!title && s.title.toLowerCase() === title.trim().toLowerCase()))?.id
+}
+
+/** Adds findings from a check to the list (the older open ones from the same source go). */
+export function addFindings(task: FindingSource, list: Omit<AgentItem, 'id' | 'task'>[]) {
+  const items = list.map(x => ({ ...x, id: newId(), task }))
+  useAgents.setState(s => ({ items: [...items, ...s.items.filter(i => i.task !== task || i.done)] }))
+  save()
+}
+
+const KIND_TITLE: Record<RepeatKind, string> = {
+  phrase: 'The same words in {n} scenes: “{text}”',
+  image: 'The same image in {n} scenes: “{text}”',
+  opening: '{n} scenes open the same way: “{text}…”',
+  ending: '{n} scenes end the same way: “{text}…”',
+}
+
+/** The free, local check: what the book repeats from one scene to another. */
+export function runRepeats() {
+  const book = useStore.getState().book!
+  const where = new Map(book.chapters.flatMap(c => c.scenes.map(s => [s.id, `${c.title || '…'} · ${s.title}`] as const)))
+  const found = bookRepeats(book)
+  addFindings('repeats', found.map(r => ({
+    title: t(KIND_TITLE[r.kind], { n: r.scenes.length, text: r.text }),
+    detail: r.scenes.map(s => `${where.get(s.id) ?? ''}: “${s.quote}”`).join('\n'),
+    where: where.get(r.scenes[0].id),
+    sceneId: r.scenes[0].id,
+    quote: r.scenes[0].quote,
+  })))
+  useStore.getState().notify('ok', found.length ? t('{n} findings in Agent tasks.', { n: found.length }) : t('Nothing repeats from scene to scene.'))
+}
 
 async function runList(task: AgentTask, opts: { system: string; message: string; tools?: string; cwd?: string }) {
   useAgents.setState({ busy: task, progress: '' })
@@ -67,11 +112,15 @@ async function runList(task: AgentTask, opts: { system: string; message: string;
       role: 'edit', system: opts.system, message: opts.message, tools: opts.tools, cwd: opts.cwd,
       onText: chunk => useAgents.setState(s => ({ progress: (s.progress + chunk).slice(-400) })),
     })
-    const list = parseJSON<{ title: string; detail: string; where?: string }[]>(reply)
+    const list = parseJSON<{ title: string; detail: string; where?: string; scene?: string; quote?: string }[]>(reply)
     if (!list) throw new Error(t('Claude’s reply could not be read. Try again.'))
-    const items = list.filter(x => x?.title).map(x => ({ id: newId(), task, title: String(x.title), detail: String(x.detail ?? ''), where: x.where ? String(x.where) : undefined }))
-    useAgents.setState(s => ({ items: [...items, ...s.items.filter(i => i.task !== task || i.done)] }))
-    save()
+    const book = useStore.getState().book!
+    const items = list.filter(x => x?.title).map(x => ({
+      title: String(x.title), detail: String(x.detail ?? ''), where: x.where ? String(x.where) : undefined,
+      sceneId: sceneFor(book, x.scene ? String(x.scene) : undefined, x.where ? String(x.where) : undefined),
+      quote: x.quote ? String(x.quote) : undefined,
+    }))
+    addFindings(task, items)
     useStore.getState().notify('ok', t('{n} findings in Agent tasks.', { n: items.length }))
   } catch (e) { useStore.getState().notify('error', (e as Error).message) }
   useAgents.setState({ busy: null, progress: '' })
@@ -125,9 +174,15 @@ export function toBible(item: AgentItem) {
   useStore.getState().notify('ok', t('Added to the review list in the Bible.'))
 }
 
-/** Opens the scene a finding names, if there is one with that title. */
+/** Opens the scene a finding names and shows its words, when it quotes some. */
 export function goTo(item: AgentItem) {
   const book = useStore.getState().book!
-  const s = book.chapters.flatMap(c => c.scenes).find(x => item.where && x.title.toLowerCase() === item.where.toLowerCase())
-  if (s) useStore.getState().selectScene(s.id)
+  const id = item.sceneId && findScene(book, item.sceneId) ? item.sceneId : sceneFor(book, undefined, item.where)
+  if (!id) return
+  useStore.getState().selectScene(id)
+  if (item.quote) setTimeout(() => import('./editor/actions').then(({ getEditorView }) => {
+    const v = getEditorView()
+    const at = v ? locateQuote(v.state.doc.toString(), item.quote!) : -1
+    if (v && at >= 0) { v.dispatch({ selection: { anchor: at, head: at + item.quote!.length }, scrollIntoView: true }); v.focus() }
+  }), 300)
 }
