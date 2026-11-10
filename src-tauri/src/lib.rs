@@ -231,6 +231,17 @@ fn remove_backup(app: AppHandle, name: String, file: String) -> Result<(), Strin
     if path.is_file() { std::fs::remove_file(path).map_err(|e| e.to_string()) } else { Ok(()) }
 }
 
+/// Removes one old version of a scene or entry: only a .md file two levels under .plume/history.
+#[tauri::command]
+fn remove_version(root: String, rel: String) -> Result<(), String> {
+    let parts: Vec<&str> = rel.split('/').collect();
+    if parts.len() != 4 || parts[0] != ".plume" || parts[1] != "history" || !rel.ends_with(".md") {
+        return Err(format!("Not an old version: {rel}"));
+    }
+    let path = safe_join(&root, &rel)?;
+    if path.is_file() { std::fs::remove_file(path).map_err(|e| e.to_string()) } else { Ok(()) }
+}
+
 /// Backups already made for a book, newest first.
 #[tauri::command]
 fn list_backups(app: AppHandle, name: String) -> Vec<String> {
@@ -412,6 +423,7 @@ pub fn run() {
             list_all,
             write_backup,
             remove_backup,
+            remove_version,
             list_backups,
             file_mtime,
             device_name

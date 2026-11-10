@@ -6,7 +6,7 @@ import { ask } from '@tauri-apps/plugin-dialog'
 import { Camera, GitCompare, Trash2 } from 'lucide-react'
 import { Dialog } from '../studio-kit/shell.js'
 import { useStore } from '../store'
-import { compareEntries, comparePlan, compareSnap, deleteSnap, listSnaps, makeSnap, planText, saveSnap, type EntryChange, type PlanChange, type Snap } from '../lib/snapshots'
+import { compareEntries, comparePlan, compareSnap, deleteSnap, listSnaps, makeSnap, planText, readSnap, saveSnap, type EntryChange, type PlanChange, type Snap, type SnapInfo } from '../lib/snapshots'
 import { CHAPTER_PLAN_KEYS, META_PLAN_KEYS, SCENE_PLAN_KEYS } from '../lib/undo'
 import { parseEntry } from '../lib/bible'
 import { diffWords, snapshot, snapshotEntry } from '../writing'
@@ -15,7 +15,7 @@ import { numLocale, useT } from '../i18n'
 export default function SnapshotsDialog({ onClose }: { onClose: () => void }) {
   const book = useStore(s => s.book)!
   const t = useT()
-  const [snaps, setSnaps] = useState<Snap[] | null>(null)
+  const [snaps, setSnaps] = useState<SnapInfo[] | null>(null)
   const [name, setName] = useState('')
   const [open, setOpen] = useState<string | null>(null)
   const [picked, setPicked] = useState<string | null>(null)
@@ -24,7 +24,8 @@ export default function SnapshotsDialog({ onClose }: { onClose: () => void }) {
   const refresh = () => listSnaps(book.root).then(setSnaps)
   useEffect(() => { refresh() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const snap = snaps?.find(s => s.id === open) ?? null
+  const [snap, setSnap] = useState<Snap | null>(null)
+  useEffect(() => { setSnap(null); if (open) readSnap(book.root, open).then(s => setSnap(s?.id === open ? s : null)) }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
   const kindOf = (k: 'changed' | 'new' | 'removed') => k === 'changed' ? t('Changed') : k === 'new' ? t('New since the snapshot') : t('Removed since the snapshot')
   const rows = useMemo(() => {
     if (!snap) return []
@@ -44,7 +45,7 @@ export default function SnapshotsDialog({ onClose }: { onClose: () => void }) {
     useStore.getState().notify('ok', t('Snapshot taken.'))
     refresh()
   }
-  const drop = async (s: Snap) => {
+  const drop = async (s: SnapInfo) => {
     if (!(await ask(t('Delete the snapshot “{name}”?', { name: s.name }), { title: t('Snapshots'), kind: 'warning' }))) return
     await deleteSnap(book.root, s.id)
     if (open === s.id) { setOpen(null); setPicked(null) }
@@ -91,7 +92,7 @@ export default function SnapshotsDialog({ onClose }: { onClose: () => void }) {
         {snaps && snaps.length === 0 && <span className="sk-hint">{t('No snapshot yet. A snapshot keeps the whole book as it is now, so you can compare later.')}</span>}
         {snaps?.map(s => (
           <div key={s.id} className={`pl-snap ${open === s.id ? 'pl-snap-open' : ''}`}>
-            <span className="pl-grow"><b>{s.name}</b> <span className="sk-hint">{new Date(s.date).toLocaleString(numLocale())} · {n(s.words)} {t('words')}</span></span>
+            <span className="pl-grow"><b>{s.name}</b> <span className="sk-hint">{new Date(s.date).toLocaleString(numLocale())} · {n(s.words)} {t('words')}{s.scope && ` · ${t('this chapter only')}`}</span></span>
             <button type="button" className="sk-btn sk-btn-sm" onClick={() => { setOpen(open === s.id ? null : s.id); setPicked(null) }}><GitCompare size={13} /> {t('Compare')}</button>
             <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm sk-btn-icon" aria-label={t('Delete')} onClick={() => drop(s)}><Trash2 size={13} /></button>
           </div>
@@ -109,7 +110,7 @@ export default function SnapshotsDialog({ onClose }: { onClose: () => void }) {
               </div>
             ))}
             {row?.diff && <div className="pl-diff">{parts.map((p, i) => p.kind === 'same' ? <span key={i}>{p.text}</span> : p.kind === 'add' ? <ins key={i}>{p.text}</ins> : <del key={i}>{p.text}</del>)}</div>}
-            {!snap.entries && <span className="sk-hint">{t('This snapshot is older than version 0.39: it holds the text of the scenes only.')}</span>}
+            {!snap.entries && !snap.scope && <span className="sk-hint">{t('This snapshot is older than version 0.39: it holds the text of the scenes only.')}</span>}
           </div>
         )}
       </div>

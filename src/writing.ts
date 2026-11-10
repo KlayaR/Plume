@@ -12,6 +12,7 @@ import { ask, hashText } from './ai'
 import { canRun } from './llm'
 import { findScene, useStore } from './store'
 import { arcsOf } from './lib/serial'
+import { versionsToRemove } from './lib/backups'
 import { t } from './i18n'
 
 export interface Darling { id: string; sceneId: string; sceneTitle: string; text: string; before: string; after: string; date: string }
@@ -140,6 +141,20 @@ export function snapshotEntry(root: string, e: Entry, force = false) {
   lastSnap.set(id, { at: Date.now(), text })
   const stamp = new Date().toISOString().replace(/[:.]/g, '-')
   invoke('write_text', { root, rel: `${historyDir(id)}/${stamp}.md`, content: text }).catch(() => {})
+}
+
+/** Thins out the old versions of every scene and entry (see versionsToRemove); once per book opening, in the background. */
+export async function pruneHistory(root: string) {
+  let files: string[] = []
+  try { files = await invoke<string[]>('list_files', { root, rel: '.plume/history' }) } catch { return }
+  const byDir = new Map<string, string[]>()
+  for (const rel of files) {
+    const at = rel.lastIndexOf('/')
+    byDir.set(rel.slice(0, at), [...byDir.get(rel.slice(0, at)) ?? [], rel.slice(at + 1)])
+  }
+  for (const [dir, names] of byDir) {
+    for (const n of versionsToRemove(names)) await invoke('remove_version', { root, rel: `${dir}/${n}` }).catch(() => {})
+  }
 }
 
 export async function listVersions(root: string, sceneId: string): Promise<{ rel: string; date: Date }[]> {

@@ -202,7 +202,7 @@ export async function writeChapter(chapterId: string) {
   if (!todo.length) return st.notify('warn', t('No empty scene with a plan note in this chapter.'))
   const [a, b] = book.meta.ai.chapterWords
   if (!(await askDialog(t('Claude will write {n} scene(s) of this chapter from their plan notes, about {a} to {b} words in all. Scenes that already have text are left alone, and a snapshot is taken first.', { n: todo.length, a, b }), { title: t('Write the chapter'), kind: 'info' }))) return
-  await saveSnap(book.root, makeSnap(book, t('Before Claude wrote “{title}”', { title: chapter.title || t('Chapter') })))
+  await saveSnap(book.root, makeSnap(book, t('Before Claude wrote “{title}”', { title: chapter.title || t('Chapter') }), [chapter.id]))
   useAI.setState({ running: 'chapter' })
   let done = 0
   const toFix: string[] = []

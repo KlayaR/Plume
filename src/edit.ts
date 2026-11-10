@@ -196,7 +196,7 @@ export async function fixChapter() {
     if (at) list.push({ id: newId(), ...at, insert: fixTypography(insert, book.meta.language), why })
   }
   try {
-    await saveSnap(book.root, makeSnap(book, t('Before editing “{title}”', { title: c.title || t('Chapter') })))
+    await saveSnap(book.root, makeSnap(book, t('Before editing “{title}”', { title: c.title || t('Chapter') }), [c.id]))
     for (const f of chosen.filter(x => x.ready !== undefined)) add(f.sceneId, f.quote, f.ready!, `${f.kind}: ${f.problem}`)
     const forClaude = chosen.filter(x => x.ready === undefined)
     if (forClaude.length) {
@@ -261,7 +261,7 @@ export async function fixFlagged(sceneIds: string[]) {
   const tokens = todo.reduce((k, x) => k + Math.round(x.words * 1.8) + 1500, 0)
   if (!(await askDialog(t('Claude will fix {n} scene(s): {points}. {cost}. A snapshot is taken first, and every fix shows in the text as a tracked change to accept or reject.', { n: todo.length, points, cost: costText(tokens) }), { title: t('Fix what’s flagged'), kind: 'info' }))) return
   const title = findScene(book, todo[0].id)!.chapter.title || t('Chapter')
-  await saveSnap(book.root, makeSnap(book, t('Before fixing “{title}”', { title })))
+  await saveSnap(book.root, makeSnap(book, t('Before fixing “{title}”', { title }), [...new Set(todo.map(x => findScene(book, x.id)!.chapter.id))]))
   useAI.setState({ running: 'chapter' })
   let placed = 0, missed = 0, before = 0, after = 0
   const still = new Set<string>()

@@ -144,7 +144,7 @@ export async function lineEdit(sceneId: string, view: EditorView | null) {
     })
     const edits = parseJSON<FixEdit[]>(reply)
     if (!Array.isArray(edits)) throw new Error(t('Claude’s reply could not be read. Try again.'))
-    await saveSnap(book.root, makeSnap(book, t('Before the line edit of “{title}”', { title: scene.title || chapter.title || t('Chapter') })))
+    await saveSnap(book.root, makeSnap(book, t('Before the line edit of “{title}”', { title: scene.title || chapter.title || t('Chapter') }), [chapter.id]))
     const doc = view.state.doc.toString()
     const { fixes, missed } = placeFixes(doc, edits, book.meta.language)
     const have = view.state.field(changesField)

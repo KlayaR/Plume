@@ -28,7 +28,7 @@ import { countSigns, textStats } from './stats'
 import type { Book, Entry, Scene } from './types'
 import { DEFAULT_AI, DEFAULT_VOICE, ENTRY_TYPES, FAMILIES, VOICE_TYPES, familyOf } from './types'
 import { adverbs, passives, echoes, sentences } from './analysis'
-import { backupsToRemove } from './backups'
+import { backupsToRemove, versionsToRemove } from './backups'
 import { aiTells, checkRules, expandVariables } from './voice'
 import { review, reviewChecks, topProblems } from './review'
 import { applyFixes, fixGuard, fixRequest, placeFixes } from './fixes'
@@ -570,6 +570,17 @@ describe('snapshots', () => {
     const changes = compareSnap(now, snap)
     expect(changes.map(c => [c.id, c.kind, c.delta])).toEqual([['a', 'changed', 1], ['c', 'new', 1], ['b', 'removed', -1]])
     expect(compareSnap(before, snap)).toEqual([])
+  })
+  it('keeps only the chapter being changed, and compares only that chapter', () => {
+    const before = bookOf([scene('a', 'one two')])
+    before.chapters.push({ ...before.chapters[0], id: 'other', scenes: [scene('z', 'elsewhere')] })
+    const snap = makeSnap(before, 'v1', [before.chapters[0].id])
+    expect(snap.scenes.map(s => s.id)).toEqual(['a'])
+    expect(snap.entries).toBeUndefined()
+    const now = bookOf([scene('a', 'one two')])
+    now.chapters.push({ ...now.chapters[0], id: 'other', scenes: [scene('z', 'changed'), scene('y', 'new')] })
+    expect(compareSnap(now, snap)).toEqual([])
+    expect(comparePlan(now, snap)).toEqual([])
   })
 })
 
@@ -1955,6 +1966,12 @@ describe('backups', () => {
     expect(kept.slice(0, 10)).toEqual(daily.slice(0, 10))
     expect(kept.length).toBeLessThan(18)
     expect(gone).not.toContain('notes.txt')
+  })
+  it('keeps every version of the last week, then one a day, then one a month', () => {
+    const now = Date.UTC(2026, 10, 10, 12)
+    const at = (days: number, h: number) => new Date(now - days * 864e5 - h * 36e5).toISOString().replace(/[:.]/g, '-') + '.md'
+    const names = [at(1, 1), at(1, 2), at(10, 1), at(10, 2), at(200, 1), at(205, 1), 'notes.md']
+    expect(versionsToRemove(names, now).sort()).toEqual([at(10, 2), at(205, 1)].sort())
   })
 })
 

@@ -749,6 +749,7 @@ const FR: Record<string, string> = {
   'Check while writing': 'Vérifier pendant l’écriture',
   'Off by default. When on, the scene’s text is sent to the server a moment after you stop typing, in Write mode too.': 'Désactivé par défaut. Activé, le texte de la scène est envoyé au serveur un instant après que vous cessez de taper, en mode Écriture aussi.',
   'Snapshot taken.': 'Instantané pris.',
+  'this chapter only': 'ce chapitre seulement',
   'Delete the snapshot “{name}”?': 'Supprimer l’instantané « {name} » ?',
   'Scene restored. Its previous text is in its history.': 'Scène restaurée. Son texte précédent est dans son historique.',
   'Name this snapshot, e.g. “before the rewrite of act 2”': 'Nommez cet instantané, p. ex. « avant la réécriture de l’acte 2 »',

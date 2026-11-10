@@ -1,6 +1,8 @@
 // Named snapshots of the whole book ("before the big rewrite"): the text, the bible
 // and the plan, kept in the book folder under .plume/snapshots (a .md file holding JSON, because the
 // folder lister only knows Markdown). Compare one with the book as it is now.
+// Before Claude changes a chapter, only that chapter is kept (a snapshot with a scope).
+// A small index lists them, so opening the list doesn't read every snapshot.
 import { invoke } from '@tauri-apps/api/core'
 import type { Book } from './types'
 import { countWords } from './text'
@@ -19,15 +21,37 @@ export interface Snap {
   entries?: { slug: string; name: string; path: string; file: string }[]
   /** Since 0.39: what the plan says, beside the scenes' text. */
   plan?: { chapters: PlanItem[]; scenes: PlanItem[]; meta: PlanFields }
+  /** Since 0.47: the chapters it holds, when it isn't the whole book. */
+  scope?: string[]
 }
+
+/** What the list shows of a snapshot, from the index. */
+export type SnapInfo = Pick<Snap, 'id' | 'name' | 'date' | 'words' | 'scope'>
+const INDEX = `${DIR}/index.json.md`
+const infoOf = (s: Snap): SnapInfo => ({ id: s.id, name: s.name, date: s.date, words: s.words, ...(s.scope ? { scope: s.scope } : {}) })
 
 export type PlanFields = Record<string, unknown>
 export interface PlanItem { id: string; title: string; fields: PlanFields }
 
 const fieldsOf = (o: object, keys: readonly string[]): PlanFields => Object.fromEntries(keys.flatMap(k => { const v = (o as PlanFields)[k]; return v === undefined ? [] : [[k, v]] }))
 
-export function makeSnap(book: Book, name: string): Snap {
-  const scenes = book.chapters.flatMap(c => c.scenes.map(s => ({ id: s.id, title: s.title, chapter: c.title, text: s.text })))
+/** A snapshot of the book, or only of the chapters in `scope` (no bible then, and the plan of those chapters only). */
+export function makeSnap(book: Book, name: string, scope?: string[]): Snap {
+  const chapters = scope ? book.chapters.filter(c => scope.includes(c.id)) : book.chapters
+  const scenes = chapters.flatMap(c => c.scenes.map(s => ({ id: s.id, title: s.title, chapter: c.title, text: s.text })))
+  if (scope) return {
+    id: new Date().toISOString().replace(/[:.]/g, '-'),
+    name: name.trim() || new Date().toLocaleDateString(),
+    date: new Date().toISOString(),
+    words: scenes.reduce((n, s) => n + countWords(s.text), 0),
+    scenes,
+    plan: {
+      chapters: chapters.map(c => ({ id: c.id, title: c.title, fields: fieldsOf(c, CHAPTER_PLAN_KEYS) })),
+      scenes: chapters.flatMap(c => c.scenes.map(s => ({ id: s.id, title: s.title, fields: fieldsOf(s, SCENE_PLAN_KEYS) }))),
+      meta: {},
+    },
+    scope: chapters.map(c => c.id),
+  }
   return {
     id: new Date().toISOString().replace(/[:.]/g, '-'),
     name: name.trim() || new Date().toLocaleDateString(),
@@ -43,28 +67,51 @@ export function makeSnap(book: Book, name: string): Snap {
   }
 }
 
-export const saveSnap = (root: string, snap: Snap) => invoke<void>('write_text', { root, rel: `${DIR}/${snap.id}.md`, content: JSON.stringify(snap) })
-export const deleteSnap = (root: string, id: string) => invoke<void>('move_to_trash', { root, rel: `${DIR}/${id}.md` })
+const writeIndex = (root: string, list: SnapInfo[]) => invoke<void>('write_text', { root, rel: INDEX, content: JSON.stringify(list) })
 
-/** The snapshots, newest first. */
-export async function listSnaps(root: string): Promise<Snap[]> {
+export async function saveSnap(root: string, snap: Snap) {
+  await invoke<void>('write_text', { root, rel: `${DIR}/${snap.id}.md`, content: JSON.stringify(snap) })
+  const list = await listSnaps(root)
+  await writeIndex(root, [infoOf(snap), ...list.filter(s => s.id !== snap.id)]).catch(() => {})
+}
+export async function deleteSnap(root: string, id: string) {
+  await invoke<void>('move_to_trash', { root, rel: `${DIR}/${id}.md` })
+  await writeIndex(root, (await listSnaps(root)).filter(s => s.id !== id)).catch(() => {})
+}
+
+/** One snapshot in full, to compare. */
+export async function readSnap(root: string, id: string): Promise<Snap | null> {
+  try {
+    const s = JSON.parse(await invoke<string>('read_text', { root, rel: `${DIR}/${id}.md` })) as Snap
+    return s && Array.isArray(s.scenes) ? s : null
+  } catch { return null }
+}
+
+/** The snapshots, newest first: from the index, or (a book from before 0.47) by reading each once and writing the index. */
+export async function listSnaps(root: string): Promise<SnapInfo[]> {
   let files: string[] = []
-  try { files = await invoke<string[]>('list_files', { root, rel: DIR }) } catch { return [] }
-  const out: Snap[] = []
-  for (const rel of files) {
-    try {
-      const s = JSON.parse(await invoke<string>('read_text', { root, rel })) as Snap
-      if (s && Array.isArray(s.scenes)) out.push(s)
-    } catch { /* a damaged snapshot is skipped */ }
+  try { files = (await invoke<string[]>('list_files', { root, rel: DIR })).filter(f => f !== INDEX) } catch { return [] }
+  const ids = new Set(files.map(f => f.split('/').pop()!.replace(/\.md$/, '')))
+  try {
+    const index = JSON.parse(await invoke<string>('read_text', { root, rel: INDEX })) as SnapInfo[]
+    if (Array.isArray(index) && index.length === ids.size && index.every(s => ids.has(s.id))) return index.sort((a, b) => b.date.localeCompare(a.date))
+  } catch { /* no index yet */ }
+  const out: SnapInfo[] = []
+  for (const id of ids) {
+    const s = await readSnap(root, id)
+    if (s) out.push(infoOf(s))
   }
-  return out.sort((a, b) => b.date.localeCompare(a.date))
+  out.sort((a, b) => b.date.localeCompare(a.date))
+  await writeIndex(root, out).catch(() => {})
+  return out
 }
 
 export interface SceneChange { id: string; title: string; chapter: string; kind: 'changed' | 'new' | 'removed'; before: string; after: string; delta: number }
 
 /** What differs between a snapshot and the book now: changed, new and removed scenes. */
 export function compareSnap(book: Book, snap: Snap): SceneChange[] {
-  const now = new Map(book.chapters.flatMap(c => c.scenes.map(s => [s.id, { s, chapter: c.title }] as const)))
+  const chapters = snap.scope ? book.chapters.filter(c => snap.scope!.includes(c.id)) : book.chapters
+  const now = new Map(chapters.flatMap(c => c.scenes.map(s => [s.id, { s, chapter: c.title }] as const)))
   const old = new Map(snap.scenes.map(s => [s.id, s]))
   const out: SceneChange[] = []
   for (const [id, { s, chapter }] of now) {
@@ -114,6 +161,7 @@ export function comparePlan(book: Book, snap: Snap): PlanChange[] {
       if (so && !samePlan(so.fields, sn, SCENE_PLAN_KEYS)) out.push({ id: s.id, level: 'scene', title: s.title || so.title, before: so.fields, after: sn })
     }
   }
+  if (snap.scope) return out
   const meta = fieldsOf(book.meta, META_PLAN_KEYS)
   if (!samePlan(snap.plan.meta, meta, META_PLAN_KEYS)) out.push({ id: 'book', level: 'book', title: '', before: snap.plan.meta, after: meta })
   return out

@@ -554,7 +554,7 @@ export const useStore = create<State>((set, get) => {
       const unreadable = takeBroken()
       if (unreadable.length) setTimeout(() => get().notify('warn', t('Plume couldn’t read the header of {list}: its plan and settings show as empty. A copy of each file as it was is in the book’s .plume/broken folder.', { list: unreadable.join(', ') })), 1500)
       import('./chat').then(m => m.loadChat(book))
-      import('./writing').then(m => m.loadNotes(book))
+      import('./writing').then(m => { m.loadNotes(book); setTimeout(() => m.pruneHistory(book.root), 20_000) })
       import('./scratch').then(m => m.loadScratch(book))
       import('./grids').then(m => m.loadGrids(book))
       import('./agents').then(m => m.loadAgents())
