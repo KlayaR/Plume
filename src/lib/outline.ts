@@ -2,6 +2,7 @@
 // book's outline as compact text, and Claude's JSON turned into a proposal
 // that the Outline tab shows before anything changes. No screen, no calls.
 import { countWords, foldText } from './text'
+import { renderEntry } from './context'
 import { FOUNDATION_KEYS, SERIES_KEYS, type SeriesPlan, type Book, type Chapter, type EntryType, type Foundation, type Lang, type Scene, type SceneMode } from './types'
 
 /** How many scenes a chapter gets: mostly one (the default), as each chapter needs, or within a range. */
@@ -35,6 +36,34 @@ What a chapter is (about ${a.toLocaleString('en-US')} to ${b.toLocaleString('en-
 - A concrete, immediate goal for the point-of-view character, not the big quest.
 - It escalates: each attempt gives “yes, but…” or “no, and what’s more…”.
 - It ends on a turn: a worse problem, a revelation that changes the plan, an image or a realisation for a quiet chapter, or a question for the next one.`
+}
+
+/** The rules for any planning request: Plume's, then the author's own planning style, which wins. */
+export function planRules(book: Book, mode: SceneMode = book.meta.sceneMode ?? { kind: 'one' }): string {
+  const style = book.meta.ai.planStyle?.trim()
+  const fr = book.meta.language === 'fr'
+  return [
+    outlineRules(book.meta.language, mode, book.meta.ai.chapterWords),
+    style ? `${fr ? 'Comment l’auteur planifie (prime sur ce qui précède) :' : 'How the author plans (it wins over the above):'}\n${style}` : '',
+  ].filter(Boolean).join('\n\n')
+}
+
+/** For planning a chapter: the full entries of the main characters and of those its cards bring in, main ones first. */
+export function planCast(book: Book, c: Chapter, n: number, max = 6): string {
+  const there = new Set(c.scenes.flatMap(s => [s.pov ?? '', ...(s.cast ?? [])]).filter(Boolean))
+  const chars = book.entries
+    .filter(e => e.type === 'character' && e.include !== 'secret' && e.include !== 'never' && (e.rank === 'main' || there.has(e.slug)))
+    .sort((a, b) => Number(b.rank === 'main') - Number(a.rank === 'main'))
+    .slice(0, max)
+  if (!chars.length) return ''
+  const lang = book.meta.language
+  const index = book.meta.series?.index ?? 1
+  return `<characters>\n${chars.map(e => renderEntry(e, 'full', n, lang, index, false, book.meta.fields?.character)).join('\n\n')}\n</characters>`
+}
+
+/** The chapters after a given one, one line each (title, goal, ending), so a plan doesn't take over what comes later. */
+export function laterText(book: Book, from: number): string {
+  return book.chapters.slice(from).map((c, i) => `${from + i + 1}. ${c.title || '…'}${c.goal ? ` · ${c.goal}` : ''}${c.ending ? ` → ${c.ending}` : ''}`).join('\n')
 }
 
 /** What a detailed card holds, for the request that fills it. */

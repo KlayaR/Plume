@@ -11,7 +11,7 @@ import { ENTRY_TYPES, FOUNDATION_KEYS, WORLD_TYPES, type Book, type Chapter, typ
 import { templateBeats } from './lib/structures'
 import { foldText } from './lib/text'
 import {
-  CHAPTER_JSON, SCENE_JSON, addVersion, findEntrySlug, cardOf, cardPatch, cardSpec, chapterText, foundationText, outlineRules, outlineText,
+  CHAPTER_JSON, SCENE_JSON, addVersion, findEntrySlug, cardOf, cardPatch, cardSpec, chapterText, foundationText, laterText, outlineText, planCast, planRules,
   readCard, readChapterProposal, readRevision, revisionChanges, revisionOrder, revisionText, seriesText, turningPointsText, versionOf, versionProposal,
   type CardDraft, type OutlineProposal, type OutlineRevision, type OutlineVersion,
 } from './lib/outline'
@@ -92,11 +92,13 @@ export async function planChapter(chapterId: string, kind: 'detail' | 'regenerat
   const message = [
     grounding(book),
     i > 0 ? `<outline_so_far>\n${outlineText(book, i)}\n</outline_so_far>` : '',
+    planCast(book, c, i + 1),
     `<chapter>\n${chapterText(book, c, i + 1, true)}\n</chapter>`,
     next ? `<next_chapter>\n${chapterText(book, next, i + 2)}\n</next_chapter>` : '',
-    outlineRules(book.meta.language, book.meta.sceneMode ?? { kind: 'one' }, book.meta.ai.chapterWords),
+    i + 2 < book.chapters.length ? `<later_chapters>\n${laterText(book, i + 2)}\n</later_chapters>` : '',
+    planRules(book),
     cardSpec(book.meta.language, !!book.meta.series),
-    `<task>\n${task}${direction.trim() ? `\n${F ? 'Consigne de l’auteur' : 'Author’s direction'} : ${direction.trim()}` : ''}\n${F ? 'Le chapitre suivant (<next_chapter>) doit rester possible : n’en reprends pas les événements.' : 'The next chapter (<next_chapter>) must stay possible: don’t take over its events.'}\n</task>`,
+    `<task>\n${task}${direction.trim() ? `\n${F ? 'Consigne de l’auteur' : 'Author’s direction'} : ${direction.trim()}` : ''}\n${F ? 'Les chapitres suivants (<next_chapter>, <later_chapters>) doivent rester possibles : n’en reprends pas les événements.' : 'The chapters after it (<next_chapter>, <later_chapters>) must stay possible: don’t take over their events.'}\n</task>`,
     `JSON: ${CHAPTER_JSON}`,
   ].filter(Boolean).join('\n\n')
   const raw = await run<unknown>(`${kind}:${chapterId}`, message, book)
@@ -117,8 +119,10 @@ export async function planScene(sceneId: string, direction = '') {
   const message = [
     grounding(book),
     i > 0 ? `<outline_so_far>\n${outlineText(book, i)}\n</outline_so_far>` : '',
+    planCast(book, c, i + 1),
     `<chapter>\n${chapterText(book, c, i + 1, true)}\n</chapter>`,
-    outlineRules(book.meta.language, book.meta.sceneMode ?? { kind: 'one' }, book.meta.ai.chapterWords),
+    i + 1 < book.chapters.length ? `<later_chapters>\n${laterText(book, i + 1)}\n</later_chapters>` : '',
+    planRules(book),
     cardSpec(book.meta.language, !!book.meta.series),
     `<task>\n${F ? `Réécris uniquement la fiche de la scène "${sceneId}" ; les autres scènes restent telles quelles.` : `Rewrite only the card of scene "${sceneId}"; the other scenes stay as they are.`}${direction.trim() ? `\n${F ? 'Consigne de l’auteur' : 'Author’s direction'} : ${direction.trim()}` : ''}\n</task>`,
     `JSON: ${SCENE_JSON}`,
@@ -187,7 +191,7 @@ export async function checkOutline() {
   const message = [
     grounding(book),
     `<outline>\n${outlineText(book)}\n</outline>`,
-    outlineRules(book.meta.language, book.meta.sceneMode ?? { kind: 'one' }, book.meta.ai.chapterWords),
+    planRules(book),
     F ? `Relis ce plan comme un directeur littéraire, au niveau des grands romans du genre. Liste au plus 12 problèmes réels, les plus importants d’abord :
 - causalité : trous, coïncidences qui règlent un problème, fils abandonnés, personnages qui disparaissent ;
 - préparations et récompenses : un indice, un objet, une promesse ou une révélation posés (lignes Reveals) et jamais repris, ou une révélation qui tombe sans avoir été préparée ;
@@ -239,7 +243,7 @@ export async function reviseOutline(instruction: string) {
   const message = [
     grounding(book),
     `<outline>\n${revisionText(book)}\n</outline>`,
-    outlineRules(book.meta.language, book.meta.sceneMode ?? { kind: 'one' }, book.meta.ai.chapterWords),
+    planRules(book),
     cardSpec(book.meta.language, !!book.meta.series),
     `<instruction>\n${instruction.trim()}\n</instruction>`,
     `<task>\n${F ? `Change ce plan comme l’auteur le demande dans <instruction>, et rien d’autre.

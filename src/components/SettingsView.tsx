@@ -304,6 +304,9 @@ function BookTab() {
           <span>{t('words')}</span>
         </span>
       </SettingRow>
+      <SettingRow label={t('How you plan')} description={t('Your own way of planning, in your own words (“chapters end on a cliffhanger”, “two points of view that alternate”). It goes with every planning request and wins over Plume’s rules.')}>
+        <textarea className="sk-input" rows={3} value={ai.planStyle ?? ''} onChange={e => setAi({ planStyle: e.target.value })} />
+      </SettingRow>
       <SettingRow label={t('Words a day')}>
         <input className="sk-input pl-num" type="number" min={0} step={100} value={goal.daily} onChange={e => setGoal({ daily: Math.max(0, Number(e.target.value) || 0) })} />
       </SettingRow>

@@ -385,6 +385,8 @@ export interface BookMeta {
     beatsWords: number
     /** A chapter's usual length, a guide shared between its scenes when Claude writes them from the plan. */
     chapterWords: [number, number]
+    /** Your own way of planning, in your words: it goes with every planning request and wins over Plume's. */
+    planStyle?: string
   }
   voice: Voice
   structure: { template: string; beats: Beat[] }

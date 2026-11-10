@@ -750,6 +750,8 @@ const FR: Record<string, string> = {
   'Off by default. When on, the scene’s text is sent to the server a moment after you stop typing, in Write mode too.': 'Désactivé par défaut. Activé, le texte de la scène est envoyé au serveur un instant après que vous cessez de taper, en mode Écriture aussi.',
   'Snapshot taken.': 'Instantané pris.',
   'this chapter only': 'ce chapitre seulement',
+  'How you plan': 'Votre façon de planifier',
+  'Your own way of planning, in your own words (“chapters end on a cliffhanger”, “two points of view that alternate”). It goes with every planning request and wins over Plume’s rules.': 'Votre façon de planifier, avec vos mots (« les chapitres finissent sur un suspense », « deux points de vue en alternance »). Elle accompagne chaque demande de plan et prime sur les règles de Plume.',
   'It’s in your text: change it as you like. Ctrl+Z takes it all back.': 'C’est dans votre texte : modifiez-le à votre guise. Ctrl+Z annule le tout.',
   'Claude\'s text': 'Texte de Claude',
   'Puts each paragraph in the text, to accept or reject one by one': 'Place chaque paragraphe dans le texte, à accepter ou refuser un par un',

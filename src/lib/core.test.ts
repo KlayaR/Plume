@@ -37,7 +37,7 @@ import { changesField, setChanges } from '../editor/marks'
 import { parseStoryTime } from './structures'
 import { makeZip, readZip, utf8, fromUtf8 } from './zip'
 import { bibleMarkdown, markdownToDocx, toDocx } from './export'
-import { outlineMarkdown } from './outline'
+import { outlineMarkdown, laterText, planCast, planRules } from './outline'
 import { arcsOf, beatChapter, bufferOf, hookFlags, maskSystem, mergeStats, readBox, releaseDates, releaseStreak, statConflicts, statsAt, systemBoxes, textKey, threadStates, volumesOf, weekReleases } from './serial'
 import { chapterTitleFor, royalRoadHtml, volumeBook } from './export'
 import { serialStorySoFar } from './context'
@@ -1949,6 +1949,28 @@ describe('board keys', () => {
     expect(boardMove(book, '2', 'right')).toEqual({ chapterId: 'empty', index: 0 })
     expect(boardMove(book, '1', 'up')).toBeNull()
     expect(boardMove(book, '3', 'right')).toBeNull()
+  })
+})
+
+describe('planning reads more', () => {
+  const hero = entry({ slug: 'ana', type: 'character', name: 'Ana', short: 'A thief.', full: 'A thief who fears heights.', rank: 'main' })
+  const guard = entry({ slug: 'bo', type: 'character', name: 'Bo', short: 'A guard.', full: 'Bo hates his job.' })
+  const extra = entry({ slug: 'cy', type: 'character', name: 'Cy', short: 'Nobody.', full: 'Not in this chapter.' })
+  it('gives the full entries of the main characters and of the chapter’s cast', () => {
+    const b = bookOf([scene('a', '', { cast: ['bo'] })], [hero, guard, extra])
+    const text = planCast(b, b.chapters[0], 1)
+    expect(text).toContain('fears heights')
+    expect(text).toContain('hates his job')
+    expect(text).not.toContain('Not in this chapter')
+    expect(text.indexOf('Ana')).toBeLessThan(text.indexOf('Bo'))
+  })
+  it('lists later chapters in one line each, and adds the author’s planning style', () => {
+    const b = bookOf([scene('a', '')])
+    b.chapters.push({ ...b.chapters[0], id: 'c2', title: 'The vault', goal: 'Get in', ending: 'Caught', scenes: [] })
+    expect(laterText(b, 1)).toBe('2. The vault · Get in → Caught')
+    expect(planRules(b)).not.toContain('How the author plans')
+    b.meta.ai = { ...b.meta.ai, planStyle: 'Every chapter ends on a cliffhanger.' }
+    expect(planRules(b)).toContain('Every chapter ends on a cliffhanger.')
   })
 })
 

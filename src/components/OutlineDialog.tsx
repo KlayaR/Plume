@@ -7,7 +7,7 @@ import { ListTree, Sparkles } from 'lucide-react'
 import { Dialog } from '../studio-kit/shell.js'
 import { useStore } from '../store'
 import { FOUNDATION_KEYS } from '../lib/types'
-import { findEntrySlug, outlineRules, type SceneMode } from '../lib/outline'
+import { findEntrySlug, planRules, type SceneMode } from '../lib/outline'
 import { ask, parseJSON } from '../ai'
 import { grounding, interviewFoundation } from '../outline'
 import { useT } from '../i18n'
@@ -46,7 +46,7 @@ export default function OutlineDialog({ onClose }: { onClose: () => void }) {
         system: fr
           ? 'Tu aides un romancier à bâtir le plan de son livre. Réponds uniquement en JSON valide, en français.'
           : 'You help a novelist build the outline of their book. Reply with valid JSON only.',
-        message: `${grounding(fresh)}\n\n${outlineRules(lang, mode, fresh.meta.ai.chapterWords)}\n\n${fr
+        message: `${grounding(fresh)}\n\n${planRules(fresh, mode)}\n\n${fr
           ? `Propose ${chapters} chapitres pour un livre d’environ ${words.toLocaleString('fr-FR')} mots. Chaque chapitre a son but immédiat (goal) et sa fin (ending : le tournant ou la question sur lesquels il se termine). Chaque scène a un titre court, un résumé de 2 à 3 phrases (qui veut quoi, ce qui l’en empêche, ce qui change à la fin), son personnage de point de vue et son lieu, avec les noms de la bible quand ils y sont. Pas encore d’étapes détaillées : elles viendront chapitre par chapitre.${points ? ' Place chaque tournant de <turning_points> dans le chapitre où il se produit, en respectant sa position (en % du livre) : ce chapitre reçoit "beat" avec le nom du tournant.' : ''}`
           : `Propose ${chapters} chapters for a book of about ${words.toLocaleString('en-US')} words. Each chapter gets its immediate goal (goal) and its ending (the turn or question it lands on). Each scene gets a short title, a 2-to-3-sentence summary (who wants what, what stands in the way, what changes by the end), its point-of-view character and its place, using the bible's names when they are there. No detailed beats yet: they come chapter by chapter.${points ? ' Place each turning point of <turning_points> in the chapter where it happens, at its position (% of the book): that chapter gets "beat" with the turning point\'s name.' : ''}`}\nJSON: [{"title": "...", "goal": "...", "ending": "...", "beat": "", "scenes": [{"title": "...", "summary": "...", "pov": "...", "place": "..."}]}]`,
       })
