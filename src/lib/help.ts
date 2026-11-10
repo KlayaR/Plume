@@ -101,6 +101,7 @@ export const HELP: HelpTopic[] = [
         'Right-click selected text for the same actions without leaving the page. Choose the model next to the buttons; Settings → Claude sets the model and effort for writing, for editing and planning, and for small jobs.',
         'Claude only sees what it needs: your rules, the bible entries named in the passage, and the text around it. The line under the button shows the size before you send; open it for the model, the prompt and each entry.',
         'On a proposal that replaces text, **Change by change** puts each difference in the text, with ✓ and ✕ to accept or reject it.',
+        '**Suggest** is for when you want to write it yourself: Claude reads the same as for Continue, then proposes three ways the scene could go on and asks one question, and writes nothing. **Note it** puts a suggestion at the cursor as ⟦a note⟧ to yourself. On a proposal of new text, **By paragraph** lets you take it a paragraph at a time, and **Edit** puts it in your text to rework.',
       ],
       fr: [
         '**Continuer** (Ctrl+Entrée) écrit la suite à partir du curseur. **Réécrire** travaille sur le texte sélectionné. **Étapes en prose** transforme une liste d\'étapes en passage. Actions rapides : **Développer, Raccourcir, Le montrer, Aiguiser les dialogues** (sur une sélection) et **Décrire** (au curseur).',
@@ -111,6 +112,7 @@ export const HELP: HelpTopic[] = [
         'Clic droit sur un texte sélectionné pour les mêmes actions sans quitter la page. Choisissez le modèle à côté des boutons ; Paramètres → Claude règle le modèle et l’effort pour écrire, pour corriger et planifier, et pour les petites tâches.',
         'Claude ne voit que ce qu\'il lui faut : vos règles, les fiches de la bible citées dans le passage, et le texte autour. La ligne sous le bouton montre la taille avant l’envoi ; ouvrez-la pour le modèle, le prompt et chaque fiche.',
         'Sur une proposition qui remplace du texte, **Modification par modification** place chaque différence dans le texte, avec ✓ et ✕ pour l’accepter ou la refuser.',
+        '**Suggérer**, pour quand vous voulez écrire vous-même : Claude lit la même chose que pour Continuer, propose trois façons dont la scène pourrait continuer et pose une question, sans rien écrire. **Noter** place une suggestion au curseur comme ⟦une note⟧ pour vous. Sur une proposition de texte nouveau, **Par paragraphe** la prend un paragraphe à la fois, et **Modifier** la met dans votre texte pour la retravailler.',
       ],
     },
   },
@@ -182,6 +184,7 @@ export const HELP: HelpTopic[] = [
         '**Structure** (under Analysis): pick a template (three acts, hero\'s journey…) and place its beats on your scenes. The **tension curve** shows how tense each scene is (Claude rates them; click the chart to correct), and warns when a beat that should peak sits on a calm scene.',
         '**Timeline** and **Story lines** show story time and which scene moves which thread. **Dashboard**: chapter-by-chapter charts and a "needs attention" list. **Revision**: tick off passes (structure, line edit, proofread) scene by scene. In **Story lines**, click a square to choose the scenes; **By scene** shows each scene.',
         '**Outline from a premise** (the **Claude** menu of the Outline): write a few lines, Claude proposes chapters and scenes, and you untick what you don\'t want.',
+        '**Agent tasks** (the More menu at the bottom, or Ctrl+K) is the book’s list of findings, and runs reads of the whole book: the **Editor’s letter** (Claude reads the whole manuscript in one request: what works, what to revise first, and continuity checked on the text), **A reader’s read** (interest chapter by chapter, and where attention drops), **Where the book left the plan** (each written scene against its card; the outline then shows what was written, and the cards that left the plan), **Series continuity** (this book against the other books of its series that Plume knows) and the free **Repetitions across the book**. The whole-book reads are large requests: their size shows before you run them.',
       ],
       fr: [
         '**Plan détaillé** : tout le plan sur une page, chaque champ modifiable sur place : le but et la fin de chaque chapitre, et pour chaque scène son résumé, point de vue, lieu, moment, qui est là, ses **étapes** numérotées, ce que le lecteur apprend, le trajet intérieur et le rythme. Claude écrit à partir de tout cela.',
@@ -193,6 +196,7 @@ export const HELP: HelpTopic[] = [
         '**Structure** (sous Analyse) : choisissez un modèle (trois actes, voyage du héros…) et placez ses temps forts sur vos scènes. La **courbe de tension** montre la tension de chaque scène (Claude les note ; cliquez le graphique pour corriger) et prévient quand un temps fort censé culminer tombe sur une scène calme.',
         '**Chronologie** et **Intrigues** montrent le temps de l\'histoire et quelle scène fait avancer quel fil. **Tableau de bord** : graphiques chapitre par chapitre et liste « à surveiller ». **Révision** : cochez les passes (structure, style, relecture) scène par scène. Dans **Intrigues**, cliquez sur une case pour choisir les scènes ; **Par scène** montre chaque scène.',
         '**Plan à partir d\'un pitch** (menu **Claude** du Plan détaillé) : écrivez quelques lignes, Claude propose chapitres et scènes, vous décochez ce que vous ne voulez pas.',
+        '**Tâches d’agent** (menu Plus en bas, ou Ctrl+K) est la liste des remarques du livre, et lance des lectures du livre entier : la **Lettre d’éditeur** (Claude lit tout le manuscrit en une requête : ce qui fonctionne, ce qu’il faut réviser d’abord, et la continuité vérifiée sur le texte), **La lecture d’un lecteur** (l’intérêt chapitre par chapitre, et où l’attention retombe), **Où le livre s’écarte du plan** (chaque scène écrite face à sa fiche ; le plan détaillé montre ensuite ce qui a été écrit, et les fiches dont le texte s’est écarté), **Continuité de la série** (ce tome face aux autres tomes que Plume connaît) et les **Répétitions dans tout le livre**, gratuites. Les lectures du livre entier sont de grosses requêtes : leur taille s’affiche avant de les lancer.',
       ],
     },
   },

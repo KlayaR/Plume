@@ -7,6 +7,15 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.48.0
+The last part of the November audit: reads of the whole book, a plan that sees where the text went, and Claude as a partner when you'd rather write.
+- **Editor's letter.** In Agent tasks (the More menu, or Ctrl+K), Claude reads the whole manuscript in one request and writes you a letter: what works, then what to revise first, with examples. It also checks continuity on the text itself (not on summaries), and those findings go to the list, each opening its scene with the words selected. The letter stays in the dialog until the next one.
+- **A reader's read.** Claude reads the whole book as a reader of its genre: how much it wants to keep reading, chapter by chapter, shown as a small curve, and the passages where it would have skimmed. Chapters where interest drops go to the list.
+- **Where the book left the plan.** Each written scene's summary is compared with its card. The outline now shows, under each written card, what the scene actually became, and marks the cards whose text left the plan in a way the later cards depend on.
+- **Series continuity.** For a book in a series, Claude checks it against the other books of the series that Plume knows (each one opened once in Plume): contradictions in facts, ages, relationships, what characters already know, and promises an earlier book made that this one forgets.
+- **Suggest, don't write.** The Assistant has **Suggest**: Claude reads what Continue reads, proposes three ways the scene could go on and asks one question, and writes nothing. **Note it** puts a suggestion at the cursor as ⟦a note⟧ to yourself, which Fill can write out later if you change your mind.
+- The whole-book reads are large requests (a full novel is about 250,000 tokens): their size shows next to each task before you run it.
+
 ## 0.47.0
 The third part of the November audit: one place for what to fix, a book-wide look at repetitions and promises, and safer, smaller calls.
 - **One list of findings.** Agent tasks is now the book's list of things to look at. Findings point to the scene itself (not to a title that every chapter shares), and "→ scene" opens it with the quoted words selected. The outline check's points can be kept there with **Keep in the list**, instead of vanishing when you close them.
