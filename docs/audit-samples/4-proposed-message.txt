@@ -1,0 +1,51 @@
+<bible>
+<entry type="character" name="Élise Varenne" aka="Élise, Lise, la Duchesse" pov="true">
+Jeune duchesse fière et imprudente, qui cache sa peur du feu.
+
+### Apparence
+Cheveux noirs, robe grise, une cicatrice au poignet.
+
+### Secrets
+Elle a allumé l’incendie de Valombre, enfant.
+Faits à ce stade de l’histoire :
+- Porte l’épée Aube sous sa cape.
+</entry>
+
+<entry type="character" name="Marc Delorme" aka="Marc, le capitaine">
+Capitaine de la garde, loyal, amoureux d’Élise sans le dire.
+</entry>
+
+<entry type="place" name="Valombre">
+Ville brûlée il y a quinze ans, encore en ruines au nord.
+</entry>
+
+<entry type="object" name="Aube">
+Épée d’argent qui chauffe à l’approche de la magie.
+</entry>
+
+<entry type="lore" name="La magie du feu">
+Toute flamme magique coûte un souvenir à celui qui l’allume.
+</entry>
+</bible>
+
+<previous_scene title="La danse">
+La musique commença quand Lise entra dans la salle.
+</previous_scene>
+
+<scene>
+Point de vue : Élise Varenne
+Lieu : Valombre
+Ce qui se passe dans la scène : Élise et Marc fuient le bal par les jardins et prennent la route de Valombre. Marc avoue qu’il savait pour l’incendie.
+Étapes, dans l’ordre :
+1. Ils franchissent le mur du jardin.
+2. Marc hésite à la grille : il doit choisir entre son serment et Élise.
+3. Sur la route, Aube chauffe : quelqu’un use de magie derrière eux.
+4. Marc avoue qu’il était à Valombre la nuit de l’incendie.
+Présents : Élise Varenne, Marc Delorme
+Trajet intérieur du point de vue : méfiante → trahie
+Rythme et ton : rapide, tendu
+</scene>
+
+Cette scène est à elle seule le chapitre : elle l’ouvre et le termine.
+
+Écris cette scène.

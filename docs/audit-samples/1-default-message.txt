@@ -1,0 +1,57 @@
+<bible>
+<entry type="object" name="Aube">
+Épée d’argent qui chauffe à l’approche de la magie.
+</entry>
+
+<entry type="character" name="Élise Varenne" aka="Élise, Lise, la Duchesse" pov="true">
+Jeune duchesse fière et imprudente, qui cache sa peur du feu.
+
+### Apparence
+Cheveux noirs, robe grise, une cicatrice au poignet.
+
+### Secrets
+Elle a allumé l’incendie de Valombre, enfant.
+Faits à ce stade de l’histoire :
+- Porte l’épée Aube sous sa cape.
+</entry>
+
+<entry type="lore" name="La magie du feu">
+Toute flamme magique coûte un souvenir à celui qui l’allume.
+</entry>
+</bible>
+
+<previous_scene title="La danse">
+La musique commença quand Lise entra dans la salle.
+</previous_scene>
+
+<scene>
+Point de vue : Élise Varenne
+Lieu : Valombre
+Ce qui se passe dans la scène : Élise et Marc fuient le bal par les jardins et prennent la route de Valombre. Marc avoue qu’il savait pour l’incendie.
+Étapes, dans l’ordre :
+1. Ils franchissent le mur du jardin.
+2. Marc hésite à la grille : il doit choisir entre son serment et Élise.
+3. Sur la route, Aube chauffe : quelqu’un use de magie derrière eux.
+4. Marc avoue qu’il était à Valombre la nuit de l’incendie.
+Présents : Élise Varenne, Marc Delorme
+Trajet intérieur du point de vue : méfiante → trahie
+Rythme et ton : rapide, tendu
+</scene>
+
+<story>
+(La scène commence ici.)
+</story>
+
+<task>
+Écris cette scène en entier d'après son plan (<scene>) : entre dans le moment, mène-la jusqu'à ce que sa note dit qui change, et termine là. Longueur indicative : au moins 3000 mots, jusqu’à environ 4500 ; plus courte ou plus longue si la scène le demande.
+Construction :
+- Donne au personnage du point de vue un but concret et immédiat dans cette scène (tiré de la note), pas la grande quête.
+- Chaque tentative complique la situation : « oui, mais… » ou « non, et en plus… ». Ne la résous pas trop facilement.
+- Le monde se révèle dans l’action et la difficulté, jamais dans une pause pour l’expliquer.
+- Cette scène ouvre le chapitre : ancre-le tout de suite dans le présent (lieu, moment, un détail sensoriel), au plus près de ce qui dérange. Pas de réveil, pas de monologue, pas de résumé du chapitre précédent.
+- Cette scène termine le chapitre : finis sur un tournant (le problème réglé en révèle un pire, une révélation qui oblige à revoir le plan, ou pour un chapitre calme une image forte, une prise de conscience muette, une résolution), ou sur une question à laquelle le chapitre suivant répondra. Pas de suspense coupé en pleine action, pas de résumé.
+</task>
+
+<scope>
+N'écris que cette scène : ce que demandent la consigne, les étapes ou la note de <scene>, et rien au-delà. <previous_scene> a déjà eu lieu : ne le répète pas. <next_scene> n'est là que pour la continuité : ses événements, ses personnages qui n'ont pas encore paru et ses révélations n'arrivent pas ici, ne les amorce pas et n'y fais pas allusion. Si la scène atteint ce que dit sa note, arrête-toi.
+</scope>
