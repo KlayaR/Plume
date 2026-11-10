@@ -3,7 +3,7 @@
 // proposal against your measurable rules, locally (zero tokens).
 import { invoke } from '@tauri-apps/api/core'
 import type { ActionId, Book, Entry, Lang, Rules, SceneRule } from './types'
-import { FANTASY_ID, FANTASY_PROMPT } from './defaults'
+import { FANTASY_BRIEF, FANTASY_BRIEF_ID, FANTASY_ID, FANTASY_PROMPT } from './defaults'
 import { adverbs, dialogue, passives, phrases, sentences, words } from './analysis'
 
 /** `fr` is the French text of a preset; your own prompts have one text. */
@@ -19,6 +19,7 @@ export const PRESETS: PromptSet[] = [
   { id: 'preset-literary', name: 'Literary', preset: true, text: 'Write literary prose in {book.language}, in {book.tense}. Favour concrete sensory detail over abstraction, subtext over stated emotion, and varied sentence rhythm. Let silences and gestures carry meaning. Avoid clichés.' },
   { id: 'preset-thriller', name: 'Thriller', preset: true, text: 'Write a tight thriller in {book.language}, in {book.tense}. Short paragraphs, short sentences in action, a question or threat open at the end of every scene. Every scene raises the stakes. No recap, no long description.' },
   { id: FANTASY_ID, name: 'Fantasy', preset: true, text: FANTASY_PROMPT.en, fr: FANTASY_PROMPT.fr },
+  { id: FANTASY_BRIEF_ID, name: 'Fantasy (short brief)', preset: true, text: FANTASY_BRIEF.en, fr: FANTASY_BRIEF.fr },
   { id: 'preset-romance', name: 'Romance', preset: true, text: 'Write romance in {book.language}, in {book.tense}, from {scene.pov}’s point of view. Tension in every exchange, emotions shown in the body and in what is not said. Banter with rhythm.' },
   { id: 'preset-noir', name: 'Noir', preset: true, text: 'Write noir in {book.language}, in {book.tense}. Dry, wry, cynical narration; hard images; dialogue that cuts. No sentimentality.' },
 ]

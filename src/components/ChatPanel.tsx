@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from 'react'
 import { ask } from '@tauri-apps/plugin-dialog'
 import { Check, History, ListPlus, MessageSquarePlus, Pencil, Pin, PinOff, Send, Square, Trash2, X } from 'lucide-react'
 import { useStore } from '../store'
-import { deleteChat, endInterview, newChat, openChat, renameChat, send, stopChat, turnIntoEntries, useChat } from '../chat'
+import { deleteChat, endInterview, newChat, openChat, renameChat, send, sendMode, CHAT_MODES, stopChat, turnIntoEntries, useChat } from '../chat'
 import { useT } from '../i18n'
 import { BackendModelSelect } from './ModelPresets'
 import { showMenu } from '../contextMenu'
@@ -116,6 +116,9 @@ export default function ChatPanel() {
           <textarea className="sk-input pl-chat-input" rows={3} value={text} placeholder={t('Your idea or question… (Ctrl+Enter)')}
             onChange={e => setText(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); go() } }} />
+          <div className="pl-chips" role="group" aria-label={t('Ways to brainstorm')}>
+            {CHAT_MODES.map(m => <button key={m.id} type="button" className="pl-chip" disabled={streaming !== null} title={t(m.hint)} onClick={() => { sendMode(m.id, text); setText('') }}>{t(m.label)}</button>)}
+          </div>
           <div className="pl-row pl-chat-model">
             <BackendModelSelect />
             {lastBackend && <span className="sk-hint" title={t('Answered by')}>{lastBackend.kind === 'openrouter' ? `OpenRouter · ${lastBackend.name}` : `Claude · ${lastBackend.name}`}</span>}

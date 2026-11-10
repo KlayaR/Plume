@@ -136,7 +136,7 @@ export function renderEntry(e: Entry, mode: Mode, chapter: number, lang: Lang, b
 }
 
 /** Samples of the author's prose, at most this many words in all (cached, so cheap after the first call). */
-export const SAMPLE_WORDS = 1500
+export const SAMPLE_WORDS = 6000
 
 /** Share of a scene that may come from Claude for it to still count as the author's own prose. */
 const OWN_SHARE = 0.25
@@ -165,7 +165,10 @@ export const isVoiceSample = (s: Scene) => s.voiceRef ?? autoSample(s)
  */
 export function proseSamples(book: Book, chapter: number): string[] {
   const out: string[] = []
-  let left = SAMPLE_WORDS
+  const budget = Math.max(0, book.meta.ai.sampleWords ?? SAMPLE_WORDS)
+  let left = budget
+  // One scene never takes it all: several passages show the voice better than one long one.
+  const share = (part: number) => Math.max(350, Math.round(budget * part))
   const take = (text: string, max: number) => {
     const t = firstWords(text.trim(), Math.min(max, left))
     const n = wordCount(t)
@@ -174,13 +177,13 @@ export function proseSamples(book: Book, chapter: number): string[] {
     left -= n
   }
   const clean = (s: Scene) => s.text.replace(/⟦[^⟧]*⟧/g, '')
-  for (const s of book.chapters.flatMap(c => c.scenes).filter(s => s.voiceRef === true)) if (left >= 60) take(clean(s), 600)
+  for (const s of book.chapters.flatMap(c => c.scenes).filter(s => s.voiceRef === true)) if (left >= 60) take(clean(s), share(0.3))
   const excerpts = book.entries.filter(e => e.type === 'excerpt' && e.full.trim() && e.include !== 'never' && e.include !== 'secret').sort((a, b) => a.slug.localeCompare(b.slug))
-  for (const e of excerpts) if (left >= 60) take(e.full, 450)
+  for (const e of excerpts) if (left >= 60) take(e.full, share(0.15))
   const own = book.chapters.flatMap((c, i) => (i + 1 === chapter ? [] : c.scenes))
     .filter(s => s.voiceRef === undefined && autoSample(s))
     .sort((a, b) => (a.status === 'done' ? 0 : 1) - (b.status === 'done' ? 0 : 1))
-  for (const s of own) if (left >= 60) take(clean(s), 350)
+  for (const s of own) if (left >= 60) take(clean(s), share(0.12))
   return out
 }
 

@@ -24,14 +24,26 @@ export async function writeShort(book: Book, e: Entry): Promise<string> {
 
 export interface Draft { short: string; full: string; aliases: string[] }
 
-/** Passages of the book that name `name`, a few hundred characters each. */
-export function snippetsFor(book: Book, name: string, max = 6): string[] {
+/**
+ * Passages of the book that name `name`: every one when they fit in `budget` characters,
+ * else an even sample from the whole book (not only its first chapters).
+ */
+export function snippetsFor(book: Book, name: string, budget = 40000): string[] {
+  const all = mentionsOf(book, name)
+  let size = 0
+  for (const p of all) size += p.length
+  if (size <= budget) return all
+  const keep = Math.max(6, Math.floor(all.length * budget / size))
+  return Array.from({ length: keep }, (_, i) => all[Math.floor(i * all.length / keep)])
+}
+
+function mentionsOf(book: Book, name: string, max = 2000): string[] {
   const matcher = buildMatcher([{ slug: 'x', type: 'lore', path: '', name, aliases: [], include: 'auto', links: [], short: '', full: '', facts: [], extra: {} }])
   const out: string[] = []
   for (const c of book.chapters) for (const s of c.scenes) {
     for (const p of s.text.split('\n')) {
       if (out.length >= max) return out
-      if (findMentions(p, matcher).length) out.push(p.length > 500 ? p.slice(0, 500) + '…' : p)
+      if (findMentions(p, matcher).length) out.push(p.length > 900 ? p.slice(0, 900) + '…' : p)
     }
   }
   return out
@@ -40,7 +52,7 @@ export function snippetsFor(book: Book, name: string, max = 6): string[] {
 /** A first draft of a bible entry from the passages that mention the name. */
 export async function draftEntry(book: Book, name: string, type: EntryType, context: string): Promise<Draft> {
   const fr = book.meta.language === 'fr'
-  const passages = [context, ...snippetsFor(book, name)].filter(Boolean).filter((p, i, a) => a.indexOf(p) === i).slice(0, 7)
+  const passages = [context, ...snippetsFor(book, name)].filter(Boolean).filter((p, i, a) => a.indexOf(p) === i)
   const headings = typeInfo(type).headings[book.meta.language]
   const known = book.entries.filter(e => e.type !== 'style' && e.short.trim() && e.include !== 'secret').slice(0, 40).map(e => `- ${e.name}: ${e.short.trim()}`).join('\n')
   const reply = await ask({ json: 'object',

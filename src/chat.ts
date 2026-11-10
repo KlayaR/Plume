@@ -19,8 +19,10 @@ import { t } from './i18n'
 /** What the chat asks for: a Claude model, or an OpenRouter model id, as chosen under the input. */
 function chatChoice(): { model: Model; effort: Effort; orModel?: string } {
   const { chatBackend, chatModel } = useStore.getState().prefs
-  if (chatBackend === 'openrouter' && chatModel) return { model: 'sonnet', effort: 'low', orModel: chatModel }
-  return { model: (['haiku', 'sonnet', 'opus', 'fable'].includes(chatModel) ? chatModel : 'sonnet') as Model, effort: 'low' }
+  // Thinking with you is worth the effort set for editing and planning (Settings → Claude), not the lowest.
+  const effort = useStore.getState().prefs.roles.edit.effort
+  if (chatBackend === 'openrouter' && chatModel) return { model: 'sonnet', effort, orModel: chatModel }
+  return { model: (['haiku', 'sonnet', 'opus', 'fable'].includes(chatModel) ? chatModel : 'sonnet') as Model, effort }
 }
 
 export interface Message { role: 'user' | 'assistant'; text: string }
@@ -254,6 +256,33 @@ export async function send(text: string) {
 }
 
 export const stopChat = () => stopAsk()
+
+/** Ways to brainstorm in one click: what you typed is the subject (or, with nothing typed, what the conversation is about). */
+export const CHAT_MODES = [
+  { id: 'options', label: 'Ten options', hint: 'Ten different directions, one line each, from the expected to the surprising' },
+  { id: 'whatif', label: 'What if…', hint: 'Five "what if" turns, with what each would break and open' },
+  { id: 'holes', label: 'Poke holes', hint: 'The weak points a careful reader would not accept, and the simplest fix for each' },
+] as const
+export type ChatMode = typeof CHAT_MODES[number]['id']
+
+export function sendMode(mode: ChatMode, text: string) {
+  const book = useStore.getState().book
+  if (!book) return
+  const fr = book.meta.language === 'fr'
+  const about = text.trim() || (fr ? 'ce dont nous venons de parler' : 'what we were just talking about')
+  const ask = {
+    options: fr
+      ? `Donne-moi dix pistes vraiment différentes pour : ${about}. Une ligne chacune, de la plus attendue à la plus surprenante, sans les développer. Elles doivent tenir avec la bible et le plan.`
+      : `Give me ten really different directions for: ${about}. One line each, from the most expected to the most surprising, not developed. They must hold with the bible and the plan.`,
+    whatif: fr
+      ? `Propose cinq « et si… » qui changeraient vraiment : ${about}. Pour chacun : ce que cela casserait dans le plan, et ce que cela ouvrirait.`
+      : `Give me five "what if…" turns that would really change: ${about}. For each: what it would break in the plan, and what it would open.`,
+    holes: fr
+      ? `Fais l’avocat du diable sur : ${about}. Les failles, ce qu’un lecteur attentif n’accepterait pas, ce qui contredit la bible ou le plan. Puis, pour chacune, la correction la plus simple.`
+      : `Play devil’s advocate on: ${about}. The weak points, what a careful reader would not accept, what contradicts the bible or the plan. Then the simplest fix for each.`,
+  }[mode]
+  return send(ask)
+}
 export const clearChat = () => deleteChat(useChat.getState().chatId)
 
 /** Interview mode for one entry: the chat opens on Claude's first question. */

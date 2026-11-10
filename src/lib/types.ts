@@ -387,6 +387,8 @@ export interface BookMeta {
     chapterWords: [number, number]
     /** Your own way of planning, in your words: it goes with every planning request and wins over Plume's. */
     planStyle?: string
+    /** Words of your own prose sent as samples of your voice (cached, so cheap after the first request). */
+    sampleWords?: number
   }
   voice: Voice
   structure: { template: string; beats: Beat[] }
