@@ -210,7 +210,7 @@ export async function runManuscript() {
   }
   const items = toItems(book, data.continuity)
   addFindings('manuscript', items)
-  useStore.getState().notify('ok', t('The editor’s letter is ready, with {n} findings.', { n: items.length }))
+  useStore.getState().notify('ok', t('The editor’s letter is ready, with {n} finding(s).', { n: items.length }))
 }
 
 /** The reverse outline: where each written scene left its card. */

@@ -29,17 +29,40 @@ export interface AskOptions {
   json?: 'list' | 'object'
 }
 
+// The command line's schema must be an object with named parts: a bare { type: 'object' } comes back
+// as {} (seen on the real command line), so both shapes travel inside a wrapper, taken off on return.
 const SCHEMA = {
   list: JSON.stringify({ type: 'object', properties: { items: { type: 'array' } }, required: ['items'] }),
-  object: JSON.stringify({ type: 'object' }),
+  object: JSON.stringify({ type: 'object', properties: { value: { type: 'object', additionalProperties: true } }, required: ['value'] }),
 }
 
-/** What a JSON task returns to its caller: the list itself, not the object the schema wraps it in. */
-function unwrap(text: string, json: AskOptions['json']): string {
-  if (json !== 'list') return text
-  const d = parseJSON<{ items?: unknown }>(text)
-  return d && !Array.isArray(d) && Array.isArray(d.items) ? JSON.stringify(d.items) : text
+/** What a JSON task returns to its caller: the list or the object itself, not the wrapper the schema puts it in. */
+export function unwrap(text: string, json: AskOptions['json']): string {
+  if (!json) return text
+  const d = parseJSON<{ items?: unknown; value?: unknown }>(text)
+  if (!d || Array.isArray(d)) return text
+  const keys = Object.keys(d)
+  // Sometimes the inside comes as a string of JSON: read it too.
+  const inner = (v: unknown) => (typeof v === 'string' ? parseJSON<unknown>(v) : v)
+  if (json === 'list') { const v = inner(d.items); return Array.isArray(v) ? JSON.stringify(revive(v)) : text }
+  const v = keys.length === 1 && keys[0] === 'value' ? inner(d.value) : null
+  return v && typeof v === 'object' && !Array.isArray(v) ? JSON.stringify(revive(v)) : text
 }
+
+/** A list or object that arrived as a string of JSON inside the reply (the command line does this at times) becomes itself again. */
+function revive(v: unknown): unknown {
+  if (typeof v === 'string') {
+    const s = v.trim()
+    if (!/^[[{][\s\S]*[\]}]$/.test(s)) return v
+    try { const d: unknown = JSON.parse(s); return d && typeof d === 'object' ? revive(d) : v } catch { return v }
+  }
+  if (Array.isArray(v)) return v.map(revive)
+  if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, revive(x)]))
+  return v
+}
+
+/** A reply a JSON task can use: it parses, and an object isn't empty. */
+const usable = (text: string) => { const d = parseJSON<unknown>(text); return d !== null && (Array.isArray(d) || Object.keys(d as object).length > 0) }
 
 /**
  * Cheap mode: past the 5-hour usage threshold set in Settings, every call
@@ -58,7 +81,7 @@ let current: string | null = null
 
 export async function ask(o: AskOptions): Promise<string> {
   const first = unwrap(await askOnce(o), o.json)
-  if (!o.json || parseJSON(first) !== null) return first
+  if (!o.json || usable(first)) return first
   return unwrap(await askOnce(o), o.json)
 }
 

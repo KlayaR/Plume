@@ -130,7 +130,7 @@ export async function backupNow(book: Book): Promise<string> {
   const zip = await makeZip(entries)
   const key = backupKey(book)
   const path = await invoke<string>('write_backup', { name: key, date: dayKey(), data: toBase64(zip) })
-  const names = (await invoke<string[]>('list_backups', { name: key }).catch(() => [] as string[])).map(p => p.split(/[\/]/).pop()!)
+  const names = (await invoke<string[]>('list_backups', { name: key }).catch(() => [] as string[])).map(p => p.split(/[\\/]/).pop()!)
   for (const file of backupsToRemove(names)) await invoke('remove_backup', { name: key, file }).catch(() => {})
   try {
     const done = JSON.parse(localStorage.getItem(BACKED) ?? '{}')

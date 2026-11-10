@@ -7,6 +7,13 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.48.1
+Fixes found by checking 0.45.1 to 0.48.0 again, this time in the installed app with real Claude.
+- **Claude's plans and drafts failed or came back empty (since 0.47.0).** Detail and Regenerate in the Outline, entry drafts, and the new whole-book reads asked the command line for an answer in a shape it returns as empty. They now ask for it in a shape that works, and an empty answer is asked again once. Lists (line edits, checks, suggestions) were not affected.
+- **Old backups were never removed (since 0.46.0).** The rule "the last ten, then one a week for half a year" never matched a file on Windows, so every daily backup stayed. It now applies at the next backup.
+- **Planning a chapter sends the characters its cards name.** Only the main characters and the point-of-view character were sent; the cast written on the cards is now recognised by name.
+- "1 findings" reads "1 finding(s)".
+
 ## 0.48.0
 The last part of the November audit: reads of the whole book, a plan that sees where the text went, and Claude as a partner when you'd rather write.
 - **Editor's letter.** In Agent tasks (the More menu, or Ctrl+K), Claude reads the whole manuscript in one request and writes you a letter: what works, then what to revise first, with examples. It also checks continuity on the text itself (not on summaries), and those findings go to the list, each opening its scene with the words selected. The letter stays in the dialog until the next one.

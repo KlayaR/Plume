@@ -50,7 +50,8 @@ export function planRules(book: Book, mode: SceneMode = book.meta.sceneMode ?? {
 
 /** For planning a chapter: the full entries of the main characters and of those its cards bring in, main ones first. */
 export function planCast(book: Book, c: Chapter, n: number, max = 6): string {
-  const there = new Set(c.scenes.flatMap(s => [s.pov ?? '', ...(s.cast ?? [])]).filter(Boolean))
+  // A card names its point of view by entry, and who is there by name (as typed or as Claude wrote it).
+  const there = new Set(c.scenes.flatMap(s => [s.pov ?? '', ...(s.cast ?? []).map(n => findEntrySlug(book, n, ['character']) ?? '')]).filter(Boolean))
   const chars = book.entries
     .filter(e => e.type === 'character' && e.include !== 'secret' && e.include !== 'never' && (e.rank === 'main' || there.has(e.slug)))
     .sort((a, b) => Number(b.rank === 'main') - Number(a.rank === 'main'))

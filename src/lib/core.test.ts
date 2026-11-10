@@ -1960,7 +1960,7 @@ describe('planning reads more', () => {
   const guard = entry({ slug: 'bo', type: 'character', name: 'Bo', short: 'A guard.', full: 'Bo hates his job.' })
   const extra = entry({ slug: 'cy', type: 'character', name: 'Cy', short: 'Nobody.', full: 'Not in this chapter.' })
   it('gives the full entries of the main characters and of the chapter’s cast', () => {
-    const b = bookOf([scene('a', '', { cast: ['bo'] })], [hero, guard, extra])
+    const b = bookOf([scene('a', '', { cast: ['Bo'] })], [hero, guard, extra])
     const text = planCast(b, b.chapters[0], 1)
     expect(text).toContain('fears heights')
     expect(text).toContain('hates his job')

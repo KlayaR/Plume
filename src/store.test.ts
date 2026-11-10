@@ -59,3 +59,17 @@ describe('save queue', () => {
     expect(written.get('manuscript/c/a.md')).toContain('Will not save.')
   })
 })
+
+describe('JSON replies from the command line', () => {
+  it('takes the wrapper off a list and off an object, and reads insides that came as text', async () => {
+    const { unwrap } = await import('./ai')
+    expect(unwrap('{"items":[{"a":1}]}', 'list')).toBe('[{"a":1}]')
+    expect(unwrap('{"value":{"letter":"Hi","continuity":[{"title":"t"}]}}', 'object')).toBe('{"letter":"Hi","continuity":[{"title":"t"}]}')
+    // The command line sometimes sends a list inside as a string of JSON.
+    expect(JSON.parse(unwrap('{"value":{"letter":"Hi","continuity":"[{\\"title\\": \\"t\\"}]"}}', 'object'))).toEqual({ letter: 'Hi', continuity: [{ title: 't' }] })
+    // OpenRouter and older replies come without a wrapper: left as they are.
+    expect(unwrap('[{"a":1}]', 'list')).toBe('[{"a":1}]')
+    expect(unwrap('{"goal":"g","scenes":[]}', 'object')).toBe('{"goal":"g","scenes":[]}')
+    expect(unwrap('plain prose', undefined)).toBe('plain prose')
+  })
+})

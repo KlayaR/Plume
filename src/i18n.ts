@@ -757,7 +757,7 @@ const FR: Record<string, string> = {
   'Free, on this computer: the same words, images, scene openings and endings from one scene to another.': 'Gratuit, sur cet ordinateur : les mêmes mots, images, débuts et fins de scène d’une scène à l’autre.',
   'The scene': 'La scène',
   'Free': 'Gratuit',
-  'The editor’s letter is ready, with {n} findings.': 'La lettre d’éditeur est prête, avec {n} remarques.',
+  'The editor’s letter is ready, with {n} finding(s).': 'La lettre d’éditeur est prête, avec {n} remarque(s).',
   'No written scene has both a plan card and an up-to-date summary yet. Update summaries first.': 'Aucune scène écrite n’a encore à la fois une fiche de plan et un résumé à jour. Mettez d’abord les résumés à jour.',
   'The book follows its plan.': 'Le livre suit son plan.',
   'Chapter {n}: interest {v}/10': 'Chapitre {n} : intérêt {v}/10',
