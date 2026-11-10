@@ -9,7 +9,7 @@ import type { Override } from '../lib/context'
 import { alternatives, assistantChoice, currentContext, pickAlternative, retryFixing, runAction, stopAction, useAI } from '../editor/actions'
 import { diffWords, learnTaste, staleScenes, useNotes } from '../writing'
 import { getEditorView } from '../editor/actions'
-import { allPrompts } from '../lib/voice'
+import { allPrompts, fixable } from '../lib/voice'
 import { BackendModelSelect } from './ModelPresets'
 import { isCheap } from '../ai'
 import { numLocale, useT } from '../i18n'
@@ -171,7 +171,7 @@ export default function ContextPanel() {
               <span className="sk-num">{c.detail}</span>
             </div>
           ))}
-          {checks.some(c => !c.ok) && (
+          {fixable(checks).length > 0 && (
             <button type="button" className="sk-btn sk-btn-sm" onClick={retryFixing}><Wand2 size={14} /> {t('Retry fixing these')}</button>
           )}
         </section>

@@ -7,9 +7,10 @@ import { findScene, useStore } from './store'
 import { ask, effective, parseJSON } from './ai'
 import { buildMatcher, findMentions, renderEntry, systemPrompt } from './lib/context'
 import { chapterText } from './lib/outline'
-import { checkRules, type Check } from './lib/voice'
+import { checkRules, fixable, type Check } from './lib/voice'
 import { reviewChecks } from './lib/review'
-import { applyFixes, fixGuard, fixRequest, placeFixes, type FixEdit } from './lib/fixes'
+import { applyFixes, fixGuard, fixRequest, placeFixes, placeOf, type FixEdit } from './lib/fixes'
+import { fixTypography } from './lib/typography'
 import { isLocked } from './lib/serial'
 import { newId } from './lib/text'
 import { makeSnap, saveSnap } from './lib/snapshots'
@@ -187,12 +188,13 @@ export async function fixChapter() {
   const n = book.chapters.indexOf(c) + 1
   useEdit.setState({ stage: 'fixing' })
   const byScene: Record<string, Change[]> = {}
+  // The same matching as every other fix: exact first, then whatever spaces and apostrophes Claude copied.
   const add = (sceneId: string, find: string, insert: string, why: string) => {
     const s = findScene(useStore.getState().book, sceneId)?.scene
-    if (!s || !find || find === insert) return
+    if (!s || !find.trim() || find === insert) return
     const list = byScene[sceneId] ??= []
-    const at = locate(s.text, find, list)
-    if (at >= 0) list.push({ id: newId(), from: at, to: at + find.length, insert, why })
+    const at = placeOf(s.text, find, list)
+    if (at) list.push({ id: newId(), ...at, insert: fixTypography(insert, book.meta.language), why })
   }
   try {
     await saveSnap(book.root, makeSnap(book, t('Before editing “{title}”', { title: c.title || t('Chapter') })))
@@ -236,11 +238,8 @@ export async function fixChapter() {
   }
 }
 
-/** What a text fails: your rules, then every report well over its target, explained in the book's language. */
-export const flagged = (text: string, book: Book): Check[] => [
-  ...checkRules(text, book),
-  ...reviewChecks(text, book, { every: true, say: s => translate(book.meta.language, s) }),
-].filter(c => !c.ok)
+/** What Claude may fix in a text: banned words, AI habits, and your limits on sentences, lines and dashes (not rates). */
+export const flagged = (text: string, book: Book): Check[] => fixable(checkRules(text, book))
 
 /**
  * Fixes what the scorecard flags in scenes already written, as tracked changes.
@@ -258,7 +257,7 @@ export async function fixFlagged(sceneIds: string[]) {
   const open = written.filter(f => !isLocked(f!.chapter, st.unlocked))
   if (written.length && !open.length) return st.notify('warn', t('This chapter is published: press Edit anyway above it to change it.'))
   const todo = open.map(f => ({ id: f!.scene.id, words: f!.scene.text.split(/\s+/).length, failed: flagged(f!.scene.text, book) })).filter(x => x.failed.length)
-  if (!todo.length) return st.notify('ok', t('Nothing flagged here: your rules and the reports are within their targets.'))
+  if (!todo.length) return st.notify('ok', t('Nothing to fix here: no banned word, no AI habit, and every sentence and line of dialogue within your limits.'))
   const points = [...new Set(todo.flatMap(x => x.failed.map(c => t(c.label))))].join(', ')
   const tokens = todo.reduce((k, x) => k + Math.round(x.words * 1.8) + 1500, 0)
   if (!(await askDialog(t('Claude will fix {n} scene(s): {points}. {cost}. A snapshot is taken first, and every fix shows in the text as a tracked change to accept or reject.', { n: todo.length, points, cost: costText(tokens) }), { title: t('Fix what’s flagged'), kind: 'info' }))) return

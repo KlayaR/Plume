@@ -46,8 +46,8 @@ export async function draftEntry(book: Book, name: string, type: EntryType, cont
   const reply = await ask({
     role: 'edit',
     system: fr
-      ? 'Tu aides un romancier de fantasy à tenir sa bible. Tu ne décris que ce que le texte dit ou implique clairement ; tu n’inventes rien. Réponds uniquement en JSON valide, en français.'
-      : 'You help a fantasy novelist keep their story bible. Describe only what the text states or clearly implies; invent nothing. Reply with valid JSON only.',
+      ? 'Tu aides un romancier à tenir sa bible. Tu ne décris que ce que le texte dit ou implique clairement ; tu n’inventes rien. Réponds uniquement en JSON valide, en français.'
+      : 'You help a novelist keep their story bible. Describe only what the text states or clearly implies; invent nothing. Reply with valid JSON only.',
     message: `<name type="${type}">${name}</name>\n<passages>\n${passages.join('\n---\n')}\n</passages>\n${known ? `<known_entries>\n${known}\n</known_entries>\n` : ''}\n${fr
       ? `Rédige la fiche : "short" (1-2 phrases, 35 mots au plus), "full" (markdown, sections parmi : ${headings.join(', ')} ; saute celles que le texte ne permet pas de remplir), "aliases" (autres façons dont le texte désigne l’entrée).`
       : `Write the entry: "short" (1-2 sentences, 35 words at most), "full" (markdown, sections among: ${headings.join(', ')}; skip those the text can't fill), "aliases" (other ways the text refers to it).`}\nJSON: {"short": "...", "full": "...", "aliases": ["..."]}`,

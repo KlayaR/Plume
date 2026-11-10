@@ -8,7 +8,10 @@ import { buildMatcher, findMentions } from './lib/context'
 import { estimateTokens, newId } from './lib/text'
 import { ask, parseJSON } from './ai'
 import { aiFull } from './lib/blocks'
-import { setChanges, type Change } from './editor/marks'
+import { changesField, setChanges } from './editor/marks'
+import { systemPrompt } from './lib/context'
+import { placeFixes, type FixEdit } from './lib/fixes'
+import { makeSnap, saveSnap } from './lib/snapshots'
 import { t } from './i18n'
 
 export interface AIFinding { quote: string; note: string; who?: string }
@@ -119,28 +122,38 @@ export function betaRead(chapterId: string, persona: string, custom = '') {
 
 export const lineEditCost = (sceneId: string) => estimateTokens(sceneOf(sceneId).scene.text) * 2 + 500
 
-/** A line edit of the scene, shown as tracked changes in the text: accept or reject each. */
+/**
+ * A line edit of the scene, shown as tracked changes in the text: accept or reject each.
+ * The same engine as Edit this chapter: your voice (style guide, samples) as Claude
+ * reads it when writing, tolerant matching, a snapshot first, and changes already
+ * waiting in the scene kept.
+ */
 export async function lineEdit(sceneId: string, view: EditorView | null) {
   if (!view) return useStore.getState().notify('warn', t('Click into the scene first.'))
   useReview.setState({ busy: 'edit' })
   try {
-    const { scene } = sceneOf(sceneId)
+    const book = useStore.getState().book!
+    const { scene, number, chapter } = sceneOf(sceneId)
+    const F = fr()
     const reply = await ask({
       role: 'edit',
-      system: fr() ? 'Tu es correcteur littéraire. Tu proposes des corrections précises, sans réécrire la voix de l’auteur. Réponds uniquement en JSON valide, en français.' : 'You are a line editor. You suggest precise edits without rewriting the author’s voice. Reply with valid JSON only.',
-      message: `<scene>\n${scene.text}\n</scene>\n\n${fr() ? 'Propose au plus 25 corrections ponctuelles : fautes, lourdeurs, répétitions, adverbes inutiles, clichés. "find" = les mots exacts du texte (assez pour être uniques), "replace" = le remplacement, "why" = la raison en quelques mots.' : 'Suggest at most 25 local edits: errors, clunky phrasing, repetitions, needless adverbs, clichés. "find" = the exact words of the text (enough to be unique), "replace" = the replacement, "why" = the reason in a few words.'}\nJSON: [{"find": "...", "replace": "...", "why": "..."}]`,
+      system: systemPrompt(book, 'rewrite', number),
+      message: `<scene>\n${scene.text}\n</scene>\n\n<task>\n${F
+        ? 'Fais la correction ligne à ligne de cette scène, dans la voix de l’auteur : au plus 25 corrections ponctuelles (fautes, lourdeurs, répétitions, adverbes inutiles, clichés, phrases qu’il faut relire pour comprendre). Ne réécris pas ce qui marche. "find" = les mots exacts du texte (assez pour être uniques), "replace" = le remplacement, "why" = la raison en quelques mots.'
+        : 'Line edit this scene in the author’s voice: at most 25 local edits (errors, clunky phrasing, repetitions, needless adverbs, clichés, sentences that need a second reading). Leave what works alone. "find" = the exact words of the text (enough to be unique), "replace" = the replacement, "why" = the reason in a few words.'}\n</task>\n\nJSON: [{"find": "…", "replace": "…", "why": "…"}]`,
     })
-    const edits = parseJSON<{ find: string; replace: string; why: string }[]>(reply) ?? []
+    const edits = parseJSON<FixEdit[]>(reply)
+    if (!Array.isArray(edits)) throw new Error(t('Claude’s reply could not be read. Try again.'))
+    await saveSnap(book.root, makeSnap(book, t('Before the line edit of “{title}”', { title: scene.title || chapter.title || t('Chapter') })))
     const doc = view.state.doc.toString()
-    const changes: Change[] = []
-    for (const e of edits) {
-      if (!e.find || e.find === e.replace) continue
-      const at = doc.indexOf(e.find)
-      if (at < 0 || changes.some(c => at < c.to && at + e.find.length > c.from)) continue
-      changes.push({ id: newId(), from: at, to: at + e.find.length, insert: e.replace ?? '', why: e.why ?? '' })
-    }
-    view.dispatch({ effects: setChanges.of(changes) })
-    useStore.getState().notify('ok', t('{n} suggested edits in the text: ✓ to accept, ✕ to reject.', { n: changes.length }))
+    const { fixes, missed } = placeFixes(doc, edits, book.meta.language)
+    const have = view.state.field(changesField)
+    const fresh = fixes.filter(c => !have.some(h => c.from <= h.to && c.to >= h.from)).map(c => ({ id: newId(), ...c }))
+    view.dispatch({ effects: setChanges.of([...have, ...fresh]) })
+    useStore.getState().notify(missed ? 'warn' : 'ok', [
+      t('{n} suggested edits in the text: ✓ to accept, ✕ to reject.', { n: fresh.length }),
+      missed ? t('Not placed, the words were not found in the text: {k}.', { k: missed }) : '',
+    ].filter(Boolean).join(' '))
   } catch (e) { useStore.getState().notify('error', (e as Error).message) }
   useReview.setState({ busy: null })
 }

@@ -5,7 +5,7 @@ import type { EditorView } from '@codemirror/view'
 import { isRewrite, type ActionId, type Book, type Lang } from '../lib/types'
 import { buildContext, scenePlace, systemPrompt, type Built, type Override } from '../lib/context'
 import { reviewChecks } from '../lib/review'
-import { checkRules, fixDirection, type Check } from '../lib/voice'
+import { checkRules, fixable, fixDirection, type Check } from '../lib/voice'
 import { ask, effective, isCheap, stopAsk } from '../ai'
 import { diffWords, noteTaste } from '../writing'
 import { hunksOf } from '../lib/hunks'
@@ -32,12 +32,16 @@ interface AIState {
   last: { action: ActionId; instruction: string; overrides: Record<string, Override> } | null
   /** The rule checker's scorecard for the proposal on screen. */
   checks: Check[]
+  /** Tracked changes waiting in the scene you are in. */
+  changes: number
 }
-export const useAI = create<AIState>(() => ({ running: null, hasProposal: false, last: null, checks: [] }))
+export const useAI = create<AIState>(() => ({ running: null, hasProposal: false, last: null, checks: [], changes: 0 }))
 
 export const syncProposalState = () => {
   const has = !!view?.state.field(proposalField, false)
   if (useAI.getState().hasProposal !== has) useAI.setState({ hasProposal: has, ...(has ? {} : { checks: [] }) })
+  const changes = view?.state.field(changesField, false)?.length ?? 0
+  if (useAI.getState().changes !== changes) useAI.setState({ changes })
 }
 
 /** The request as it would be sent now, for the size meter and the preview. */
@@ -215,7 +219,7 @@ export async function writeChapter(chapterId: string) {
       if (!text || useAI.getState().running !== 'chapter') break
       text = fixTypography(text, b2.meta.language)
       useStore.getState().updateScene(s.id, { text, extra: { ...f.scene.extra, aiWords: wordCount(text) } })
-      if (scorecard(text, b2).some(x => !x.ok)) toFix.push(s.id)
+      if (fixable(scorecard(text, b2)).length) toFix.push(s.id)
       done++
     }
   } catch (err) {
@@ -341,7 +345,7 @@ export async function retryFixing() {
   const st = useStore.getState()
   const book = st.book
   const last = useAI.getState().last
-  const failed = useAI.getState().checks.filter(c => !c.ok)
+  const failed = fixable(useAI.getState().checks)
   const p = view?.state.field(proposalField)
   if (!view || !book || !last || !p || p.streaming || !failed.length || useAI.getState().running) return
   const message = fixMessage(p.text, failed, book.meta.language)

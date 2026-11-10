@@ -16,7 +16,7 @@ export function fixRequest(text: string, failed: Check[], lang: Lang): string {
     : 'Do not rewrite the scene. Change only what is quoted or concerned, in the author’s voice, without touching the facts, the names or the meaning, and keep about the same length. A phrasing that is right where it stands can stay: the aim is to break the habit, not to erase every use. One fix = one replacement: "find" = the exact words of the scene to replace (the shortest passage that will do, unique in the scene), "replace" = the new text, "why" = the point fixed, in a few words.'}\n</task>\n\nJSON: [{"find": "…", "replace": "…", "why": "…"}]`
 }
 
-const overlaps = (from: number, to: number, taken: PlacedFix[]) => taken.some(c => from < c.to && to > c.from)
+const overlaps = (from: number, to: number, taken: { from: number; to: number }[]) => taken.some(c => from < c.to && to > c.from)
 
 /** The words of `find`, whatever spaces and apostrophes Claude copied them with (French no-break spaces, ’ or '). */
 function looseFind(find: string): RegExp {
@@ -25,7 +25,7 @@ function looseFind(find: string): RegExp {
 }
 
 /** Where `find` is in the text, free of the fixes already placed: exact first, then loosely. */
-function placeOf(text: string, find: string, taken: PlacedFix[]): { from: number; to: number } | null {
+export function placeOf(text: string, find: string, taken: { from: number; to: number }[]): { from: number; to: number } | null {
   for (let at = text.indexOf(find); at >= 0; at = text.indexOf(find, at + 1)) {
     if (!overlaps(at, at + find.length, taken)) return { from: at, to: at + find.length }
   }

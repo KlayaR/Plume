@@ -10,7 +10,8 @@ import type { Chapter, Entry, Scene, SceneStatus } from '../lib/types'
 import { sceneCounts, scenePlaceholders } from '../lib/stats'
 import { allowedKinds, chapterLabels } from '../lib/chapters'
 import Editor from '../editor/Editor'
-import { accept, discard, proposalReplaces, proposalToChanges, retry, useAI } from '../editor/actions'
+import { accept, discard, getEditorView, proposalReplaces, proposalToChanges, retry, syncProposalState, useAI } from '../editor/actions'
+import { acceptAllChanges, nextChange, rejectAllChanges } from '../editor/marks'
 import { leaveDraft, useDraft } from '../editor/draft'
 import ContextPanel from './ContextPanel'
 import ReviewPanel from './ReviewPanel'
@@ -41,6 +42,7 @@ export default function WritingView() {
   const sceneId = useStore(s => s.sceneId)
   const prefs = useStore(s => s.prefs)
   const hasProposal = useAI(s => s.hasProposal)
+  const changes = useAI(s => s.changes)
   const running = useAI(s => s.running)
   const drafting = useDraft(s => s.on)
   const chatting = useChat(s => s.streaming !== null)
@@ -70,6 +72,14 @@ export default function WritingView() {
           {proposalReplaces() && <button type="button" className="sk-btn sk-btn-sm" disabled={!!running} onClick={proposalToChanges} title={t('Puts each change in the text, to accept or reject one by one')}>{t('Change by change')}</button>}
           <button type="button" className="sk-btn sk-btn-sm" disabled={!!running} onClick={() => retry()}>{t('Retry')}</button>
           <button type="button" className="sk-btn sk-btn-sm sk-btn-ghost" onClick={() => discard()}>{t('Discard')} <kbd>Esc</kbd></button>
+        </div>
+      )}
+      {changes > 0 && !hasProposal && (
+        <div className="pl-propbar" role="group" aria-label={t('Changes')}>
+          <span>{t(changes === 1 ? '1 change waiting' : '{n} changes waiting', { n: changes })}</span>
+          <button type="button" className="sk-btn sk-btn-sm" onMouseDown={e => e.preventDefault()} onClick={() => { const v = getEditorView(); if (v) nextChange(v) }}>{t('Next')} <kbd>F8</kbd></button>
+          <button type="button" className="sk-btn sk-btn-sm sk-btn-primary" onMouseDown={e => e.preventDefault()} onClick={() => { const v = getEditorView(); if (v) { acceptAllChanges(v); syncProposalState() } }}>{t('Accept all')}</button>
+          <button type="button" className="sk-btn sk-btn-sm sk-btn-ghost" onMouseDown={e => e.preventDefault()} onClick={() => { const v = getEditorView(); if (v) { rejectAllChanges(v); syncProposalState() } }}>{t('Reject all')}</button>
         </div>
       )}
       {drafting && !hasProposal && (

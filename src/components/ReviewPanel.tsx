@@ -50,7 +50,9 @@ export default function ReviewPanel() {
   useEffect(() => () => useReview.setState({ report: null }), [])
 
   const top = topProblems(r.results)
-  const color = r.score >= 75 ? 'pl-good' : r.score >= 50 ? 'pl-ok' : 'pl-bad'
+  // No score to chase: how many reports are over their target.
+  const over = r.results.filter(x => x.status !== 'good').length
+  const color = over === 0 ? 'pl-good' : over <= 3 ? 'pl-ok' : 'pl-bad'
   return (
     <aside className="pl-context pl-review-panel">
       <div className="pl-row">
@@ -61,10 +63,10 @@ export default function ReviewPanel() {
       </div>
 
       <section className="pl-scorebox">
-        <div className={`pl-score ${color}`}>{r.words ? r.score : '–'}</div>
+        <div className={`pl-score ${color}`}>{r.words ? over : '–'}</div>
         <div>
-          <div className="sk-label">{t('Review score')}</div>
-          <p className="sk-hint">{t('Share of the reports within their target. Targets are Plume’s estimates for published fiction; your style may differ on purpose.')}</p>
+          <div className="sk-label">{t('Reports over their target')}</div>
+          <p className="sk-hint">{t('How many reports are over their target. They show what is there; whether it is a fault is yours to judge. Targets are Plume’s estimates, or your reference books.')}</p>
         </div>
       </section>
 

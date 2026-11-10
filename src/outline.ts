@@ -55,8 +55,8 @@ export function grounding(book: Book): string {
 }
 
 const system = (book: Book) => fr(book)
-  ? 'Tu aides un romancier de fantasy à construire le plan détaillé de son livre, chapitre par chapitre. Réponds uniquement en JSON valide, en français.'
-  : 'You help a fantasy novelist build the detailed outline of their book, chapter by chapter. Reply with valid JSON only.'
+  ? 'Tu aides un romancier à construire le plan détaillé de son livre, chapitre par chapitre. Réponds uniquement en JSON valide, en français.'
+  : 'You help a novelist build the detailed outline of their book, chapter by chapter. Reply with valid JSON only.'
 
 async function run<T>(key: string, message: string, book: Book): Promise<T | null> {
   useOutline.setState({ busy: key })
@@ -362,8 +362,8 @@ export async function proposeFoundation() {
   const message = [
     grounding(book),
     chat ? `<conversation>\n${chat}\n</conversation>` : '',
-    F ? `Construis les fondations de cette histoire, comme pour un grand roman de fantasy. Garde ce qui est déjà écrit dans <foundation> et ce que l’auteur a décidé dans la conversation ; complète le reste. Chaque champ en une à trois phrases concrètes, propres à CE livre, sans généralités. "magic" plus complet (jusqu’à six phrases) : sa source, ses règles, ses limites, son prix, qui peut s’en servir, comment elle se voit, ce qu’elle ne peut pas faire ; des limites et un prix qui créent des conflits. "comps" : deux ou trois livres ou auteurs comparables et ce qu’on prend à chacun ; ceux de l’auteur s’il en a cité.`
-      : `Build this story's foundation, as for a great fantasy novel. Keep what is already in <foundation> and what the author decided in the conversation; fill in the rest. Each field in one to three concrete sentences, specific to THIS book, no generalities. "magic" fuller (up to six sentences): its source, rules, limits, cost, who can use it, how it shows, what it can't do; limits and costs that create conflict. "comps": two or three comparable books or authors and what to take from each; the author's own if they named any.`,
+    F ? `Construis les fondations de cette histoire, comme pour un grand roman du genre. Garde ce qui est déjà écrit dans <foundation> et ce que l’auteur a décidé dans la conversation ; complète le reste. Chaque champ en une à trois phrases concrètes, propres à CE livre, sans généralités. "magic" plus complet (jusqu’à six phrases) : sa source, ses règles, ses limites, son prix, qui peut s’en servir, comment elle se voit, ce qu’elle ne peut pas faire ; des limites et un prix qui créent des conflits. "comps" : deux ou trois livres ou auteurs comparables et ce qu’on prend à chacun ; ceux de l’auteur s’il en a cité.`
+      : `Build this story's foundation, as for a great novel of its genre. Keep what is already in <foundation> and what the author decided in the conversation; fill in the rest. Each field in one to three concrete sentences, specific to THIS book, no generalities. "magic" fuller (up to six sentences): its source, rules, limits, cost, who can use it, how it shows, what it can't do; limits and costs that create conflict. "comps": two or three comparable books or authors and what to take from each; the author's own if they named any.`,
     `JSON: {${FOUNDATION_KEYS.map(k => `"${k}": "…"`).join(', ')}}`,
   ].filter(Boolean).join('\n\n')
   const raw = await run<Partial<Foundation>>('foundation', message, book)
@@ -511,7 +511,7 @@ export async function createEntriesFromOutline() {
   // Names in the cards' "who is there" that the bible doesn't know, as hints.
   const hints = [...new Set(book.chapters.flatMap(c => c.scenes.flatMap(s => s.cast ?? [])))].filter(n => !findEntrySlug(book, n, NAMED))
   const story = [grounding(book), `<outline>\n${outlineText(book)}\n</outline>`, `<existing_entries>\n${existing || '-'}\n</existing_entries>`].join('\n\n')
-  const ask_ = (message: string) => ask({ role: 'edit', system: F ? 'Tu construis la bible d’un roman de fantasy à partir de son plan. Réponds uniquement en JSON valide, en français.' : 'You build the story bible of a fantasy novel from its outline. Reply with valid JSON only.', message })
+  const ask_ = (message: string) => ask({ role: 'edit', system: F ? 'Tu construis la bible d’un roman à partir de son plan. Réponds uniquement en JSON valide, en français.' : 'You build the story bible of a novel from its outline. Reply with valid JSON only.', message })
   useOutline.setState({ busy: 'entries' })
   try {
     useStore.getState().notify('ok', t('Claude is reading the outline for missing entries…'))

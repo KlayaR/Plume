@@ -37,8 +37,8 @@ export default function SynonymDialog({ onClose }: { onClose: () => void }) {
     ask({
       role: 'quick',
       system: lang === 'fr'
-        ? 'Tu es un dictionnaire de synonymes pour un romancier de fantasy. Réponds uniquement par un tableau JSON de chaînes.'
-        : 'You are a thesaurus for a fantasy novelist. Reply with a JSON array of strings only.',
+        ? 'Tu es un dictionnaire de synonymes pour un romancier. Réponds uniquement par un tableau JSON de chaînes.'
+        : 'You are a thesaurus for a novelist. Reply with a JSON array of strings only.',
       message: lang === 'fr'
         ? `Phrase : ${tg.context}\n\nPropose 8 façons de remplacer ce qui est entre [[ ]], qui s’accordent grammaticalement avec la phrase, de registres variés (du plus simple au plus recherché), sans cliché. Même forme (genre, nombre, temps) que l’original.\nJSON: ["...", "..."]`
         : `Sentence: ${tg.context}\n\nSuggest 8 replacements for what is between [[ ]] that fit the sentence grammatically, in varied registers (plain to rich), no clichés. Same form (number, tense) as the original.\nJSON: ["...", "..."]`,

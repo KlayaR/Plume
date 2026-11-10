@@ -243,6 +243,32 @@ export function resolveChange(view: EditorView, id: string, ok: boolean) {
   })
 }
 
+/** Accepts every change waiting in the scene, in one step (one Ctrl+Z takes them all back). */
+export function acceptAllChanges(view: EditorView): boolean {
+  const list = [...view.state.field(changesField)].sort((a, b) => a.from - b.from)
+  if (!list.length) return false
+  view.dispatch({ changes: list.map(c => ({ from: c.from, to: c.to, insert: c.insert })), effects: setChanges.of([]), userEvent: 'input.review' })
+  return true
+}
+
+/** Drops every change waiting in the scene. */
+export function rejectAllChanges(view: EditorView): boolean {
+  if (!view.state.field(changesField).length) return false
+  view.dispatch({ effects: setChanges.of([]) })
+  return true
+}
+
+/** Selects the next change after the cursor (the first one after the last), so ✓ and ✕ are right there. */
+export function nextChange(view: EditorView): boolean {
+  const list = [...view.state.field(changesField)].sort((a, b) => a.from - b.from)
+  if (!list.length) return false
+  const head = view.state.selection.main.head
+  const c = list.find(x => x.from > head) ?? list[0]
+  view.dispatch({ selection: { anchor: c.from, head: c.to }, scrollIntoView: true })
+  view.focus()
+  return true
+}
+
 export const trackedChangesExt = [
   changesField,
   EditorView.decorations.compute([changesField], (state: EditorState) => {
@@ -262,6 +288,7 @@ export const trackedChangesExt = [
       return true
     },
   }),
+  keymap.of([{ key: 'F8', run: nextChange }]),
 ]
 
 // --- Italics and bold ---------------------------------------------------------------

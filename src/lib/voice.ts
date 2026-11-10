@@ -16,11 +16,11 @@ const PROMPTS_KEY = 'plume.prompts'
 
 /** Genre presets, read-only; copy one to make it yours. */
 export const PRESETS: PromptSet[] = [
-  { id: 'preset-literary', name: 'Literary', preset: true, text: 'Write literary prose in {book.language}, in {book.tense}. Favour concrete sensory detail over abstraction, subtext over stated emotion, and varied sentence rhythm. Let silences and gestures carry meaning. Avoid clichés and the words in {list.all}.' },
-  { id: 'preset-thriller', name: 'Thriller', preset: true, text: 'Write a tight thriller in {book.language}, in {book.tense}. Short paragraphs, short sentences in action, a question or threat open at the end of every scene. Every scene raises the stakes. No recap, no long description. Avoid the words in {list.all}.' },
+  { id: 'preset-literary', name: 'Literary', preset: true, text: 'Write literary prose in {book.language}, in {book.tense}. Favour concrete sensory detail over abstraction, subtext over stated emotion, and varied sentence rhythm. Let silences and gestures carry meaning. Avoid clichés.' },
+  { id: 'preset-thriller', name: 'Thriller', preset: true, text: 'Write a tight thriller in {book.language}, in {book.tense}. Short paragraphs, short sentences in action, a question or threat open at the end of every scene. Every scene raises the stakes. No recap, no long description.' },
   { id: FANTASY_ID, name: 'Fantasy', preset: true, text: FANTASY_PROMPT.en, fr: FANTASY_PROMPT.fr },
-  { id: 'preset-romance', name: 'Romance', preset: true, text: 'Write romance in {book.language}, in {book.tense}, from {scene.pov}’s point of view. Tension in every exchange, emotions shown in the body and in what is not said. Banter with rhythm. Avoid the words in {list.all}.' },
-  { id: 'preset-noir', name: 'Noir', preset: true, text: 'Write noir in {book.language}, in {book.tense}. Dry, wry, cynical narration; hard images; dialogue that cuts. No sentimentality. Avoid the words in {list.all}.' },
+  { id: 'preset-romance', name: 'Romance', preset: true, text: 'Write romance in {book.language}, in {book.tense}, from {scene.pov}’s point of view. Tension in every exchange, emotions shown in the body and in what is not said. Banter with rhythm.' },
+  { id: 'preset-noir', name: 'Noir', preset: true, text: 'Write noir in {book.language}, in {book.tense}. Dry, wry, cynical narration; hard images; dialogue that cuts. No sentimentality.' },
 ]
 
 // The library is kept in Plume's own data file (prompts.json, in its folder on
@@ -97,7 +97,7 @@ export function expandVariables(text: string, ctx: { book: Book; sceneTitle?: st
 
 export const SCENE_RULES: { id: SceneRule; label: string; en: string; fr: string }[] = [
   { id: 'medias-res', label: 'Start in medias res', en: 'Open scenes in the middle of the action, never with set-up.', fr: 'Ouvre les scènes au cœur de l’action, jamais par une mise en place.' },
-  { id: 'hook', label: 'End on a hook', en: 'End every scene on a hook: a question, a threat or a turn.', fr: 'Termine chaque scène sur une accroche : une question, une menace ou un retournement.' },
+  { id: 'hook', label: 'End on a hook', en: 'End each scene where it turns (a decision, a revelation, a threat, an open question), never on a summary or a reflection.', fr: 'Termine chaque scène là où elle bascule (une décision, une révélation, une menace, une question ouverte), jamais sur un résumé ni une réflexion.' },
   { id: 'no-weather', label: 'No weather openings', en: 'Never open a scene with the weather or the sky.', fr: 'N’ouvre jamais une scène sur la météo ou le ciel.' },
   { id: 'no-reminiscing', label: 'No ending on reminiscing', en: 'Never end a scene on a character reminiscing or reflecting.', fr: 'Ne termine jamais une scène sur un personnage qui se souvient ou réfléchit.' },
   { id: 'show', label: 'Show, don’t tell emotions', en: 'Show emotions through action, body and dialogue; never name them.', fr: 'Montre les émotions par l’action, le corps et le dialogue ; ne les nomme jamais.' },
@@ -242,6 +242,15 @@ export function aiTells(text: string, lang: Lang): { kind: Tell; quotes: string[
   }
   return out
 }
+
+/**
+ * What Claude may be asked to fix: your hard rules (banned words, longest sentence and
+ * line, dialogue dashes) and the habits that make prose read as machine-written. Rates
+ * (passive voice, adverbs) and the Review reports stay information for you: turned into
+ * instructions, they push every sentence toward the same average.
+ */
+export const FIXABLE = new Set(['banned', 'tells', 'dash', 'sentence', 'dialogue'])
+export const fixable = (checks: Check[]) => checks.filter(c => !c.ok && FIXABLE.has(c.id))
 
 /** The direction for "Retry fixing these". */
 export const fixDirection = (failed: Check[], lang: Lang) =>
