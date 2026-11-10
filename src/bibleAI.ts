@@ -43,7 +43,7 @@ export async function draftEntry(book: Book, name: string, type: EntryType, cont
   const passages = [context, ...snippetsFor(book, name)].filter(Boolean).filter((p, i, a) => a.indexOf(p) === i).slice(0, 7)
   const headings = typeInfo(type).headings[book.meta.language]
   const known = book.entries.filter(e => e.type !== 'style' && e.short.trim() && e.include !== 'secret').slice(0, 40).map(e => `- ${e.name}: ${e.short.trim()}`).join('\n')
-  const reply = await ask({
+  const reply = await ask({ json: 'object',
     role: 'edit',
     system: fr
       ? 'Tu aides un romancier à tenir sa bible. Tu ne décris que ce que le texte dit ou implique clairement ; tu n’inventes rien. Réponds uniquement en JSON valide, en français.'

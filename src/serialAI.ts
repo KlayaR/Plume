@@ -32,7 +32,7 @@ export async function checkHooks() {
     for (let i = 0; i < todo.length; i += 8) {
       const batch = todo.slice(i, i + 8)
       const blocks = batch.map(c => `<chapter n="${labels[book.chapters.indexOf(c)].number}" title="${c.title}">\n<opening>\n${chapterOpening(c)}\n</opening>\n<ending>\n${chapterClosing(c)}\n</ending>\n</chapter>`).join('\n')
-      const reply = await ask({
+      const reply = await ask({ json: 'list',
         role: 'edit',
         system: fr
           ? 'Tu es éditeur de web novels (Royal Road). Tu juges si l’ouverture d’un chapitre accroche tout de suite et si sa fin donne envie de cliquer sur le chapitre suivant. Réponds uniquement en JSON valide, en français.'
@@ -83,7 +83,7 @@ export async function findThreads() {
   const known = book.meta.threads ?? []
   useSerialAI.setState({ busy: 'threads' })
   try {
-    const reply = await ask({
+    const reply = await ask({ json: 'list',
       role: 'edit',
       system: fr
         ? 'Tu aides l’auteur d’un web novel à suivre les promesses faites au lecteur : mystères, promesses, mises en place, présages. Réponds uniquement en JSON valide, en français.'

@@ -128,7 +128,7 @@ export async function checkChapter(depth: Depth) {
 - language: errors, agreement, punctuation.`)
       : (F ? `Relis ce chapitre comme un correcteur littéraire : fautes, répétitions, lourdeurs, clichés, verbes de perception inutiles, émotions nommées, tics d’IA (contrastes « pas X mais Y », triades, comparaisons en série, « , et il… » à répétition, « comme on… »), ponctuation. Pas de remarques sur l’intrigue ni le rythme.`
         : `Read this chapter as a line editor: errors, repetitions, clunky phrasing, clichés, needless filter verbs, named emotions, AI tells ("not X but Y" contrasts, triads, strings of similes), punctuation. No remarks on plot or pacing.`)
-    const reply = await ask({
+    const reply = await ask({ json: 'list',
       role: 'edit',
       system: F ? 'Tu es éditeur de romans. Tu relèves des problèmes précis, cités mot pour mot, sans réécrire le livre. Réponds uniquement en JSON valide, en français.' : 'You are a fiction editor. You flag precise problems, quoted word for word, without rewriting the book. Reply with valid JSON only.',
       message: [
@@ -204,7 +204,7 @@ export async function fixChapter() {
       const listed = forClaude.map((f, i) => `${i + 1}. [${F ? 'scène' : 'scene'} ${scenes.findIndex(s => s.id === f.sceneId) + 1}] “${f.quote}”: ${f.problem} → ${f.fix}`).join('\n')
       const choice = assistantChoice('rewrite')
       const e = effective(choice.model, choice.effort)
-      const reply = await ask({
+      const reply = await ask({ json: 'list',
         model: e.model, effort: e.effort, orModel: choice.orModel,
         // The author's voice, style guide and prose samples, as when Claude writes (and from the cache).
         system: systemPrompt(book, 'rewrite', n),
@@ -276,7 +276,7 @@ export async function fixFlagged(sceneIds: string[]) {
       st.notify('ok', t('Fixing “{title}”…', { title: f.scene.title }))
       const choice = assistantChoice('rewrite')
       const e = effective(choice.model, choice.effort)
-      const reply = await ask({ model: e.model, effort: e.effort, orModel: choice.orModel, system: systemPrompt(now, 'rewrite', f.number), message: fixRequest(f.scene.text, failed, lang) })
+      const reply = await ask({ json: 'list', model: e.model, effort: e.effort, orModel: choice.orModel, system: systemPrompt(now, 'rewrite', f.number), message: fixRequest(f.scene.text, failed, lang) })
       if (useAI.getState().running !== 'chapter') break
       const edits = parseJSON<FixEdit[]>(reply)
       if (!Array.isArray(edits)) throw new Error(t('Claude’s reply could not be read. Try again.'))

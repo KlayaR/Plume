@@ -307,6 +307,7 @@ fn run_claude(
     message: String,
     tools: Option<String>,
     cwd: Option<String>,
+    schema: Option<String>,
 ) -> Result<(), String> {
     // An empty folder of Plume's own, so no CLAUDE.md or project file is ever read.
     let run_dir = app.path().app_local_data_dir().map_err(|e| e.to_string())?.join("run");
@@ -330,6 +331,10 @@ fn run_claude(
         cmd.args(["--effort", &effort]);
     }
     cmd.arg("--system-prompt-file").arg(&sp_file);
+    // A JSON task: the reply is checked against this shape by the command line itself.
+    if let Some(s) = schema.filter(|s| !s.trim().is_empty()) {
+        cmd.arg("--json-schema").arg(s);
+    }
     // Agent tasks read the book folder; everything else runs in Plume's empty folder.
     let work_dir = cwd.filter(|c| Path::new(c).is_dir()).map(PathBuf::from).unwrap_or(run_dir.clone());
     cmd.current_dir(&work_dir)

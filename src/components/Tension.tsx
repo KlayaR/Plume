@@ -30,7 +30,7 @@ export default function Tension() {
       for (let from = 0; from < scenes.length; from += 40) {
         const part = scenes.slice(from, from + 40)
         const list = part.map((s, i) => `${i + 1}. ${s.title} : ${(s.summary || s.note || s.text.slice(0, 500)).replace(/\s+/g, ' ').trim()}`).join('\n')
-        const reply = await ask({
+        const reply = await ask({ json: 'list',
           role: 'quick',
           system: lang === 'fr' ? 'Tu es éditeur de romans. Réponds uniquement en JSON valide.' : 'You are a fiction editor. Reply with valid JSON only.',
           message: `<scenes>\n${list}\n</scenes>\n\n${lang === 'fr'

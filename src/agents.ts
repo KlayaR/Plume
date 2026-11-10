@@ -63,7 +63,7 @@ const ITEMS = '[{"title": "...", "detail": "...", "where": "scene title, if any"
 async function runList(task: AgentTask, opts: { system: string; message: string; tools?: string; cwd?: string }) {
   useAgents.setState({ busy: task, progress: '' })
   try {
-    const reply = await ask({
+    const reply = await ask({ json: 'list',
       role: 'edit', system: opts.system, message: opts.message, tools: opts.tools, cwd: opts.cwd,
       onText: chunk => useAgents.setState(s => ({ progress: (s.progress + chunk).slice(-400) })),
     })

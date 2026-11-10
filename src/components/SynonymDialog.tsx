@@ -34,7 +34,7 @@ export default function SynonymDialog({ onClose }: { onClose: () => void }) {
     const tg = target.current
     if (!tg) { setBusy(false); return }
     let off = false
-    ask({
+    ask({ json: 'list',
       role: 'quick',
       system: lang === 'fr'
         ? 'Tu es un dictionnaire de synonymes pour un romancier. Réponds uniquement par un tableau JSON de chaînes.'

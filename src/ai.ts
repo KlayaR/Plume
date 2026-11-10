@@ -22,6 +22,23 @@ export interface AskOptions {
   /** Agent tasks only: tools the CLI may use, and the folder it works in (read-only tools). */
   tools?: string
   cwd?: string
+  /**
+   * A JSON task: 'list' (an array) or 'object'. On the claude command line the reply is held
+   * to that shape, and a list comes back as the array itself; a reply that can't be read is asked again once.
+   */
+  json?: 'list' | 'object'
+}
+
+const SCHEMA = {
+  list: JSON.stringify({ type: 'object', properties: { items: { type: 'array' } }, required: ['items'] }),
+  object: JSON.stringify({ type: 'object' }),
+}
+
+/** What a JSON task returns to its caller: the list itself, not the object the schema wraps it in. */
+function unwrap(text: string, json: AskOptions['json']): string {
+  if (json !== 'list') return text
+  const d = parseJSON<{ items?: unknown }>(text)
+  return d && !Array.isArray(d) && Array.isArray(d.items) ? JSON.stringify(d.items) : text
 }
 
 /**
@@ -39,7 +56,13 @@ export const isCheap = () => effective('sonnet', 'low').cheap
 
 let current: string | null = null
 
-export function ask(o: AskOptions): Promise<string> {
+export async function ask(o: AskOptions): Promise<string> {
+  const first = unwrap(await askOnce(o), o.json)
+  if (!o.json || parseJSON(first) !== null) return first
+  return unwrap(await askOnce(o), o.json)
+}
+
+function askOnce(o: AskOptions): Promise<string> {
   const st = useStore.getState()
   if (!canRun()) return Promise.reject(new Error(t('The claude command line was not found. Set its path in Settings.')))
   const r = o.role ? st.prefs.roles[o.role] : undefined
@@ -47,7 +70,7 @@ export function ask(o: AskOptions): Promise<string> {
   const { model, effort } = effective(c.model, c.effort)
   return new Promise((resolve, reject) => {
     runLLM(
-      { model, effort, preset: c.preset, orModel: o.orModel, system: o.system, message: o.message, tools: o.tools, cwd: o.cwd },
+      { model, effort, preset: c.preset, orModel: o.orModel, system: o.system, message: o.message, tools: o.tools, cwd: o.cwd, schema: o.json && !o.tools ? SCHEMA[o.json] : undefined },
       text => o.onText?.(text),
       r => {
         current = null

@@ -324,7 +324,7 @@ export async function turnIntoEntries() {
   const existing = book.entries.filter(e => TYPES.includes(e.type)).map(e => `${e.slug}: ${e.name} (${e.type})${e.short.trim() ? ` — ${e.short.trim().slice(0, 160)}` : ''}`).join('\n')
   useChat.setState({ busy: 'entries' })
   try {
-    const reply = await ask({
+    const reply = await ask({ json: 'list',
       role: 'edit',
       system: fr
         ? 'Tu transformes une conversation de travail sur un roman en fiches de bible. Réponds uniquement en JSON valide.'
@@ -401,7 +401,7 @@ export async function checkContradictions(): Promise<Contradiction[]> {
   const fr = book.meta.language === 'fr'
   const all = book.entries.filter(e => TYPES.includes(e.type) && e.include !== 'secret')
     .map(e => `<entry type="${e.type}" name="${e.name}">\n${[e.short, aiFull(e), e.facts.map(f => `- ${f.text}`).join('\n')].filter(s => s.trim()).join('\n')}\n</entry>`).join('\n')
-  const reply = await ask({
+  const reply = await ask({ json: 'list',
     role: 'edit',
     system: fr ? 'Tu relis la bible d’un roman pour y trouver les contradictions. Réponds uniquement en JSON valide.' : 'You read a novel’s story bible to find contradictions. Reply with valid JSON only.',
     message: `<bible>\n${all}\n</bible>\n\n${fr ? 'Liste les contradictions réelles entre fiches ou dans une fiche (dates, âges, lieux, règles, liens). Pas de suggestions de style. En français.' : 'List real contradictions between entries or inside one (dates, ages, places, rules, relationships). No style suggestions.'}\nJSON: [{"entries": ["name"], "issue": "...", "fix": "..."}]`,

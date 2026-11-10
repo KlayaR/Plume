@@ -26,6 +26,8 @@ export interface LlmRequest {
   /** Agent tasks that read files: only the claude command line can do these. */
   tools?: string
   cwd?: string
+  /** A JSON schema the claude command line holds the reply to (OpenRouter goes by the prompt alone). */
+  schema?: string
 }
 
 /** Settings of an action, turned into what a request needs: a Claude preset becomes its model and effort, an OpenRouter one stays a preset. */
@@ -172,7 +174,7 @@ export async function runLLM(req: LlmRequest, onText: (t: string) => void, onDon
     active.set(outer, a)
     useStore.setState({ lastBackend: { kind: 'claude', name: req.model } })
     a.inner = await runClaude(
-      { exe: st.claudeExe, model: req.model, effort: req.effort, system: req.system, message: req.message, tools: req.tools, cwd: req.cwd },
+      { exe: st.claudeExe, model: req.model, effort: req.effort, system: req.system, message: req.message, tools: req.tools, cwd: req.cwd, schema: req.schema },
       onText,
       r => {
         // The plan ran out before anything came back: the same request goes to OpenRouter.

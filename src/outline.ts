@@ -58,10 +58,10 @@ const system = (book: Book) => fr(book)
   ? 'Tu aides un romancier à construire le plan détaillé de son livre, chapitre par chapitre. Réponds uniquement en JSON valide, en français.'
   : 'You help a novelist build the detailed outline of their book, chapter by chapter. Reply with valid JSON only.'
 
-async function run<T>(key: string, message: string, book: Book): Promise<T | null> {
+async function run<T>(key: string, message: string, book: Book, json: 'list' | 'object' = 'object'): Promise<T | null> {
   useOutline.setState({ busy: key })
   try {
-    const reply = await ask({ role: 'edit', system: system(book), message })
+    const reply = await ask({ role: 'edit', json, system: system(book), message })
     const data = parseJSON<T>(reply)
     if (!data) throw new Error(t('Claude’s reply could not be read. Try again.'))
     return data
@@ -210,7 +210,7 @@ Pour chacun : "n" (le numéro du chapitre concerné), "chapter" (son titre), le 
 For each: "n" (the number of the chapter it concerns), "chapter" (its title), the problem and a concrete fix.`,
     'JSON: [{"n": 1, "chapter": "…", "issue": "…", "fix": "…"}]',
   ].filter(Boolean).join('\n\n')
-  const list = await run<OutlineIssue[]>('check', message, book)
+  const list = await run<OutlineIssue[]>('check', message, book, 'list')
   if (list) useOutline.setState({ issues: Array.isArray(list) ? list.filter(x => x && x.issue) : [] })
 }
 
@@ -405,7 +405,7 @@ export async function proposeTurningPoints() {
       : `For each turning point in <turning_points>, write in one or two sentences what happens at that moment in THIS book: concrete, causal (each follows from the one before), with stakes rising to the climax. Keep notes already written.`,
     'JSON: [{"name": "…", "note": "…"}]',
   ].filter(Boolean).join('\n\n')
-  const raw = await run<{ name: string; note: string }[]>('points', message, fresh)
+  const raw = await run<{ name: string; note: string }[]>('points', message, fresh, 'list')
   if (Array.isArray(raw)) useOutline.setState({ points: raw.filter(x => x && x.name && x.note).map(x => ({ name: String(x.name), note: String(x.note) })) })
 }
 
@@ -511,7 +511,7 @@ export async function createEntriesFromOutline() {
   // Names in the cards' "who is there" that the bible doesn't know, as hints.
   const hints = [...new Set(book.chapters.flatMap(c => c.scenes.flatMap(s => s.cast ?? [])))].filter(n => !findEntrySlug(book, n, NAMED))
   const story = [grounding(book), `<outline>\n${outlineText(book)}\n</outline>`, `<existing_entries>\n${existing || '-'}\n</existing_entries>`].join('\n\n')
-  const ask_ = (message: string) => ask({ role: 'edit', system: F ? 'Tu construis la bible d’un roman à partir de son plan. Réponds uniquement en JSON valide, en français.' : 'You build the story bible of a novel from its outline. Reply with valid JSON only.', message })
+  const ask_ = (message: string) => ask({ role: 'edit', json: 'list', system: F ? 'Tu construis la bible d’un roman à partir de son plan. Réponds uniquement en JSON valide, en français.' : 'You build the story bible of a novel from its outline. Reply with valid JSON only.', message })
   useOutline.setState({ busy: 'entries' })
   try {
     useStore.getState().notify('ok', t('Claude is reading the outline for missing entries…'))

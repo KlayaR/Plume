@@ -41,7 +41,7 @@ export default function OutlineDialog({ onClose }: { onClose: () => void }) {
       useStore.getState().updateMeta({ sceneMode: mode })
       const fresh = useStore.getState().book!
       const points = fresh.meta.structure.beats.length > 0
-      const reply = await ask({
+      const reply = await ask({ json: 'list',
         role: 'edit',
         system: fr
           ? 'Tu aides un romancier à bâtir le plan de son livre. Réponds uniquement en JSON valide, en français.'
