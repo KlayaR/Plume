@@ -315,12 +315,18 @@ fn run_claude(
     let sp_file = run_dir.join(format!("system-{id}.txt"));
     std::fs::write(&sp_file, system).map_err(|e| e.to_string())?;
 
+    // Only ever start Claude's own command line, never another program named by the page.
+    let named_claude = Path::new(&exe).file_stem().and_then(|s| s.to_str()).is_some_and(|s| s.eq_ignore_ascii_case("claude"));
+    if !named_claude || !Path::new(&exe).is_file() {
+        return Err(format!("Not Claude's command line: {exe}"));
+    }
     let mut cmd = Command::new(&exe);
     // Writing calls get no tools at all; agent tasks get read-only ones (or web search), pre-approved.
     let tools = tools.unwrap_or_default();
     cmd.args(["-p", "--safe-mode", "--tools", &tools]);
     if !tools.is_empty() {
-        cmd.args(["--allowedTools", &tools]);
+        // Restricted: the tools it is given read, nothing runs or writes.
+        cmd.args(["--restricted", "--allowedTools", &tools]);
     }
     cmd.args([
         "--strict-mcp-config", "--disable-slash-commands",
