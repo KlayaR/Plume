@@ -271,16 +271,41 @@ export const proposalReplaces = () => {
   return !!p && p.to > p.from
 }
 
-/** A finished rewrite becomes tracked changes in the text, to accept or reject one by one. */
+/** Accepts the proposal and puts the cursor at its start, to change it in the text (one Ctrl+Z takes it all back). */
+export function acceptToEdit() {
+  const p = view?.state.field(proposalField, false)
+  if (!view || !p || !accept()) return
+  view.dispatch({ selection: { anchor: Math.min(p.from, view.state.doc.length) }, scrollIntoView: true })
+  useStore.getState().notify('ok', t('It’s in your text: change it as you like. Ctrl+Z takes it all back.'))
+}
+
+/** New text in pieces of one paragraph each, with what comes before it (the pieces put back together are the text). */
+export const paragraphsOf = (text: string) => text.match(/\s*\S[\s\S]*?(?=\n\s*\n|$)/g) ?? []
+
+/**
+ * A finished proposal becomes tracked changes in the text, to accept or reject one by one:
+ * a rewrite change by change, new text paragraph by paragraph.
+ */
 export function proposalToChanges() {
   const st = useStore.getState()
   const p = view?.state.field(proposalField, false)
-  if (!view || !st.book || !p || p.streaming || p.to <= p.from) return
-  const text = fixTypography(p.text.replace(/\s+$/, ''), st.book.meta.language).replace(/^\s+/, '')
-  const hunks = hunksOf(diffWords(view.state.doc.sliceString(p.from, p.to), text), p.from)
+  if (!view || !st.book || !p || p.streaming || !p.text.trim()) return
+  let text = fixTypography(p.text.replace(/\s+$/, ''), st.book.meta.language)
+  let hunks: { from: number; to: number; insert: string }[]
+  const replacing = p.to > p.from
+  if (replacing) {
+    text = text.replace(/^\s+/, '')
+    hunks = hunksOf(diffWords(view.state.doc.sliceString(p.from, p.to), text), p.from)
+  } else {
+    // As Accept does: a space before new text that would otherwise stick to the last word.
+    const prev = view.state.doc.sliceString(Math.max(0, p.from - 1), p.from)
+    if (prev && !/\s/.test(prev) && !/^\s/.test(text)) text = ' ' + text
+    const at = p.from
+    hunks = paragraphsOf(text).map(insert => ({ from: at, to: at, insert }))
+  }
   if (!hunks.length) return st.notify('ok', t('Claude changed nothing in this passage.'))
   discardProposal(view)
-  view.dispatch({ effects: setChanges.of([...view.state.field(changesField), ...hunks.map(h => ({ ...h, id: newId(), why: t('Claude\'s rewrite') }))]) })
+  view.dispatch({ effects: setChanges.of([...view.state.field(changesField), ...hunks.map(h => ({ ...h, id: newId(), why: replacing ? t('Claude\'s rewrite') : t('Claude\'s text') }))]) })
   // Counted as Claude's words, even if some are rejected: better not to take them for your voice.
   const found = findScene(st.book, st.sceneId)
   if (found) st.updateScene(found.scene.id, { extra: { ...found.scene.extra, aiWords: Number(found.scene.extra.aiWords ?? 0) + (text.match(/\S+/g) ?? []).length } })

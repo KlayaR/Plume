@@ -10,7 +10,7 @@ import type { Chapter, Entry, Scene, SceneStatus } from '../lib/types'
 import { sceneCounts, scenePlaceholders } from '../lib/stats'
 import { allowedKinds, chapterLabels } from '../lib/chapters'
 import Editor from '../editor/Editor'
-import { accept, discard, getEditorView, proposalReplaces, proposalToChanges, retry, syncProposalState, useAI } from '../editor/actions'
+import { accept, acceptToEdit, discard, getEditorView, proposalReplaces, proposalToChanges, retry, syncProposalState, useAI } from '../editor/actions'
 import { acceptAllChanges, nextChange, rejectAllChanges } from '../editor/marks'
 import { leaveDraft, useDraft } from '../editor/draft'
 import ContextPanel from './ContextPanel'
@@ -69,7 +69,10 @@ export default function WritingView() {
         <div className="pl-propbar" role="group" aria-label={t('Proposal')}>
           <span>{running ? t('Claude is writing…') : t('Proposal')}</span>
           <button type="button" className="sk-btn sk-btn-sm sk-btn-primary" disabled={!!running} onClick={() => accept()}>{t('Accept')} <kbd>Tab</kbd></button>
-          {proposalReplaces() && <button type="button" className="sk-btn sk-btn-sm" disabled={!!running} onClick={proposalToChanges} title={t('Puts each change in the text, to accept or reject one by one')}>{t('Change by change')}</button>}
+          {proposalReplaces()
+            ? <button type="button" className="sk-btn sk-btn-sm" disabled={!!running} onClick={proposalToChanges} title={t('Puts each change in the text, to accept or reject one by one')}>{t('Change by change')}</button>
+            : <button type="button" className="sk-btn sk-btn-sm" disabled={!!running} onClick={proposalToChanges} title={t('Puts each paragraph in the text, to accept or reject one by one')}>{t('By paragraph')}</button>}
+          <button type="button" className="sk-btn sk-btn-sm" disabled={!!running} onClick={acceptToEdit} title={t('Accepts it and puts the cursor at its start, to change it in the text')}>{t('Edit')}</button>
           <button type="button" className="sk-btn sk-btn-sm" disabled={!!running} onClick={() => retry()}>{t('Retry')}</button>
           <button type="button" className="sk-btn sk-btn-sm sk-btn-ghost" onClick={() => discard()}>{t('Discard')} <kbd>Esc</kbd></button>
         </div>

@@ -236,11 +236,14 @@ export function resolveChange(view: EditorView, id: string, ok: boolean) {
   const list = view.state.field(changesField)
   const c = list.find(x => x.id === id)
   if (!c) return
+  // New paragraphs waiting at the same point: those before this one stay before it once it is in.
+  const before = ok && c.to === c.from ? list.slice(0, list.indexOf(c)).filter(x => x.from === c.from && x.to === c.from).map(x => x.id) : []
   view.dispatch({
     changes: ok ? { from: c.from, to: c.to, insert: c.insert } : undefined,
     effects: setChanges.of(list.filter(x => x.id !== id)),
     userEvent: ok ? 'input.review' : undefined,
   })
+  if (before.length) view.dispatch({ effects: setChanges.of(view.state.field(changesField).map(x => before.includes(x.id) ? { ...x, from: c.from, to: c.from } : x)) })
 }
 
 /** Accepts every change waiting in the scene, in one step (one Ctrl+Z takes them all back). */
