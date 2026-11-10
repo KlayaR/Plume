@@ -1,12 +1,13 @@
 // Right panel: the three AI actions, the size meter, and the bible entries
 // that will be sent, each droppable or switchable between short and full.
 import { useMemo, useState } from 'react'
-import { Check, CircleCheck, CircleX, Copy, Eye, GraduationCap, Pin, Send, Square, Wand2 } from 'lucide-react'
+import { Check, CircleCheck, CircleX, Copy, Eye, GraduationCap, Lightbulb, Pin, Send, Square, Wand2 } from 'lucide-react'
 import { Dialog } from '../studio-kit/shell.js'
 import { useStore } from '../store'
 import type { ActionId } from '../lib/types'
 import type { Override } from '../lib/context'
-import { alternatives, assistantChoice, currentContext, pickAlternative, retryFixing, runAction, stopAction, useAI } from '../editor/actions'
+import { alternatives, assistantChoice, currentContext, noteAtCursor, pickAlternative, retryFixing, runAction, stopAction, suggestNext, useAI } from '../editor/actions'
+import type { Nudge } from '../lib/editorial'
 import { diffWords, learnTaste, staleScenes, useNotes } from '../writing'
 import { getEditorView } from '../editor/actions'
 import { allPrompts, fixable } from '../lib/voice'
@@ -56,6 +57,7 @@ export default function ContextPanel() {
   const [alts, setAlts] = useState<{ texts: string[]; from: number; to: number; original: string } | null>(null)
   const taste = useNotes(s => s.taste.length)
   const [learning, setLearning] = useState(false)
+  const [nudges, setNudges] = useState<Nudge[] | null>(null)
   // Beats to prose falls back on the plan card's note when no beats are written.
   const sceneNote = useStore(s => s.book?.chapters.flatMap(c => c.scenes).find(x => x.id === s.sceneId)?.note ?? '')
   const instruction = action === 'beats' && !text.beats.trim() ? sceneNote : text[action]
@@ -146,7 +148,26 @@ export default function ContextPanel() {
             <Copy size={14} /> {t('×3')}
           </button>
         )}
+        {!running && (
+          <button type="button" className="sk-btn" disabled={hasProposal} title={t('Claude suggests what could come next and asks a question, and writes nothing: you write')}
+            onClick={async () => { const r = await suggestNext(overrides); if (r) setNudges(r) }}>
+            <Lightbulb size={14} /> {t('Suggest')}
+          </button>
+        )}
       </div>
+
+      {nudges && (
+        <section className="pl-nudges" aria-label={t('Suggestions')}>
+          <div className="pl-row"><span className="sk-label pl-grow">{t('What could come next')}</span>
+            <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm" onClick={() => setNudges(null)}>{t('Close')}</button></div>
+          {nudges.map((x, i) => (
+            <div key={i} className={`pl-nudge ${x.kind === 'question' ? 'pl-nudge-q' : ''}`}>
+              <span className="pl-grow">{x.kind === 'question' ? '? ' : ''}{x.text}</span>
+              {x.kind === 'beat' && <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm" title={t('Puts it at the cursor as a note to yourself (⟦…⟧)')} onClick={() => noteAtCursor(x.text)}>{t('Note it')}</button>}
+            </div>
+          ))}
+        </section>
+      )}
 
       <details className="pl-fold" open={prefs.assistQuick} onToggle={e => setFold({ assistQuick: e.currentTarget.open })}>
         <summary>{t('Quick actions')}</summary>

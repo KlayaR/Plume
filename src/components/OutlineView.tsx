@@ -16,7 +16,7 @@ import { foldText } from '../lib/text'
 import { sceneCounts } from '../lib/stats'
 import { FOUNDATION_HINTS, FOUNDATION_LABELS, SERIES_LABELS, chapterBeats, mergeCards, outlineMarkdown, revisionChanges, revisionOrder, sameCard, type CardDraft, type RevisionChapter } from '../lib/outline'
 import { acceptAll, acceptFoundation, applyRevision, createEntriesFromOutline, stopEntries, acceptOutline, acceptTurningPoints, checkOutline, cleanOutline, detailAll, fixIssue, interviewFoundation, issueChapter, loadVersions, planChapter, planScene, proposeFoundation, proposeTurningPoints, rejectOutline, restoreVersion, reviseOutline, useOutline } from '../outline'
-import { addFindings } from '../agents'
+import { addFindings, useAgents } from '../agents'
 import { writeChapter, writeFromPlan } from '../editor/actions'
 import { askText, showMenu } from '../contextMenu'
 import { chapterMenu, sceneMenu } from '../menus'
@@ -256,6 +256,8 @@ function SceneCard({ book, c, s, k }: { book: Book; c: Chapter; s: Scene; k: num
   const prevCh = book.chapters[ci - 1]
   const nextCh = book.chapters[ci + 1]
   const words = sceneCounts(s).words
+  // The reverse outline: what the written scene became, and where it left its card.
+  const drift = useAgents(x => x.items).filter(i => i.task === 'drift' && !i.done && i.sceneId === s.id)
   const regenerate = async () => { const d = await askText(t('Direction for Claude (optional)'), '', t('e.g. darker, Alice doesn’t show up, end on the letter')); if (d !== null) planScene(s.id, d) }
   const detail = () => planScene(s.id, book.meta.language === 'fr' ? 'Garde ses événements ; remplis la fiche en entier.' : 'Keep its events; fill in the whole card.')
   const merge = () => { if (next) mergeScenes(s, next, t) }
@@ -293,6 +295,8 @@ function SceneCard({ book, c, s, k }: { book: Book; c: Chapter; s: Scene; k: num
       {s.seeds?.trim() && <div className="pl-ol-small"><b>{t('Seeds for later books')}</b> {s.seeds}</div>}
       {s.arc?.trim() && <div className="pl-ol-small"><b>{t('Arc')}</b> {s.arc}</div>}
       {s.pace?.trim() && <div className="pl-ol-small"><b>{t('Pace and tone')}</b> {s.pace}</div>}
+      {words > 0 && s.summary?.trim() && <div className="pl-ol-small pl-ol-written"><b>{t('What was written')}</b> {s.summary}</div>}
+      {drift.map(d => <div key={d.id} className="pl-ol-small pl-ol-drift"><b>{t('Left the plan')}</b> {d.title}</div>)}
     </article>
   )
   return <SceneForm book={book} c={c} s={s} k={k} update={update} lock={lock} tools={tools} />

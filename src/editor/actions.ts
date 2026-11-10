@@ -6,7 +6,8 @@ import { isRewrite, type ActionId, type Book, type Lang } from '../lib/types'
 import { buildContext, scenePlace, systemPrompt, type Built, type Override } from '../lib/context'
 import { reviewChecks } from '../lib/review'
 import { checkRules, fixable, fixDirection, type Check } from '../lib/voice'
-import { ask, effective, isCheap, stopAsk } from '../ai'
+import { ask, effective, isCheap, parseJSON, stopAsk } from '../ai'
+import { nudgeMessage, readNudges, type Nudge } from '../lib/editorial'
 import { diffWords, noteTaste } from '../writing'
 import { hunksOf } from '../lib/hunks'
 import { newId } from '../lib/text'
@@ -80,6 +81,36 @@ export function assistantChoice(action: ActionId): { model: Model; effort: Effor
   void action // every drafting action uses the drafting model; the effort is the role's
   if (st.prefs.assistBackend === 'openrouter' && st.prefs.assistModel) return { ...draft, orModel: st.prefs.assistModel }
   return { ...draft }
+}
+
+/**
+ * Author-first: Claude suggests what could come next and asks a question, and writes nothing.
+ * Same context as Continue (the scene so far, its card, the bible it mentions), on the drafting model.
+ */
+export async function suggestNext(overrides: Record<string, Override>): Promise<Nudge[] | null> {
+  const st = useStore.getState()
+  if (!view || !st.book || useAI.getState().running) return null
+  if (!canRun()) { st.notify('error', t('The claude command line was not found. Set its path in Settings.')); return null }
+  const ctx = currentContext('continue', '', overrides)
+  if (!ctx) return null
+  const c = assistantChoice('continue')
+  const e = effective(c.model, c.effort)
+  useAI.setState({ running: 'suggest' })
+  try {
+    const reply = await ask({ json: 'list', model: e.model, effort: e.effort, orModel: c.orModel, system: ctx.system, message: nudgeMessage(ctx.message, st.book.meta.language) })
+    const list = readNudges(parseJSON(reply))
+    if (!list.length) throw new Error(t('Claude’s reply could not be read. Try again.'))
+    return list
+  } catch (err) { st.notify('error', (err as Error).message); return null }
+  finally { useAI.setState({ running: null }) }
+}
+
+/** Puts a suggestion at the cursor as a note to yourself (⟦…⟧), which Fill can write out later if you want. */
+export function noteAtCursor(text: string) {
+  if (!view) return
+  const at = view.state.selection.main.head
+  view.dispatch({ changes: { from: at, insert: `⟦${text}⟧` }, selection: { anchor: at + text.length + 2 }, scrollIntoView: true })
+  view.focus()
 }
 
 export async function runAction(action: ActionId, instruction: string, overrides: Record<string, Override>) {
@@ -244,7 +275,7 @@ export function fillPlaceholder(v: EditorView, from: number, to: number, note: s
 export function stopAction() {
   const id = useAI.getState().running
   // Writing a chapter: stop after the scene being written is abandoned.
-  if (id === 'chapter') { useAI.setState({ running: null }); stopAsk(); return }
+  if (id === 'chapter' || id === 'suggest') { useAI.setState({ running: null }); stopAsk(); return }
   if (id && id !== 'starting') cancelLLM(id)
 }
 

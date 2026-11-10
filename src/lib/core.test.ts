@@ -31,6 +31,7 @@ import { adverbs, passives, echoes, sentences } from './analysis'
 import { backupsToRemove, versionsToRemove } from './backups'
 import { bookRepeats } from './repeats'
 import { promiseList } from './promises'
+import { driftText, dropsOf, manuscriptText, nudgeMessage, readCurve, readNudges } from './editorial'
 import { aiTells, checkRules, expandVariables } from './voice'
 import { review, reviewChecks, topProblems } from './review'
 import { applyFixes, fixGuard, fixRequest, placeFixes } from './fixes'
@@ -2009,6 +2010,29 @@ describe('promises to the reader', () => {
       ['The heist', 'dropped'], ['Ghost', 'never'], ['A coin from book 2', 'open'], ['Who wrote the letter?', 'open'], ['Love', 'resolved'],
     ])
     expect(list[0].gap).toBe(5)
+  })
+})
+
+describe('whole-book reads', () => {
+  it('sends the manuscript with scene ids, and each card beside what was written', () => {
+    const b = bookOf([scene('a', 'She ran.', { note: 'She escapes.', summary: 'She runs away.' }), scene('b', '', { note: 'Later.' })])
+    const m = manuscriptText(b)
+    expect(m).toContain('<scene id="a"')
+    expect(m).not.toContain('id="b"')
+    const d = driftText(b)
+    expect(d).toContain('<plan>She escapes.</plan>')
+    expect(d).toContain('<written>She runs away.</written>')
+  })
+  it('reads a reader’s curve and finds the drops', () => {
+    const curve = readCurve([{ chapter: 1, interest: 8, why: 'a' }, { chapter: 2, interest: 5, why: 'b' }, { chapter: 3, interest: 15, why: 'c' }, { chapter: 9, interest: 2 }, 'junk'], 3)
+    expect(curve.map(p => p.interest)).toEqual([8, 5, 10])
+    expect(dropsOf(curve).map(p => p.chapter)).toEqual([2])
+  })
+  it('turns Continue into suggestions, and reads them back', () => {
+    const m = nudgeMessage('<scene>x</scene>\n\n<task>\nContinue.\n</task>', 'en')
+    expect(m).not.toContain('Continue.')
+    expect(m).toContain('Do not write the next part')
+    expect(readNudges([{ kind: 'beat', text: 'She opens it.' }, { kind: 'question', text: 'Why now?' }, { text: '' }])).toEqual([{ kind: 'beat', text: 'She opens it.' }, { kind: 'question', text: 'Why now?' }])
   })
 })
 

@@ -1153,3 +1153,18 @@ body.pl-typing .pl-draftbar { opacity: 0.08; }
 .pl-grid-tile:hover .pl-grid-wire, .pl-grid-tile.pl-on .pl-grid-wire, .pl-grid-tile:hover .pl-grid-size, .pl-grid-tile.pl-on .pl-grid-size { opacity: 1; }
 .pl-grid-band { position: absolute; border: 1px solid var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); pointer-events: none; }
 .pl-grid-empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 24px; text-align: center; color: var(--text-muted); pointer-events: none; }
+
+/* Agent tasks: a reader's interest by chapter, and the editor's letter. */
+.pl-curve { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; }
+.pl-curve-bars { display: flex; align-items: flex-end; gap: 2px; height: 56px; }
+.pl-curve-bars span { flex: 1; min-width: 3px; background: var(--accent); border-radius: 2px 2px 0 0; opacity: 0.8; }
+.pl-curve-bars span.pl-warn { background: var(--danger, #c0392b); }
+.pl-letter { margin: 8px 0; }
+.pl-letter-text { white-space: pre-wrap; line-height: 1.55; max-height: 22rem; overflow: auto; padding: 8px 0; }
+/* Outline: what a written scene became, beside its plan. */
+.pl-ol-written { border-left: 2px solid var(--accent); padding-left: 6px; }
+.pl-ol-drift { color: var(--danger, #c0392b); }
+/* Assistant: Claude's suggestions when you write yourself. */
+.pl-nudges { display: flex; flex-direction: column; gap: 4px; padding: 8px; border: 1px solid var(--border); border-radius: 8px; }
+.pl-nudge { display: flex; align-items: flex-start; gap: 6px; line-height: 1.45; }
+.pl-nudge-q { font-style: italic; color: var(--text-muted); }

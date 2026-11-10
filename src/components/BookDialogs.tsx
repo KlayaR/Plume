@@ -16,7 +16,7 @@ import { volumeToBook } from '../library'
 import { fromBase64, toBase64, utf8 } from '../lib/zip'
 import { imageType } from '../lib/images'
 import { pageSizeFor } from '../lib/fonts'
-import { clearDone, estimate, goTo, markDone, missingSummaries, runRepeats, runTask, stopTask, toBible, useAgents, type AgentTask } from '../agents'
+import { clearDone, estimate, goTo, markDone, missingSummaries, runDrift, runManuscript, runReader, runRepeats, runSeries, runTask, stopTask, toBible, useAgents, type AgentTask } from '../agents'
 import { updateSummaries, useNotes } from '../writing'
 import BookView from './BookView'
 import { numLocale, translate, useT } from '../i18n'
@@ -204,12 +204,22 @@ const TASKS: { id: AgentTask; label: string; hint: string }[] = [
   { id: 'audit', label: 'Deep audit, reading the files', hint: 'Claude reads the manuscript and bible files itself, read-only. The most thorough and the most expensive.' },
   { id: 'research', label: 'Research a real-world fact', hint: 'Searches the web and answers with sources; a finding can become a bible entry.' },
   { id: 'repeats', label: 'Repetitions across the book', hint: 'Free, on this computer: the same words, images, scene openings and endings from one scene to another.' },
+  { id: 'manuscript', label: 'Editor’s letter', hint: 'Claude reads the whole manuscript in one request: a letter on what works and what to revise first, and continuity checked on the text itself.' },
+  { id: 'reader', label: 'A reader’s read', hint: 'Claude reads the whole book as a reader of its genre: interest chapter by chapter, and the passages where attention drops.' },
+  { id: 'drift', label: 'Where the book left the plan', hint: 'Compares each written scene’s summary with its card: what changed, and what it means for the cards after it.' },
+  { id: 'series', label: 'Series continuity', hint: 'Checks this book against the other books of its series (through their summaries): contradictions and forgotten promises.' },
 ]
+
+/** The tasks that run on their own instead of through runTask. */
+const RUNNERS: Partial<Record<AgentTask, () => unknown>> = { repeats: runRepeats, manuscript: runManuscript, reader: runReader, drift: runDrift, series: runSeries }
 
 export function AgentDialog({ onClose }: { onClose: () => void }) {
   const items = useAgents(s => s.items)
   const busy = useAgents(s => s.busy)
   const progress = useAgents(s => s.progress)
+  const letter = useAgents(s => s.letter)
+  const curve = useAgents(s => s.curve)
+  const book = useStore(s => s.book)
   const summarizing = useNotes(s => s.summarizing)
   const [question, setQuestion] = useState('')
   const t = useT()
@@ -236,12 +246,27 @@ export function AgentDialog({ onClose }: { onClose: () => void }) {
               <span className="sk-hint">{task.id === 'repeats' ? t('Free') : `≈ ${n(estimate(task.id))} ${t('tokens')}`}</span>
               {busy === task.id
                 ? <button type="button" className="sk-btn sk-btn-danger sk-btn-sm" onClick={stopTask}><Square size={13} /> {t('Stop')}</button>
-                : <button type="button" className="sk-btn sk-btn-sm" disabled={!!busy || (task.id === 'research' && !question.trim())} onClick={() => task.id === 'repeats' ? runRepeats() : runTask(task.id, question)}>{task.id === 'research' ? <Search size={13} /> : <ListChecks size={13} />} {t('Run')}</button>}
+                : <button type="button" className="sk-btn sk-btn-sm" disabled={!!busy || (task.id === 'research' && !question.trim()) || (task.id === 'series' && !book?.meta.series)} onClick={() => { const run = RUNNERS[task.id]; if (run) run(); else runTask(task.id, question) }}>{task.id === 'research' ? <Search size={13} /> : <ListChecks size={13} />} {t('Run')}</button>}
             </div>
           </div>
         ))}
       </div>
       {busy && <pre className="pl-agent-progress">{progress || t('Working…')}</pre>}
+      {curve.length > 0 && (
+        <div className="pl-curve" aria-label={t('A reader’s interest, chapter by chapter')}>
+          <span className="sk-label">{t('A reader’s interest, chapter by chapter')}</span>
+          <div className="pl-curve-bars">
+            {curve.map(p => <span key={p.chapter} className={p.interest <= 4 ? 'pl-warn' : ''} style={{ height: `${p.interest * 10}%` }} title={`${p.chapter} · ${p.interest}/10 · ${p.why}`} />)}
+          </div>
+        </div>
+      )}
+      {letter && (
+        <details className="pl-letter">
+          <summary>{t('Editor’s letter')} <span className="sk-hint">{new Date(letter.date).toLocaleDateString(numLocale())}</span></summary>
+          <div className="pl-letter-text">{letter.text}</div>
+          <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm" onClick={() => { navigator.clipboard?.writeText(letter.text); useStore.getState().notify('ok', t('Copied.')) }}>{t('Copy')}</button>
+        </details>
+      )}
       <div className="pl-row">
         <span className="sk-label pl-grow">{t('Findings ({n})', { n: open.length })}</span>
         {items.some(i => i.done) && <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm" onClick={clearDone}>{t('Clear the done ones')}</button>}
