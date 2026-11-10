@@ -64,7 +64,7 @@ export function voiceCheck(sceneId: string) {
     const cards = voiced(scene.text).map(c => `<character name="${c.name}">\n${Object.entries(c.voice!).filter(([, v]) => v.trim()).map(([k, v]) => `${k}: ${v}`).join('\n')}\n</character>`).join('\n')
     if (!cards) throw new Error(t('No character with a voice card speaks in this scene. Fill the Voice section of your characters in the bible.'))
     const reply = await ask({
-      model: 'sonnet', effort: 'medium',
+      role: 'edit',
       system: fr() ? 'Tu es un éditeur attentif aux voix des personnages. Réponds uniquement en JSON valide, en français.' : 'You are an editor with an ear for character voices. Reply with valid JSON only.',
       message: `<voice_cards>\n${cards}\n</voice_cards>\n<scene>\n${scene.text}\n</scene>\n\n${fr() ? 'Relève les répliques qui ne sonnent pas comme leur personnage (registre, tics, ce qu’il ne dirait jamais). Cite les mots exacts. "who" = le personnage.' : 'List lines of dialogue that don’t sound like their speaker (register, tics, what they’d never say). Quote the exact words. "who" = the character.'}\nJSON: ${JSON_LIST}`,
     })
@@ -83,7 +83,7 @@ export function continuityCheck(sceneId: string) {
     const here = new Set(findMentions(scene.text, buildMatcher(named)).map(m => m.slug))
     const bible = named.filter(e => here.has(e.slug) || e.include === 'always').map(e => `<entry name="${e.name}">\n${[e.short, aiFull(e), e.facts.map(f => `- ${f.text}`).join('\n')].filter(s => s.trim()).join('\n')}\n</entry>`).join('\n')
     const reply = await ask({
-      model: 'sonnet', effort: 'medium',
+      role: 'edit',
       system: fr() ? 'Tu vérifies la continuité d’un roman. Réponds uniquement en JSON valide, en français.' : 'You check a novel’s continuity. Reply with valid JSON only.',
       message: `<bible chapter="${number}">\n${bible}\n</bible>\n<scene>\n${scene.text}\n</scene>\n\n${fr() ? 'Relève ce qui, dans la scène, contredit la bible (noms, lieux, objets, règles, faits, âges). Cite les mots exacts de la scène.' : 'List what in the scene contradicts the bible (names, places, objects, rules, facts, ages). Quote the exact words of the scene.'}\nJSON: ${JSON_LIST}`,
     })
@@ -109,7 +109,7 @@ export function betaRead(chapterId: string, persona: string, custom = '') {
     const who = custom.trim() || (p ? p[fr() ? 'fr' : 'en'] : '')
     const text = ch.scenes.map(s => s.text).join('\n\n* * *\n\n')
     const reply = await ask({
-      model: 'sonnet', effort: 'medium',
+      role: 'edit',
       system: fr() ? `Tu es ${who}. Tu lis un chapitre d’un roman en cours et tu le commentes franchement pour l’auteur, en français. Réponds uniquement en JSON valide.` : `You are ${who}. You read a chapter of a novel in progress and comment honestly for the author. Reply with valid JSON only.`,
       message: `<chapter>\n${text}\n</chapter>\n\n${fr() ? 'Donne 5 à 10 réactions de lecteur, liées à des passages précis (cite les mots exacts) : ce qui accroche, ce qui ennuie, ce qui est confus, ce que tu as aimé. "who" = ton rôle.' : 'Give 5 to 10 reader reactions tied to precise passages (quote the exact words): what grips, what bores, what confuses, what you loved. "who" = your role.'}\nJSON: ${JSON_LIST}`,
     })
@@ -126,7 +126,7 @@ export async function lineEdit(sceneId: string, view: EditorView | null) {
   try {
     const { scene } = sceneOf(sceneId)
     const reply = await ask({
-      model: 'sonnet', effort: 'medium',
+      role: 'edit',
       system: fr() ? 'Tu es correcteur littéraire. Tu proposes des corrections précises, sans réécrire la voix de l’auteur. Réponds uniquement en JSON valide, en français.' : 'You are a line editor. You suggest precise edits without rewriting the author’s voice. Reply with valid JSON only.',
       message: `<scene>\n${scene.text}\n</scene>\n\n${fr() ? 'Propose au plus 25 corrections ponctuelles : fautes, lourdeurs, répétitions, adverbes inutiles, clichés. "find" = les mots exacts du texte (assez pour être uniques), "replace" = le remplacement, "why" = la raison en quelques mots.' : 'Suggest at most 25 local edits: errors, clunky phrasing, repetitions, needless adverbs, clichés. "find" = the exact words of the text (enough to be unique), "replace" = the replacement, "why" = the reason in a few words.'}\nJSON: [{"find": "...", "replace": "...", "why": "..."}]`,
     })

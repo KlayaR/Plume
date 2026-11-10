@@ -1,7 +1,7 @@
 // The content of every right-click menu, one function per place. Screens call
 // these with what was clicked; the menu itself is drawn by ContextMenuHost.
 import { fixFlagged, openEdit } from './edit'
-import { ownShare } from './lib/context'
+import { isVoiceSample } from './lib/context'
 import type { EditorView } from '@codemirror/view'
 import { ask as askDialog } from '@tauri-apps/plugin-dialog'
 import { findScene, useStore } from './store'
@@ -212,9 +212,10 @@ export function sceneMenu(sceneId: string, opts: { card?: boolean } = {}): MenuI
     { separator: true },
     ...statusAndPov(scene),
     opts.card && lines.length > 0 && { label: t('Story lines'), sub: lines.map(l => ({ label: l.name, checked: !!scene.lines?.includes(l.slug), onClick: () => st.updateScene(sceneId, { lines: scene.lines?.includes(l.slug) ? scene.lines.filter(x => x !== l.slug) : [...(scene.lines ?? []), l.slug] }) })) },
-    // Revised or done scenes mostly written by you are sent as samples of your voice; this overrides the count.
-    { label: t('Sample of my voice'), checked: scene.status !== 'draft' && ownShare(scene) <= 0.25, disabled: scene.status === 'draft',
-      onClick: () => st.updateScene(sceneId, { extra: { ...scene.extra, aiWords: ownShare(scene) <= 0.25 ? (scene.text.match(/\S+/g) ?? []).length : 0 } }) },
+    // Sent to Claude as a sample of your voice, first, whoever typed it; unticked, never. Untouched, Plume decides (revised scenes mostly yours).
+    { label: t('Sample of my voice'), checked: isVoiceSample(scene), disabled: !scene.text.trim(),
+      title: t('Claude reads it as an example of how you write. Use it for a scene whose tone you want kept, even one Claude drafted and you reworked.'),
+      onClick: () => st.updateScene(sceneId, { voiceRef: !isVoiceSample(scene) }) },
     book.chapters.length > 1 && { label: t('Move to chapter'), sub: book.chapters.map((c, i) => ({ label: `${labels[i].label}${c.title && c.title !== labels[i].label ? ` · ${c.title}` : ''}`, checked: c.id === chapter.id, disabled: c.id === chapter.id, onClick: () => st.moveScene(sceneId, c.id, c.scenes.length) })) },
     { separator: true },
     { label: t('New scene after'), onClick: () => { const id = st.addScene(chapter.id, `${t('Scene')} ${chapter.scenes.length + 1}`, { stay: true }); st.moveScene(id, chapter.id, found.index + 1) } },
@@ -248,6 +249,9 @@ export function chapterMenu(chapterId: string): MenuItem[] {
       { label: t('Copy the title'), onClick: () => { navigator.clipboard?.writeText(chapterTitleFor(book, i)); st.notify('ok', t('Title copied.')) } },
       { label: c.arc ? t('Arc: {title}…', { title: c.arc }) : t('Start an arc here…'), onClick: async () => { const v = await askText(t('Title of the arc that starts here (empty: none)'), c.arc ?? ''); if (v !== null) st.updateChapter(chapterId, { arc: v.trim() }) } },
     ] as MenuItem[] : []),
+    c.scenes.some(s => s.text.trim()) && { label: t('Sample of my voice: the whole chapter'), checked: c.scenes.filter(s => s.text.trim()).every(isVoiceSample),
+      title: t('Claude reads its scenes as examples of how you write.'),
+      onClick: () => { const on = !c.scenes.filter(s => s.text.trim()).every(isVoiceSample); c.scenes.filter(s => s.text.trim()).forEach(s => st.updateScene(s.id, { voiceRef: on })) } },
     { label: t('Write the chapter from the plan (Claude)'), disabled: !c.scenes.some(s => !s.text.trim() && (s.note?.trim() || s.beats?.length)), onClick: () => writeChapter(chapterId) },
     { label: t('Rename…'), onClick: async () => { const v = await askText(t('Chapter title'), c.title); if (v !== null) st.updateChapter(chapterId, { title: v.trim() }) } },
     kinds.length > 1 && { label: t('Kind'), sub: kinds.map(k => ({ label: t(kindNames[k]), checked: c.kind === k, onClick: () => st.updateChapter(chapterId, { kind: k }) })) },

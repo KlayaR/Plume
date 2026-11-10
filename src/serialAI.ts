@@ -33,7 +33,7 @@ export async function checkHooks() {
       const batch = todo.slice(i, i + 8)
       const blocks = batch.map(c => `<chapter n="${labels[book.chapters.indexOf(c)].number}" title="${c.title}">\n<opening>\n${chapterOpening(c)}\n</opening>\n<ending>\n${chapterClosing(c)}\n</ending>\n</chapter>`).join('\n')
       const reply = await ask({
-        model: 'sonnet', effort: 'low',
+        role: 'edit',
         system: fr
           ? 'Tu es éditeur de web novels (Royal Road). Tu juges si l’ouverture d’un chapitre accroche tout de suite et si sa fin donne envie de cliquer sur le chapitre suivant. Réponds uniquement en JSON valide, en français.'
           : 'You are a web novel editor (Royal Road). You judge whether a chapter’s opening hooks at once and whether its ending makes the reader click Next. Reply with valid JSON only.',
@@ -84,7 +84,7 @@ export async function findThreads() {
   useSerialAI.setState({ busy: 'threads' })
   try {
     const reply = await ask({
-      model: 'sonnet', effort: 'medium',
+      role: 'edit',
       system: fr
         ? 'Tu aides l’auteur d’un web novel à suivre les promesses faites au lecteur : mystères, promesses, mises en place, présages. Réponds uniquement en JSON valide, en français.'
         : 'You help a web novel author keep track of the promises made to the reader: mysteries, promises, setups, foreshadowing. Reply with valid JSON only.',

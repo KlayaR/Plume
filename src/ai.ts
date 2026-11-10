@@ -1,7 +1,7 @@
 // One-shot Claude tasks outside the editor's proposals: voice description,
 // summaries, bible drafts, checks, chat, agent tasks. Each uses the lean CLI
 // call, records real usage, and resolves with the reply text.
-import type { Effort, Model } from './lib/types'
+import type { Effort, Model, Role } from './lib/types'
 import { canRun, cancelLLM, choose, runLLM } from './llm'
 import { useStore } from './store'
 import { t } from './i18n'
@@ -11,6 +11,8 @@ export interface AskOptions {
   message: string
   model?: Model
   effort?: Effort
+  /** What the request is for: its model and effort come from Settings → Claude (overrides model and effort). */
+  role?: Role
   /** A model preset id (Settings → Claude); overrides model and effort. */
   preset?: string
   /** An OpenRouter model id (used as is, no saved preset needed). */
@@ -40,7 +42,8 @@ let current: string | null = null
 export function ask(o: AskOptions): Promise<string> {
   const st = useStore.getState()
   if (!canRun()) return Promise.reject(new Error(t('The claude command line was not found. Set its path in Settings.')))
-  const c = choose({ model: o.model ?? 'sonnet', effort: o.effort ?? 'low', preset: o.preset })
+  const r = o.role ? st.prefs.roles[o.role] : undefined
+  const c = choose({ model: r?.model ?? o.model ?? 'sonnet', effort: r?.effort ?? o.effort ?? 'low', preset: o.preset })
   const { model, effort } = effective(c.model, c.effort)
   return new Promise((resolve, reject) => {
     runLLM(

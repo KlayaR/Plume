@@ -14,6 +14,15 @@ export function sceneCounts(scene: { text: string }): { words: number; signs: nu
   if (!c) { c = { words: countWords(scene.text), signs: countSigns(scene.text) }; counted.set(scene, c) }
   return c
 }
+/** Placeholders ⟦…⟧ still open in a scene, kept against the scene object like its counts. */
+const holes = new WeakMap<object, number>()
+const PLACEHOLDERS = new RegExp('⟦[^⟧\\n]*⟧', 'g')
+export function scenePlaceholders(scene: { text: string }): number {
+  let n = holes.get(scene)
+  if (n === undefined) { n = (scene.text.match(PLACEHOLDERS) ?? []).length; holes.set(scene, n) }
+  return n
+}
+
 export function bookCounts(chapters: { scenes: { text: string }[] }[]): { words: number; signs: number } {
   let words = 0, signs = 0
   for (const c of chapters) for (const s of c.scenes) { const k = sceneCounts(s); words += k.words; signs += k.signs }

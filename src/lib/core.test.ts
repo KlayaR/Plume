@@ -27,6 +27,7 @@ import { countSigns, textStats } from './stats'
 import type { Book, Entry, Scene } from './types'
 import { DEFAULT_AI, DEFAULT_VOICE, ENTRY_TYPES, FAMILIES, VOICE_TYPES, familyOf } from './types'
 import { adverbs, passives, echoes, sentences } from './analysis'
+import { backupsToRemove } from './backups'
 import { aiTells, checkRules, expandVariables } from './voice'
 import { review, reviewChecks, topProblems } from './review'
 import { applyFixes, fixGuard, fixRequest, placeFixes } from './fixes'
@@ -922,6 +923,16 @@ describe('quality per token', () => {
     expect(s).not.toContain('draft')
     expect(proseSamples(book, 1)).toEqual([])
   })
+  it('sends the scenes you marked as your voice first, even Claude’s or a draft, and never those you unmarked', () => {
+    const long = (w: string) => Array.from({ length: 200 }, () => w).join(' ')
+    const mine = { ...scene('a', long('mine')), status: 'done' as const, voiceRef: false }
+    const claude = { ...scene('b', long('claude')), status: 'done' as const, extra: { aiWords: 150 }, voiceRef: true }
+    const draft = { ...scene('c', long('draft')), voiceRef: true }
+    const s = proseSamples(bookOf([mine, claude, draft], []), 1)
+    expect(s[0]).toContain('claude')
+    expect(s.join(' ')).toContain('draft')
+    expect(s.join(' ')).not.toContain('mine')
+  })
   it('marks the system prompt for caching on Claude models through OpenRouter', () => {
     const body = chatBody('anthropic/claude-sonnet-5.5', 'Rules', 'Hi')
     expect(body.messages[0].content).toEqual([{ type: 'text', text: 'Rules', cache_control: { type: 'ephemeral' } }])
@@ -957,6 +968,14 @@ describe('scene boundaries', () => {
     expect(c.message).toContain('<previous_scene title="s1">\nJasper watched the rain.')
     const r = buildContext({ book, chapter: 1, pov: null, action: 'rewrite', instruction: '', before: '', selection: 'x', after: '', overrides: {}, scene: s1 })
     expect(r.message).not.toContain('<scope>')
+  })
+  it('gives a scene written from its plan the whole chapter so far, instead of the previous scene’s end', () => {
+    const s1 = scene('s1', 'Jasper watched the rain. Then the bell rang.', { note: 'Jasper wants a calm morning.' })
+    const s2 = scene('s2', '', { note: 'Alice tells him a new girl will change everything.' })
+    const book = bookOf([s1, s2], [])
+    const b = buildContext({ book, chapter: 1, pov: null, action: 'scene', instruction: '', before: '', selection: '', after: '', overrides: {}, scene: s2 })
+    expect(b.message).toContain('<chapter_so_far>\nJasper watched the rain. Then the bell rang.\n</chapter_so_far>')
+    expect(b.message).not.toContain('<previous_scene title')
   })
 })
 
@@ -1918,5 +1937,22 @@ describe('board keys', () => {
     expect(boardMove(book, '2', 'right')).toEqual({ chapterId: 'empty', index: 0 })
     expect(boardMove(book, '1', 'up')).toBeNull()
     expect(boardMove(book, '3', 'right')).toBeNull()
+  })
+})
+
+describe('backups', () => {
+  const day = (i: number) => new Date(Date.UTC(2026, 10, 10) - i * 864e5).toISOString().slice(0, 10) + '.zip'
+  it('keeps the last ten whatever their age', () => {
+    // Ten backups spread over a year (the book wasn't opened for months): none goes.
+    const sparse = Array.from({ length: 10 }, (_, i) => day(i * 30))
+    expect(backupsToRemove(sparse)).toEqual([])
+  })
+  it('keeps one a week after the last ten, and leaves other files alone', () => {
+    const daily = [...Array.from({ length: 40 }, (_, i) => day(i)), 'notes.txt']
+    const gone = backupsToRemove(daily)
+    const kept = daily.filter(n => !gone.includes(n) && n.endsWith('.zip'))
+    expect(kept.slice(0, 10)).toEqual(daily.slice(0, 10))
+    expect(kept.length).toBeLessThan(18)
+    expect(gone).not.toContain('notes.txt')
   })
 })

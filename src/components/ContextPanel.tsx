@@ -4,10 +4,10 @@ import { useMemo, useState } from 'react'
 import { Check, CircleCheck, CircleX, Copy, Eye, GraduationCap, Pin, Send, Square, Wand2 } from 'lucide-react'
 import { Dialog } from '../studio-kit/shell.js'
 import { useStore } from '../store'
-import type { ActionId, Effort, Model } from '../lib/types'
+import type { ActionId } from '../lib/types'
 import type { Override } from '../lib/context'
 import { alternatives, assistantChoice, currentContext, pickAlternative, retryFixing, runAction, stopAction, useAI } from '../editor/actions'
-import { diffWords, learnTaste, useNotes } from '../writing'
+import { diffWords, learnTaste, staleScenes, useNotes } from '../writing'
 import { getEditorView } from '../editor/actions'
 import { allPrompts } from '../lib/voice'
 import { BackendModelSelect } from './ModelPresets'
@@ -82,12 +82,11 @@ export default function ContextPanel() {
     [book, tick, action, instruction, overrides],
   )
 
-  const settings = book.meta.ai.actions[action]
-  const setSetting = (patch: Partial<typeof settings>) =>
-    useStore.getState().updateMeta({ ai: { ...book.meta.ai, actions: { ...book.meta.ai.actions, [action]: { ...settings, ...patch } } } })
   const setOverride = (slug: string, o: Override | null) =>
     setOverrides(prev => { const next = { ...prev }; if (o) next[slug] = o; else delete next[slug]; return next })
 
+  // The story memory: written scenes whose summary is up to date, which Claude reads as what already happened.
+  const memory = useMemo(() => { const n = book.chapters.flatMap(c => c.scenes).filter(s => s.text.trim().length > 200).length; return { n, done: n - staleScenes(book).length } }, [book])
   const total = ctx ? ctx.total : 0
   const seg = (v: number) => `${total ? (v / total) * 100 : 0}%`
   const bibleOver = ctx ? ctx.parts.bible > ctx.budget : false
@@ -211,6 +210,7 @@ export default function ContextPanel() {
             <span><i className="pl-m-task" />{t('Task')} {n(ctx.parts.task)}</span>
           </div>
           <p className="sk-hint">{t('Your rules, prompt and voice samples are cached for an hour and reused by every call, in any scene: only the bible entries, the text and the task are paid in full.')}</p>
+          {memory.n > 0 && <p className="sk-hint">{t('Story memory: {done} of {n} written scenes summarised.', memory)}</p>}
         </section>
       )}
 

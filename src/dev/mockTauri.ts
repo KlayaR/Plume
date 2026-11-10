@@ -105,6 +105,7 @@ async function invoke(cmd: string, args: any = {}): Promise<unknown> {
     case 'write_file_base64': (window as any).__exports = { ...((window as any).__exports ?? {}), [args.path]: args.data }; return null
     case 'list_all': return [...files.keys()].filter(k => !k.startsWith('.plume/'))
     case 'write_backup': (window as any).__backup = args; return `C:\\Users\\Test\\AppData\\Local\\Plume\\backups\\${args.name}\\${args.date}.zip`
+    case 'remove_backup': return null
     case 'list_backups': return (window as any).__backup ? ['C:\\backups\\today.zip'] : []
     case 'file_mtime': return 0
     case 'device_name': return 'MOCK-PC'

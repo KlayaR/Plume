@@ -111,7 +111,7 @@ export function parseEntry(path: string, text: string): Entry {
 }
 
 const ENTRY_KEYS = ['type', 'name', 'aliases', 'include', 'links', 'rank', 'voice', 'knows', 'unaware', 'later', 'notes', 'sends', 'detect', 'tags', 'image', 'kind', 'resolved', 'stats', 'fields']
-const SCENE_KEYS = ['id', 'title', 'pov', 'status', 'note', 'time', 'place', 'lines', 'summary', 'summaryOf', 'comments', 'tension', 'passes', 'beats', 'reveals', 'seeds', 'arc', 'pace', 'cast', 'locked']
+const SCENE_KEYS = ['id', 'title', 'pov', 'status', 'note', 'time', 'place', 'lines', 'summary', 'summaryOf', 'comments', 'tension', 'passes', 'beats', 'reveals', 'seeds', 'arc', 'pace', 'cast', 'locked', 'voiceRef']
 const rest = (data: Record<string, unknown>, known: string[]) => Object.fromEntries(Object.entries(data).filter(([k]) => !known.includes(k)))
 const filled = (v: VoiceCard | undefined) => (v && Object.values(v).some(x => x.trim()) ? v : undefined)
 const filledFields = (f: Entry['fields']) => { const kept = Object.entries(f ?? {}).filter(([, v]) => v.trim()); return kept.length ? Object.fromEntries(kept) : undefined }
@@ -155,6 +155,7 @@ export function parseScene(path: string, text: string): Scene {
     pace: data.pace ? String(data.pace) : undefined,
     cast: data.cast ? asList(data.cast) : undefined,
     locked: data.locked === true ? true : undefined,
+    voiceRef: data.voiceRef === true ? true : data.voiceRef === false ? false : undefined,
     comments: Array.isArray(data.comments)
       ? (data.comments as Record<string, unknown>[]).map(c => ({ id: String(c.id ?? ''), quote: String(c.quote ?? ''), text: String(c.text ?? ''), date: String(c.date ?? ''), ...(Number.isFinite(Number(c.at)) && c.at !== undefined ? { at: Number(c.at) } : {}) }))
       : [],
@@ -167,7 +168,7 @@ export function serializeScene(s: Scene): string {
     id: s.id, title: s.title, pov: s.pov ?? undefined, status: s.status,
     note: s.note, time: s.time, place: s.place ?? undefined, lines: s.lines?.length ? s.lines : undefined,
     summary: s.summary, summaryOf: s.summaryOf, tension: s.tension, passes: s.passes?.length ? s.passes : undefined, comments: s.comments?.length ? s.comments : undefined,
-    beats: s.beats?.length ? s.beats : undefined, reveals: s.reveals || undefined, seeds: s.seeds || undefined, arc: s.arc || undefined, pace: s.pace || undefined, cast: s.cast?.length ? s.cast : undefined, locked: s.locked || undefined,
+    beats: s.beats?.length ? s.beats : undefined, reveals: s.reveals || undefined, seeds: s.seeds || undefined, arc: s.arc || undefined, pace: s.pace || undefined, cast: s.cast?.length ? s.cast : undefined, locked: s.locked || undefined, voiceRef: s.voiceRef,
     ...s.extra,
   }, `\n${s.text}`)
 }

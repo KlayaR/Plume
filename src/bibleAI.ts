@@ -11,7 +11,7 @@ export async function writeShort(book: Book, e: Entry): Promise<string> {
   const fr = book.meta.language === 'fr'
   const facts = e.facts.map(f => `- ${f.text}`).join('\n')
   const reply = await ask({
-    model: 'haiku', effort: 'low',
+    role: 'quick',
     system: fr
       ? 'Tu rédiges la version courte d’une fiche de bible de roman, relue par une IA chaque fois que le nom apparaît. Réponds uniquement par le texte.'
       : 'You write the short version of a novel-bible entry, which an AI reads every time the name comes up. Reply with the text only.',
@@ -44,7 +44,7 @@ export async function draftEntry(book: Book, name: string, type: EntryType, cont
   const headings = typeInfo(type).headings[book.meta.language]
   const known = book.entries.filter(e => e.type !== 'style' && e.short.trim() && e.include !== 'secret').slice(0, 40).map(e => `- ${e.name}: ${e.short.trim()}`).join('\n')
   const reply = await ask({
-    model: 'sonnet', effort: 'low',
+    role: 'edit',
     system: fr
       ? 'Tu aides un romancier de fantasy à tenir sa bible. Tu ne décris que ce que le texte dit ou implique clairement ; tu n’inventes rien. Réponds uniquement en JSON valide, en français.'
       : 'You help a fantasy novelist keep their story bible. Describe only what the text states or clearly implies; invent nothing. Reply with valid JSON only.',

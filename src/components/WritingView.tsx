@@ -7,7 +7,7 @@ import { ChevronLeft, ChevronRight, FilePlus2, FolderPlus, GripVertical, Lock, P
 import { isLocked, isSerial } from '../lib/serial'
 import { findScene, useStore } from '../store'
 import type { Chapter, Entry, Scene, SceneStatus } from '../lib/types'
-import { countWords } from '../lib/text'
+import { sceneCounts, scenePlaceholders } from '../lib/stats'
 import { allowedKinds, chapterLabels } from '../lib/chapters'
 import Editor from '../editor/Editor'
 import { accept, discard, proposalReplaces, proposalToChanges, retry, useAI } from '../editor/actions'
@@ -20,7 +20,6 @@ import { hasPlan } from '../lib/outline'
 import ChatPanel, { ResizeHandle } from './ChatPanel'
 import { ManuscriptToolbar } from './BottomBar'
 import NotesPanel from './NotesPanel'
-import { countPlaceholders } from '../editor/marks'
 import { useChat } from '../chat'
 import { useT } from '../i18n'
 import { showMenu } from '../contextMenu'
@@ -271,7 +270,7 @@ function SceneTree() {
                 onClick={() => cycleKind(c, ci)}>
                 {c.kind === 'chapter' ? labels[ci].number : c.kind === 'prologue' ? 'P' : 'É'}
               </button>
-              {c.scenes.some(s => countPlaceholders(s.text) > 0) && <span className="pl-redot" title={t('Placeholders to fill in this chapter')} />}
+              {c.scenes.some(s => scenePlaceholders(s) > 0) && <span className="pl-redot" title={t('Placeholders to fill in this chapter')} />}
               {c.published && <span className="pl-pubmark" title={t('Published on {day}', { day: c.published })}><Lock size={11} /></span>}
               <input data-lt className="pl-chapter-title" value={c.title} placeholder={t('Untitled')} onChange={e => st().updateChapter(c.id, { title: e.target.value })} aria-label={t('Chapter title')} />
               <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm sk-btn-icon" title={t('New scene')}
@@ -295,8 +294,8 @@ function SceneTree() {
                 <GripVertical size={12} className="pl-grip" />
                 <span className={`pl-status pl-status-${s.status}`} title={t(s.status === 'draft' ? 'Draft' : s.status === 'revised' ? 'Revised' : 'Done')} />
                 <span className="pl-scene-title">{s.title}</span>
-                {countPlaceholders(s.text) > 0 && <span className="pl-redot" title={t('{n} placeholders to fill', { n: countPlaceholders(s.text) })} />}
-                <span className="pl-scene-words">{countWords(s.text)}</span>
+                {scenePlaceholders(s) > 0 && <span className="pl-redot" title={t('{n} placeholders to fill', { n: scenePlaceholders(s) })} />}
+                <span className="pl-scene-words">{sceneCounts(s).words}</span>
                 <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm sk-btn-icon pl-hover" title={t('Remove scene')}
                   onClick={e => { e.stopPropagation(); remove(s.id, s.title) }}>
                   <Trash2 size={13} />

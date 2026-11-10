@@ -64,7 +64,7 @@ async function runList(task: AgentTask, opts: { system: string; message: string;
   useAgents.setState({ busy: task, progress: '' })
   try {
     const reply = await ask({
-      model: 'sonnet', effort: 'high', system: opts.system, message: opts.message, tools: opts.tools, cwd: opts.cwd,
+      role: 'edit', system: opts.system, message: opts.message, tools: opts.tools, cwd: opts.cwd,
       onText: chunk => useAgents.setState(s => ({ progress: (s.progress + chunk).slice(-400) })),
     })
     const list = parseJSON<{ title: string; detail: string; where?: string }[]>(reply)

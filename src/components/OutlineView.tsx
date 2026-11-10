@@ -6,12 +6,13 @@
 import { useEffect, useState } from 'react'
 import { create } from 'zustand'
 import { ask as askDialog } from '@tauri-apps/plugin-dialog'
-import { ArrowDown, ArrowUp, BookPlus, Check, CheckCheck, ChevronDown, ChevronRight, Combine, History, Lock, LockOpen, MessagesSquare, MoreHorizontal, PenLine, PencilRuler, Plus, Scissors, SearchCheck, Sparkles, Wand2, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, Check, CheckCheck, ChevronDown, ChevronRight, Combine, History, Lock, LockOpen, MessagesSquare, MoreHorizontal, PenLine, Plus, Scissors, Sparkles, Wand2, X } from 'lucide-react'
 import { useStore } from '../store'
 import { FOUNDATION_KEYS, SERIES_KEYS, type Book, type Chapter, type Foundation, type Scene } from '../lib/types'
 import { TEMPLATES, templateBeats } from '../lib/structures'
 import { chapterLabels } from '../lib/chapters'
-import { countWords, foldText } from '../lib/text'
+import { foldText } from '../lib/text'
+import { sceneCounts } from '../lib/stats'
 import { FOUNDATION_HINTS, FOUNDATION_LABELS, SERIES_LABELS, chapterBeats, mergeCards, outlineMarkdown, revisionChanges, revisionOrder, sameCard, type CardDraft, type RevisionChapter } from '../lib/outline'
 import { acceptAll, acceptFoundation, applyRevision, createEntriesFromOutline, stopEntries, acceptOutline, acceptTurningPoints, checkOutline, cleanOutline, detailAll, fixIssue, interviewFoundation, issueChapter, loadVersions, planChapter, planScene, proposeFoundation, proposeTurningPoints, rejectOutline, restoreVersion, reviseOutline, useOutline } from '../outline'
 import { writeChapter, writeFromPlan } from '../editor/actions'
@@ -135,7 +136,7 @@ function ChapterBlock({ book, c, n, label, open, onFold }: { book: Book; c: Chap
   const st = useStore.getState
   const serial = book.meta.kind === 'serial'
   const next = book.chapters[n + 1]
-  const words = c.scenes.reduce((k, s) => k + countWords(s.text), 0)
+  const words = c.scenes.reduce((k, s) => k + sceneCounts(s).words, 0)
   const regenerate = async () => { const d = await askText(t('Direction for Claude (optional)'), '', t('e.g. darker, Alice doesn’t show up, end on the letter')); if (d !== null) planChapter(c.id, 'regenerate', d) }
   const mergeNext = async () => {
     if (!next || !(await askDialog(t('Merge “{a}” and “{b}” into one chapter? The scenes of the second move into the first.', { a: c.title || label, b: next.title || labels(book)[n + 1] }), { title: t('Merge chapters'), kind: 'warning' }))) return
@@ -248,7 +249,7 @@ function SceneCard({ book, c, s, k }: { book: Book; c: Chapter; s: Scene; k: num
   const ci = book.chapters.findIndex(x => x.id === c.id)
   const prevCh = book.chapters[ci - 1]
   const nextCh = book.chapters[ci + 1]
-  const words = countWords(s.text)
+  const words = sceneCounts(s).words
   const regenerate = async () => { const d = await askText(t('Direction for Claude (optional)'), '', t('e.g. darker, Alice doesn’t show up, end on the letter')); if (d !== null) planScene(s.id, d) }
   const detail = () => planScene(s.id, book.meta.language === 'fr' ? 'Garde ses événements ; remplis la fiche en entier.' : 'Keep its events; fill in the whole card.')
   const merge = () => { if (next) mergeScenes(s, next, t) }

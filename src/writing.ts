@@ -9,6 +9,7 @@ import type { ActionId, Book, Entry, Scene } from './lib/types'
 import { newId } from './lib/text'
 import { serializeEntry } from './lib/bible'
 import { ask, hashText } from './ai'
+import { canRun } from './llm'
 import { findScene, useStore } from './store'
 import { arcsOf } from './lib/serial'
 import { t } from './i18n'
@@ -198,8 +199,38 @@ export async function summarizeScene(sceneId: string) {
   const s = findScene(book, sceneId)?.scene
   if (!s || !s.text.trim()) return
   const fr = book.meta.language === 'fr'
-  const text = await ask({ model: 'haiku', effort: 'low', system: summarySystem(fr), message: `<scene title="${s.title}">\n${s.text}\n</scene>\n\n${fr ? 'Résume cette scène en 2 à 4 phrases.' : 'Summarise this scene in 2 to 4 sentences.'}` })
+  const text = await ask({ role: 'quick', system: summarySystem(fr), message: `<scene title="${s.title}">\n${s.text}\n</scene>\n\n${fr ? 'Résume cette scène en 2 à 4 phrases.' : 'Summarise this scene in 2 to 4 sentences.'}` })
   useStore.getState().updateScene(sceneId, { summary: text.trim(), summaryOf: hashText(s.text) })
+}
+
+/** A chapter's summary, made from its scenes' summaries, when they changed since it was made. */
+export async function summarizeChapter(chapterId: string) {
+  const book = useStore.getState().book
+  const c = book?.chapters.find(x => x.id === chapterId)
+  if (!book || !c) return
+  const fr = book.meta.language === 'fr'
+  const parts = c.scenes.filter(s => s.summary).map(s => `- ${s.title} : ${s.summary}`).join('\n')
+  if (!parts || c.summaryOf === hashText(parts)) return
+  const text = await ask({ role: 'quick', system: summarySystem(fr), message: `<scenes>\n${parts}\n</scenes>\n\n${fr ? 'Résume ce chapitre en 3 à 5 phrases.' : 'Summarise this chapter in 3 to 5 sentences.'}` })
+  useStore.getState().updateChapter(c.id, { summary: text.trim(), summaryOf: hashText(parts) })
+}
+
+// The story memory, kept up to date as you work: a scene you leave after changing it
+// gets its summary, then its chapter's. One at a time, in the background, on the quick model.
+let memory: Promise<unknown> = Promise.resolve()
+export const memoryOn = () => useStore.getState().prefs.memory !== false && canRun()
+
+/** Called when you leave a scene: if its summary is missing or out of date, it is made (and the chapter's after it). */
+export function remember(sceneId: string | null) {
+  const book = useStore.getState().book
+  if (!sceneId || !book || !memoryOn() || !staleScenes(book).some(s => s.id === sceneId)) return
+  const root = book.root
+  memory = memory.then(async () => {
+    if (useStore.getState().book?.root !== root) return
+    await summarizeScene(sceneId).catch(() => {})
+    const chapter = findScene(useStore.getState().book, sceneId)?.chapter
+    if (chapter) await summarizeChapter(chapter.id).catch(() => {})
+  })
 }
 
 /** Scene summaries that are missing or out of date, then the chapter and book summaries built from them. */
@@ -212,11 +243,8 @@ export async function updateSummaries() {
     }
     const fr = useStore.getState().book!.meta.language === 'fr'
     for (const c of useStore.getState().book!.chapters) {
-      const parts = c.scenes.filter(s => s.summary).map(s => `- ${s.title} : ${s.summary}`).join('\n')
-      if (!parts || c.summaryOf === hashText(parts)) continue
       useNotes.setState({ summarizing: c.title || '…' })
-      const text = await ask({ model: 'haiku', effort: 'low', system: summarySystem(fr), message: `<scenes>\n${parts}\n</scenes>\n\n${fr ? 'Résume ce chapitre en 3 à 5 phrases.' : 'Summarise this chapter in 3 to 5 sentences.'}` })
-      useStore.getState().updateChapter(c.id, { summary: text.trim(), summaryOf: hashText(parts) })
+      await summarizeChapter(c.id)
     }
     // Web novels: each arc's summary, which the AI reads instead of its chapters once the arc is over.
     for (const a of arcsOf(useStore.getState().book!)) {
@@ -224,7 +252,7 @@ export async function updateSummaries() {
       const parts = b.chapters.slice(a.start, a.end).filter(c => c.summary).map(c => `- ${c.title || '…'} : ${c.summary}`).join('\n')
       if (!parts || a.plan?.summaryOf === hashText(parts)) continue
       useNotes.setState({ summarizing: a.title })
-      const text = await ask({ model: 'haiku', effort: 'low', system: summarySystem(fr), message: `<chapters>\n${parts}\n</chapters>\n\n${fr ? 'Résume cet arc en 4 à 6 phrases : ce qui s’y passe, ce qui change, ce qui reste ouvert.' : 'Summarise this arc in 4 to 6 sentences: what happens, what changes, what is left open.'}` })
+      const text = await ask({ role: 'quick', system: summarySystem(fr), message: `<chapters>\n${parts}\n</chapters>\n\n${fr ? 'Résume cet arc en 4 à 6 phrases : ce qui s’y passe, ce qui change, ce qui reste ouvert.' : 'Summarise this arc in 4 to 6 sentences: what happens, what changes, what is left open.'}` })
       const arcs = useStore.getState().book!.meta.arcs ?? {}
       const was = arcs[a.id] ?? { template: '', beats: [], planned: 30 }
       useStore.getState().updateMeta({ arcs: { ...arcs, [a.id]: { ...was, summary: text.trim(), summaryOf: hashText(parts) } } })
@@ -233,7 +261,7 @@ export async function updateSummaries() {
     const all = book.chapters.filter(c => c.summary).map(c => `- ${c.title || '…'} : ${c.summary}`).join('\n')
     if (all) {
       useNotes.setState({ summarizing: book.meta.title })
-      const text = await ask({ model: 'haiku', effort: 'low', system: summarySystem(fr), message: `<chapters>\n${all}\n</chapters>\n\n${fr ? 'Résume le livre jusqu’ici en un paragraphe.' : 'Summarise the book so far in one paragraph.'}` })
+      const text = await ask({ role: 'quick', system: summarySystem(fr), message: `<chapters>\n${all}\n</chapters>\n\n${fr ? 'Résume le livre jusqu’ici en un paragraphe.' : 'Summarise the book so far in one paragraph.'}` })
       useStore.getState().updateMeta({ summary: text.trim() })
     }
     useStore.getState().notify('ok', t('Summaries are up to date.'))
@@ -259,7 +287,7 @@ export async function learnTaste() {
   const thrown = taste.filter(x => !x.kept).map(x => `<discarded>\n${x.text}\n</discarded>`).join('\n')
   const known = book.meta.voice.taste
   const text = await ask({
-    model: 'sonnet', effort: 'medium',
+    role: 'edit',
     system: fr ? 'Tu analyses les choix d’un auteur pour aider un coauteur à mieux écrire pour lui.' : 'You analyse an author’s choices to help a co-writer write better for them.',
     message: `${kept}\n${thrown}\n\n${fr
       ? `Voici des propositions que l’auteur a gardées et d’autres qu’il a jetées.${known ? ` Ce qu’on savait déjà :\n${known}\n` : ''} En 5 à 8 lignes concrètes, écris ce qu’il faut faire et éviter pour lui plaire. Pas d’introduction.`

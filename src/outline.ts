@@ -61,7 +61,7 @@ const system = (book: Book) => fr(book)
 async function run<T>(key: string, message: string, book: Book): Promise<T | null> {
   useOutline.setState({ busy: key })
   try {
-    const reply = await ask({ model: 'sonnet', effort: 'medium', system: system(book), message })
+    const reply = await ask({ role: 'edit', system: system(book), message })
     const data = parseJSON<T>(reply)
     if (!data) throw new Error(t('Claude’s reply could not be read. Try again.'))
     return data
@@ -511,7 +511,7 @@ export async function createEntriesFromOutline() {
   // Names in the cards' "who is there" that the bible doesn't know, as hints.
   const hints = [...new Set(book.chapters.flatMap(c => c.scenes.flatMap(s => s.cast ?? [])))].filter(n => !findEntrySlug(book, n, NAMED))
   const story = [grounding(book), `<outline>\n${outlineText(book)}\n</outline>`, `<existing_entries>\n${existing || '-'}\n</existing_entries>`].join('\n\n')
-  const ask_ = (message: string) => ask({ model: 'sonnet', effort: 'medium', system: F ? 'Tu construis la bible d’un roman de fantasy à partir de son plan. Réponds uniquement en JSON valide, en français.' : 'You build the story bible of a fantasy novel from its outline. Reply with valid JSON only.', message })
+  const ask_ = (message: string) => ask({ role: 'edit', system: F ? 'Tu construis la bible d’un roman de fantasy à partir de son plan. Réponds uniquement en JSON valide, en français.' : 'You build the story bible of a fantasy novel from its outline. Reply with valid JSON only.', message })
   useOutline.setState({ busy: 'entries' })
   try {
     useStore.getState().notify('ok', t('Claude is reading the outline for missing entries…'))

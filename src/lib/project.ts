@@ -73,6 +73,7 @@ function normalizeMeta(raw: Partial<BookMeta>): BookMeta {
   ai.actions = { ...DEFAULT_AI.actions, ...(raw.ai?.actions ?? {}) }
   return {
     format: 1,
+    id: typeof raw.id === 'string' && raw.id ? raw.id : undefined,
     title: raw.title ?? 'Untitled',
     author: raw.author ?? '',
     language: raw.language === 'en' ? 'en' : 'fr',

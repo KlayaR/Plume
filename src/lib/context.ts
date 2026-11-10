@@ -136,7 +136,7 @@ export function renderEntry(e: Entry, mode: Mode, chapter: number, lang: Lang, b
 }
 
 /** Samples of the author's prose, at most this many words in all (cached, so cheap after the first call). */
-export const SAMPLE_WORDS = 1100
+export const SAMPLE_WORDS = 1500
 
 /** Share of a scene that may come from Claude for it to still count as the author's own prose. */
 const OWN_SHARE = 0.25
@@ -150,11 +150,18 @@ export function ownShare(s: Scene): number {
   return n ? Math.min(1, ai / n) : 0
 }
 
+/** Plume's own choice of a sample, when you haven't said: revised or done, long enough, and mostly yours. */
+const autoSample = (s: Scene) => s.status !== 'draft' && ownShare(s) <= OWN_SHARE && wordCount(s.text) >= 150
+
+/** Is this scene a sample of your voice: your choice first, else Plume's. */
+export const isVoiceSample = (s: Scene) => s.voiceRef ?? autoSample(s)
+
 /**
- * Samples of the author's own prose: their excerpts first, then passages of their
- * revised or done scenes that Claude wrote little of, outside the chapter being
- * written (so the samples, and the cache, hold while you work on it). Chosen the
- * same way every time.
+ * Samples of the author's own prose: the scenes you marked as your voice first
+ * (whoever typed them: your approval is what counts), then your excerpts, then
+ * passages of revised or done scenes Claude wrote little of, outside the chapter
+ * being written (so the samples, and the cache, hold while you work on it).
+ * Chosen the same way every time.
  */
 export function proseSamples(book: Book, chapter: number): string[] {
   const out: string[] = []
@@ -166,12 +173,14 @@ export function proseSamples(book: Book, chapter: number): string[] {
     out.push(t)
     left -= n
   }
+  const clean = (s: Scene) => s.text.replace(/⟦[^⟧]*⟧/g, '')
+  for (const s of book.chapters.flatMap(c => c.scenes).filter(s => s.voiceRef === true)) if (left >= 60) take(clean(s), 600)
   const excerpts = book.entries.filter(e => e.type === 'excerpt' && e.full.trim() && e.include !== 'never' && e.include !== 'secret').sort((a, b) => a.slug.localeCompare(b.slug))
   for (const e of excerpts) if (left >= 60) take(e.full, 450)
   const own = book.chapters.flatMap((c, i) => (i + 1 === chapter ? [] : c.scenes))
-    .filter(s => s.status !== 'draft' && ownShare(s) <= OWN_SHARE && wordCount(s.text) >= 150)
+    .filter(s => s.voiceRef === undefined && autoSample(s))
     .sort((a, b) => (a.status === 'done' ? 0 : 1) - (b.status === 'done' ? 0 : 1))
-  for (const s of own) if (left >= 60) take(s.text.replace(/⟦[^⟧]*⟧/g, ''), 350)
+  for (const s of own) if (left >= 60) take(clean(s), 350)
   return out
 }
 
@@ -229,7 +238,7 @@ export function serialStorySoFar(book: Book, sceneId: string, maxTokens = 1200):
 }
 
 /** Summaries of what came before this scene, for long books: earlier chapters, then earlier scenes of this one. */
-export function storySoFar(book: Book, sceneId: string, maxTokens = 700): string {
+export function storySoFar(book: Book, sceneId: string, maxTokens = 1500): string {
   if (isSerial(book)) return serialStorySoFar(book, sceneId)
   const lines: string[] = []
   for (const c of book.chapters) {
@@ -240,18 +249,31 @@ export function storySoFar(book: Book, sceneId: string, maxTokens = 700): string
   }
   const out: string[] = []
   let used = 0
+  let cut = false
   for (const l of lines.reverse()) {
     used += estimateTokens(l)
-    if (used > maxTokens) break
+    if (used > maxTokens) { cut = true; break }
     out.unshift(l)
   }
+  // What doesn't fit is told by the book's own summary, when there is one.
+  const earlier = book.meta.summary?.trim()
+  if (cut && earlier) out.unshift(`${book.meta.language === 'fr' ? 'Plus tôt' : 'Earlier'} : ${firstWords(earlier, 180)}`)
   return out.join('\n')
+}
+
+/** The words of the chapter's scenes before this one, in full (the end of them if long): what the chapter has already told. */
+export function chapterSoFar(book: Book, sceneId: string, maxWords = 3000): string {
+  const ch = book.chapters.find(c => c.scenes.some(s => s.id === sceneId))
+  if (!ch) return ''
+  const before = ch.scenes.slice(0, ch.scenes.findIndex(s => s.id === sceneId)).filter(s => s.text.trim())
+  if (!before.length) return ''
+  return lastWords(before.map(s => s.text.trim().replace(/⟦[^⟧]*⟧/g, '')).join('\n\n* * *\n\n'), maxWords)
 }
 
 /** Keeps the reply inside the scene being written: the scenes around it are for continuity only. */
 const SCOPE: Record<Lang, string> = {
-  fr: `<scope>\nN'écris que cette scène : ce que demandent la consigne, les étapes ou la note de <scene>, et rien au-delà. <previous_scene> a déjà eu lieu : ne le répète pas. <next_scene> n'est là que pour la continuité : ses événements, ses personnages qui n'ont pas encore paru et ses révélations n'arrivent pas ici, ne les amorce pas et n'y fais pas allusion. Si la scène atteint ce que dit sa note, arrête-toi.\n</scope>`,
-  en: `<scope>\nWrite only this scene: what the direction, the beats or the <scene> note ask for, and nothing beyond. <previous_scene> has already happened: don't repeat it. <next_scene> is there for continuity only: its events, its characters who haven't appeared yet and its revelations don't happen here; don't set them up or allude to them. Once the scene reaches what its note says, stop.\n</scope>`,
+  fr: `<scope>\nN'écris que cette scène : ce que demandent la consigne, les étapes ou la note de <scene>, et rien au-delà. <chapter_so_far> et <previous_scene> ont déjà eu lieu : ne les répète pas. <next_scene> n'est là que pour la continuité : ses événements, ses personnages qui n'ont pas encore paru et ses révélations n'arrivent pas ici, ne les amorce pas et n'y fais pas allusion. Si la scène atteint ce que dit sa note, arrête-toi.\n</scope>`,
+  en: `<scope>\nWrite only this scene: what the direction, the beats or the <scene> note ask for, and nothing beyond. <chapter_so_far> and <previous_scene> have already happened: don't repeat them. <next_scene> is there for continuity only: its events, its characters who haven't appeared yet and its revelations don't happen here; don't set them up or allude to them. Once the scene reaches what its note says, stop.\n</scope>`,
 }
 
 /**
@@ -259,7 +281,7 @@ const SCOPE: Record<Lang, string> = {
  * ends (its last lines, or its plan note if unwritten) when this scene has
  * barely started, and what the next one is about (its note, or its opening).
  */
-export function sceneEdges(book: Book, sceneId: string, before: string, lang: Lang): string {
+export function sceneEdges(book: Book, sceneId: string, before: string, lang: Lang, chapterTold = false): string {
   const all = book.chapters.flatMap(c => c.scenes)
   const i = all.findIndex(s => s.id === sceneId)
   if (i < 0) return ''
@@ -267,9 +289,11 @@ export function sceneEdges(book: Book, sceneId: string, before: string, lang: La
   const next = all[i + 1]
   const fr = lang === 'fr'
   const out: string[] = []
-  // Once this scene has a few hundred words of its own, they carry the continuity.
-  if (prev && (before.match(/\S+/g) ?? []).length < 200) {
-    const body = prev.text.trim() ? lastWords(prev.text, 150) : prev.note?.trim() ? `${fr ? 'Prévu' : 'Planned'} : ${prev.note.trim()}` : ''
+  const sameChapter = !!prev && book.chapters.some(c => c.scenes.some(s => s.id === prev.id) && c.scenes.some(s => s.id === sceneId))
+  // Once this scene has a few hundred words of its own, they carry the continuity; <chapter_so_far> already holds a scene of this chapter.
+  if (prev && (before.match(/\S+/g) ?? []).length < 200 && !(chapterTold && sameChapter && prev.text.trim())) {
+    // The end of the previous chapter gets more room: it is where this one picks up from.
+    const body = prev.text.trim() ? lastWords(prev.text, sameChapter ? 150 : 400) : prev.note?.trim() ? `${fr ? 'Prévu' : 'Planned'} : ${prev.note.trim()}` : ''
     if (body) out.push(`<previous_scene title="${prev.title}">\n${body}\n</previous_scene>`)
   }
   if (next) {
@@ -320,7 +344,8 @@ export function storyParts(input: Pick<ContextInput, 'action' | 'before' | 'sele
   if (input.action === 'fill') {
     return { before: lastWords(input.before, windowWords), selection: '', after: firstWords(input.after, 300) }
   }
-  return { before: lastWords(input.before, windowWords), selection: '', after: '' }
+  // Continuing or writing from the plan: the scene so far, all of it up to 3,000 words, whatever the window is set to.
+  return { before: lastWords(input.before, Math.max(windowWords, 3000)), selection: '', after: '' }
 }
 
 export function buildContext(input: ContextInput): Built {
@@ -413,6 +438,8 @@ export function buildContext(input: ContextInput): Built {
   const placeName = sc?.place ? bySlug.get(sc.place)?.name ?? sc.place : ''
   const povName = input.pov ? bySlug.get(input.pov)?.name ?? '' : ''
   const so = !isRewrite(input.action) && sc ? storySoFar(book, sc.id) : ''
+  // Writing a scene from its plan: what this chapter has already told, in full.
+  const told = input.action === 'scene' && sc ? chapterSoFar(book, sc.id) : ''
   const info = [
     povName ? `${lang === 'fr' ? 'Point de vue' : 'Point of view'} : ${povName}` : '',
     ...(!isRewrite(input.action) && sc ? [
@@ -423,10 +450,11 @@ export function buildContext(input: ContextInput): Built {
     ] : []),
   ].filter(Boolean).join('\n')
   const bibleBlock = bible ? `<bible>\n${bible}\n</bible>` : ''
-  const edges = !isRewrite(input.action) && sc ? sceneEdges(book, sc.id, story.before, lang) : ''
+  const edges = !isRewrite(input.action) && sc ? sceneEdges(book, sc.id, story.before, lang, !!told) : ''
   const message = [
     bibleBlock,
     so ? `<story_so_far>\n${so}\n</story_so_far>` : '',
+    told ? `<chapter_so_far>\n${told}\n</chapter_so_far>` : '',
     edges,
     info ? `<scene>\n${info}\n</scene>` : '',
     taskMessage(lang, input.action, input.instruction, story, ai, sc ? scenePlace(book, sc.id) : undefined),

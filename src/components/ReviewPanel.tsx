@@ -22,6 +22,13 @@ const n = (x: number, d = 0) => x.toLocaleString(numLocale(), { maximumFractionD
 
 type Scope = 'scene' | 'chapter'
 
+/** A value that follows another once it has stopped changing for `ms`. */
+function useSettled<T>(value: T, ms: number): T {
+  const [settled, setSettled] = useState(value)
+  useEffect(() => { const timer = setTimeout(() => setSettled(value), ms); return () => clearTimeout(timer) }, [value, ms])
+  return settled
+}
+
 export default function ReviewPanel() {
   const book = useStore(s => s.book)!
   const sceneId = useStore(s => s.sceneId)
@@ -36,7 +43,9 @@ export default function ReviewPanel() {
   const text = scope === 'scene' ? scene.text : chapter.scenes.map(s => s.text).join('\n')
   const refList = useRefs(s => s.list)
   const refs = useMemo(() => referenceTargets(refList, book.meta.language), [refList, book.meta.language])
-  const r = useMemo(() => review(text, book, refs?.rates), [text, book, refs])
+  // The reports run a moment after you stop typing, not on every key.
+  const settled = useSettled(text, 400)
+  const r = useMemo(() => review(settled, book, refs?.rates), [settled, book.meta, book.entries, refs])
   // Leaving Review takes the highlights away.
   useEffect(() => () => useReview.setState({ report: null }), [])
 
@@ -334,16 +343,17 @@ function Figures({ scene, chapter, label }: { scene: string; chapter: string; la
   const book = useStore(s => s.book)!
   const t = useT()
   const [open, setOpen] = useState(false)
-  const sceneStats = useMemo(() => textStats(scene), [scene])
-  const chapterStats = useMemo(() => textStats(chapter), [chapter])
-  const bookStats = useMemo(() => textStats(book.chapters.flatMap(c => c.scenes.map(s => s.text)).join('\n')), [book.chapters])
+  // Counted only while the section is open: the whole book is long to count on every key.
+  const sceneStats = useMemo(() => open ? textStats(scene) : null, [open, scene])
+  const chapterStats = useMemo(() => open ? textStats(chapter) : null, [open, chapter])
+  const bookStats = useMemo(() => open ? textStats(book.chapters.flatMap(c => c.scenes.map(s => s.text)).join('\n')) : null, [open, book.chapters])
   return (
     <section className="pl-cat">
       <button type="button" className="pl-cat-head" onClick={() => setOpen(!open)} aria-expanded={open}>
         <span className="pl-grow">{t('Figures')}</span>
         <ChevronDown size={14} className={open ? 'pl-rot' : ''} />
       </button>
-      {open && (
+      {open && sceneStats && chapterStats && bookStats && (
         <>
           <span className="sk-label">{t('This scene')}</span><Rows s={sceneStats} />
           <span className="sk-label">{label}</span><Rows s={chapterStats} />

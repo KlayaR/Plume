@@ -201,31 +201,40 @@ fn list_all(root: String) -> Vec<String> {
     out
 }
 
-/// Writes today's backup zip of a book and removes the ones older than two weeks.
+/// The folder of a book's backups: named by the book's id, so renaming the book keeps its history.
+fn backup_dir(app: &AppHandle, key: &str) -> Result<PathBuf, String> {
+    let safe: String = key.chars().map(|c| if c.is_alphanumeric() || c == ' ' || c == '-' { c } else { '_' }).collect();
+    let safe = safe.trim();
+    if safe.is_empty() {
+        return Err("No book id for the backup".into());
+    }
+    Ok(app.path().app_local_data_dir().map_err(|e| e.to_string())?.join("backups").join(safe))
+}
+
+/// Writes today's backup zip of a book. Which old ones go is decided by the app (remove_backup).
 #[tauri::command]
 fn write_backup(app: AppHandle, name: String, date: String, data: String) -> Result<String, String> {
-    let safe: String = name.chars().map(|c| if c.is_alphanumeric() || c == ' ' || c == '-' { c } else { '_' }).collect();
-    let dir = app.path().app_local_data_dir().map_err(|e| e.to_string())?.join("backups").join(safe.trim());
+    let dir = backup_dir(&app, &name)?;
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let file = dir.join(format!("{date}.zip"));
     std::fs::write(&file, b64_decode(&data)?).map_err(|e| e.to_string())?;
-    let cutoff = SystemTime::now() - std::time::Duration::from_secs(14 * 24 * 3600);
-    if let Ok(entries) = std::fs::read_dir(&dir) {
-        for e in entries.flatten() {
-            let old = e.metadata().and_then(|m| m.modified()).map(|t| t < cutoff).unwrap_or(false);
-            if old {
-                let _ = std::fs::remove_file(e.path());
-            }
-        }
-    }
     Ok(file.to_string_lossy().into_owned())
+}
+
+/// Removes one old backup of a book: only a .zip file directly in that book's backup folder.
+#[tauri::command]
+fn remove_backup(app: AppHandle, name: String, file: String) -> Result<(), String> {
+    if file.contains('/') || file.contains('\\') || file.contains("..") || !file.ends_with(".zip") {
+        return Err(format!("Not a backup: {file}"));
+    }
+    let path = backup_dir(&app, &name)?.join(&file);
+    if path.is_file() { std::fs::remove_file(path).map_err(|e| e.to_string()) } else { Ok(()) }
 }
 
 /// Backups already made for a book, newest first.
 #[tauri::command]
 fn list_backups(app: AppHandle, name: String) -> Vec<String> {
-    let safe: String = name.chars().map(|c| if c.is_alphanumeric() || c == ' ' || c == '-' { c } else { '_' }).collect();
-    let Ok(dir) = app.path().app_local_data_dir().map(|d| d.join("backups").join(safe.trim())) else { return vec![] };
+    let Ok(dir) = backup_dir(&app, &name) else { return vec![] };
     let mut out: Vec<String> = std::fs::read_dir(&dir).map(|r| r.flatten().map(|e| e.path().to_string_lossy().into_owned()).collect()).unwrap_or_default();
     out.sort();
     out.reverse();
@@ -391,6 +400,7 @@ pub fn run() {
             write_file_base64,
             list_all,
             write_backup,
+            remove_backup,
             list_backups,
             file_mtime,
             device_name

@@ -199,6 +199,8 @@ export interface Scene {
   cast?: string[]
   /** Claude leaves a locked card alone when it regenerates the outline. */
   locked?: boolean
+  /** Sample of your voice: true always (sent first, whoever typed it), false never, unset decided by Plume. */
+  voiceRef?: boolean
   extra: Record<string, unknown>
 }
 
@@ -229,8 +231,24 @@ export type ActionId = 'continue' | 'rewrite' | 'beats' | 'fill' | 'expand' | 's
 /** Actions that replace the selected passage (the others write at the cursor). */
 export const REWRITE_ACTIONS: ActionId[] = ['rewrite', 'expand', 'shorten', 'show', 'dialogue']
 export const isRewrite = (a: ActionId) => REWRITE_ACTIONS.includes(a)
-export type Model = 'haiku' | 'sonnet' | 'opus'
-export type Effort = 'low' | 'medium' | 'high'
+export type Model = 'haiku' | 'sonnet' | 'opus' | 'fable'
+export type Effort = 'low' | 'medium' | 'high' | 'xhigh' | 'max'
+export const MODELS: Model[] = ['haiku', 'sonnet', 'opus', 'fable']
+export const EFFORTS: Effort[] = ['low', 'medium', 'high', 'xhigh', 'max']
+
+/**
+ * What a request is for, which decides the model: drafting prose (the Assistant),
+ * editing and planning (reading a chapter, checking or building the outline, the
+ * bible), and small jobs (summaries, short versions, synonyms).
+ */
+export type Role = 'draft' | 'edit' | 'quick'
+export type RoleModel = { model: Model; effort: Effort }
+export const ROLES: Role[] = ['draft', 'edit', 'quick']
+export const DEFAULT_ROLES: Record<Role, RoleModel> = {
+  draft: { model: 'sonnet', effort: 'medium' },
+  edit: { model: 'opus', effort: 'high' },
+  quick: { model: 'haiku', effort: 'low' },
+}
 
 export interface ActionSettings {
   model: Model
@@ -341,6 +359,8 @@ export const DEFAULT_SERIAL: Serial = { days: [1, 3, 5], litrpg: false, threadGa
 
 export interface BookMeta {
   format: 1
+  /** Stays the same when the book is renamed or moved: its backups are kept under it. */
+  id?: string
   title: string
   author: string
   language: Lang

@@ -8,7 +8,7 @@ export type Backend = 'claude' | 'openrouter'
 
 export interface Preset { id: string; name: string; backend: Backend; model: string; effort: Effort }
 
-export const CLAUDE_MODELS: Model[] = ['haiku', 'sonnet', 'opus']
+export const CLAUDE_MODELS: Model[] = ['haiku', 'sonnet', 'opus', 'fable']
 
 export const DEFAULT_PRESETS: Preset[] = [
   { id: 'quick', name: 'Quick (Haiku)', backend: 'claude', model: 'haiku', effort: 'low' },

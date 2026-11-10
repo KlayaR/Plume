@@ -35,7 +35,7 @@ export default function SynonymDialog({ onClose }: { onClose: () => void }) {
     if (!tg) { setBusy(false); return }
     let off = false
     ask({
-      model: 'haiku', effort: 'low',
+      role: 'quick',
       system: lang === 'fr'
         ? 'Tu es un dictionnaire de synonymes pour un romancier de fantasy. Réponds uniquement par un tableau JSON de chaînes.'
         : 'You are a thesaurus for a fantasy novelist. Reply with a JSON array of strings only.',

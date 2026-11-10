@@ -9,7 +9,8 @@ import { useStore, type PlanTab } from '../store'
 import { WORLD_TYPES, type Chapter, type LooseCard, type Scene, type SceneStatus } from '../lib/types'
 import { chapterLabels } from '../lib/chapters'
 import { boardMove, boardNeighbour, type BoardDir } from '../lib/board'
-import { countWords, newId } from '../lib/text'
+import { newId } from '../lib/text'
+import { sceneCounts } from '../lib/stats'
 import { parseStoryTime, scenePositions, templateBeats, TEMPLATES, timeFlags } from '../lib/structures'
 import { ask, parseJSON } from '../ai'
 import { numLocale, useT } from '../i18n'
@@ -249,7 +250,7 @@ function Card({ scene, active, tint, dim, tabStop, onKeyDown, onFocus, onSelect,
       <span className={`pl-card-text ${scene.note?.trim() ? '' : 'pl-card-faint'}`}>{text.slice(0, 220) || t('No note yet.')}</span>
       <span className="pl-card-foot">
         <span className="pl-grow">{[pov, scene.time, place].filter(Boolean).join(' · ')}</span>
-        {countWords(scene.text).toLocaleString(numLocale())}
+        {sceneCounts(scene).words.toLocaleString(numLocale())}
       </span>
       {!!scene.lines?.length && <span className="pl-card-lines">{scene.lines.map(l => <i key={l} title={book.entries.find(e => e.slug === l)?.name} style={{ background: lineColor(l) }} />)}</span>}
     </div>
@@ -348,7 +349,7 @@ function Structure() {
       const bible = book.entries.filter(e => WORLD_TYPES.includes(e.type) && e.include !== 'secret').map(e => `- ${e.name} (${e.type}): ${e.short}`).join('\n')
       const cards = scenes.map(s => `- ${s.title}: ${s.note ?? s.summary ?? ''}`).join('\n')
       const reply = await ask({
-        model: 'sonnet', effort: 'medium',
+        role: 'edit',
         system: lang === 'fr' ? 'Tu aides un romancier à structurer son livre. Réponds uniquement en JSON valide, en français.' : 'You help a novelist structure their book. Reply with valid JSON only.',
         message: `<bible>\n${bible}\n</bible>\n<scenes>\n${cards || '-'}\n</scenes>\n<beats>\n${beats.map(b => `- ${b.name} (${b.at} %)`).join('\n')}\n</beats>\n\n${lang === 'fr' ? 'Pour chaque temps fort, propose en une ou deux phrases ce qui pourrait s’y passer dans CE livre, à partir de la bible et des scènes.' : 'For each beat, suggest in one or two sentences what could happen there in THIS book, from the bible and the scenes.'}\nJSON: [{"name": "...", "note": "..."}]`,
       })

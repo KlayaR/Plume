@@ -11,6 +11,8 @@ import { parseFact } from './lib/bible'
 import { estimateTokens, newId } from './lib/text'
 import { buildMatcher, findMentions } from './lib/context'
 import { ask, parseJSON, stopAsk } from './ai'
+import { foundationText, outlineText, chapterText } from './lib/outline'
+import { lastWords } from './lib/text'
 import { useStore } from './store'
 import { t } from './i18n'
 
@@ -18,7 +20,7 @@ import { t } from './i18n'
 function chatChoice(): { model: Model; effort: Effort; orModel?: string } {
   const { chatBackend, chatModel } = useStore.getState().prefs
   if (chatBackend === 'openrouter' && chatModel) return { model: 'sonnet', effort: 'low', orModel: chatModel }
-  return { model: (['haiku', 'sonnet', 'opus'].includes(chatModel) ? chatModel : 'sonnet') as Model, effort: 'low' }
+  return { model: (['haiku', 'sonnet', 'opus', 'fable'].includes(chatModel) ? chatModel : 'sonnet') as Model, effort: 'low' }
 }
 
 export interface Message { role: 'user' | 'assistant'; text: string }
@@ -180,14 +182,47 @@ function systemFor(book: Book, recent: string, interview: Entry | null): string 
       ? `Tu aides l’auteur du roman « ${book.meta.title} » à compléter la fiche « ${interview.name} » de sa bible. Pose UNE question à la fois, précise et concrète, sur ce qui manque ou reste flou dans la fiche. Rebondis sur ses réponses. N’invente rien à sa place. Réponds en français.`
       : `You help the author of the novel "${book.meta.title}" complete the "${interview.name}" entry of their story bible. Ask ONE question at a time, precise and concrete, about what is missing or vague in the entry. Build on their answers. Don't invent things for them. Reply in English.`)
     : (fr
-      ? `Tu es le partenaire de réflexion de l’auteur du roman « ${book.meta.title} ». Tu connais sa bible (<bible>). Propose des idées précises, pose des questions qui font avancer, signale ce qui contredit la bible. Réponses courtes, sans flatterie. Réponds en français.\n\n${ENTRIES_HOW.fr}`
-      : `You are the brainstorming partner of the author of the novel "${book.meta.title}". You know their story bible (<bible>). Offer specific ideas, ask questions that move things forward, point out what contradicts the bible. Short answers, no flattery. Reply in English.\n\n${ENTRIES_HOW.en}`)
+      ? `Tu es le partenaire de réflexion de l’auteur du roman « ${book.meta.title} ». Tu connais sa bible (<bible>), son plan (<foundation>, <outline>) et la scène ouverte (<open_scene>). Propose des idées précises, pose des questions qui font avancer, signale ce qui contredit la bible. Réponses courtes, sans flatterie. Réponds en français.\n\n${ENTRIES_HOW.fr}`
+      : `You are the brainstorming partner of the author of the novel "${book.meta.title}". You know their story bible (<bible>), their plan (<foundation>, <outline>) and the open scene (<open_scene>). Offer specific ideas, ask questions that move things forward, point out what contradicts the bible. Short answers, no flattery. Reply in English.\n\n${ENTRIES_HOW.en}`)
   return [
     head,
+    storyFor(book),
     style?.full.trim() ? `<style_guide>\n${style.full.trim()}\n</style_guide>` : '',
     interview ? `<entry_to_complete type="${interview.type}" name="${interview.name}">\n${[interview.short, aiFull(interview)].join('\n\n').trim()}\n</entry_to_complete>` : '',
     `<bible>\n${bibleFor(book, recent)}\n</bible>`,
   ].filter(Boolean).join('\n\n')
+}
+
+/** Most tokens of the story's plan the chat reads (premise, foundation, outline). */
+const STORY_BUDGET = 6000
+
+/**
+ * What the chat knows of the story beyond the bible: the premise and the foundation,
+ * then the outline (with beats if it fits, chapter goals and scene notes if not),
+ * and what each written chapter has become (its summary). Stable between messages,
+ * so it stays in the cached system prompt.
+ */
+export function storyFor(book: Book): string {
+  const found = foundationText(book)
+  const full = outlineText(book)
+  const light = book.chapters.map((c, i) => [`## ${i + 1}. ${c.title || '…'}`, c.goal ? `Goal: ${c.goal}` : '', c.ending ? `Ending: ${c.ending}` : '', ...c.scenes.map(sc => `- ${sc.title}: ${sc.note?.trim() ?? ''}`)].filter(Boolean).join('\n')).join('\n\n')
+  const outline = estimateTokens(found + full) <= STORY_BUDGET ? full : estimateTokens(found + light) <= STORY_BUDGET ? light : light.slice(0, Math.max(0, STORY_BUDGET - estimateTokens(found)) * 3)
+  const written = book.chapters.map((c, i) => (c.summary?.trim() ? `${i + 1}. ${c.title || '…'} : ${c.summary.trim()}` : '')).filter(Boolean).join('\n')
+  return [
+    found,
+    outline.trim() ? `<outline>\n${outline}\n</outline>` : '',
+    written ? `<written_so_far>\n${written}\n</written_so_far>` : '',
+  ].filter(Boolean).join('\n\n')
+}
+
+/** The scene open in the Manuscript, its end, for "this scene" in the conversation. */
+function openScene(book: Book): string {
+  const id = useStore.getState().sceneId
+  const ch = book.chapters.find(c => c.scenes.some(s => s.id === id))
+  const sc = ch?.scenes.find(s => s.id === id)
+  if (!ch || !sc) return ''
+  const n = book.chapters.indexOf(ch) + 1
+  return `<open_scene chapter="${n}" title="${sc.title}">\n${sc.text.trim() ? lastWords(sc.text.trim(), 1200) : chapterText(book, ch, n)}\n</open_scene>`
 }
 
 const transcript = (ms: Message[]) => ms.map(m => `<${m.role}>\n${m.text}\n</${m.role}>`).join('\n')
@@ -207,7 +242,7 @@ export async function send(text: string) {
     const reply = await ask({
       ...chatChoice(),
       system: systemFor(book, recent, target),
-      message: `<conversation>\n${transcript(history.slice(0, -1))}\n</conversation>\n\n${history[history.length - 1].text}`,
+      message: [openScene(book), `<conversation>\n${transcript(history.slice(0, -1))}\n</conversation>`, history[history.length - 1].text].filter(Boolean).join('\n\n'),
       onText: chunk => useChat.setState(s => ({ streaming: (s.streaming ?? '') + chunk })),
     })
     commit(chatId, [...(useChat.getState().chats.find(c => c.id === chatId)?.messages ?? messages), { role: 'assistant', text: reply.trim() }])
@@ -290,7 +325,7 @@ export async function turnIntoEntries() {
   useChat.setState({ busy: 'entries' })
   try {
     const reply = await ask({
-      model: 'sonnet', effort: 'medium',
+      role: 'edit',
       system: fr
         ? 'Tu transformes une conversation de travail sur un roman en fiches de bible. Réponds uniquement en JSON valide.'
         : 'You turn a working conversation about a novel into story-bible entries. Reply with valid JSON only.',
@@ -367,7 +402,7 @@ export async function checkContradictions(): Promise<Contradiction[]> {
   const all = book.entries.filter(e => TYPES.includes(e.type) && e.include !== 'secret')
     .map(e => `<entry type="${e.type}" name="${e.name}">\n${[e.short, aiFull(e), e.facts.map(f => `- ${f.text}`).join('\n')].filter(s => s.trim()).join('\n')}\n</entry>`).join('\n')
   const reply = await ask({
-    model: 'sonnet', effort: 'medium',
+    role: 'edit',
     system: fr ? 'Tu relis la bible d’un roman pour y trouver les contradictions. Réponds uniquement en JSON valide.' : 'You read a novel’s story bible to find contradictions. Reply with valid JSON only.',
     message: `<bible>\n${all}\n</bible>\n\n${fr ? 'Liste les contradictions réelles entre fiches ou dans une fiche (dates, âges, lieux, règles, liens). Pas de suggestions de style. En français.' : 'List real contradictions between entries or inside one (dates, ages, places, rules, relationships). No style suggestions.'}\nJSON: [{"entries": ["name"], "issue": "...", "fix": "..."}]`,
   })

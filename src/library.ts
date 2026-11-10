@@ -9,6 +9,8 @@ import { bookCounts } from './lib/stats'
 import { createBook, isBook, makeChapter, makeScene, saveChapter, saveEntry, saveMeta, saveScene, seriesRootOf } from './lib/project'
 import { volumeBook } from './lib/export'
 import { fromBase64, fromUtf8, makeZip, readZip, toBase64 } from './lib/zip'
+import { backupsToRemove } from './lib/backups'
+import { newId } from './lib/text'
 import { allPrompts, usedPromptIds } from './lib/voice'
 import { FANTASY_LISTS, FANTASY_STYLE, FANTASY_VERSION, fantasyVoice } from './lib/defaults'
 import { STOCK_STYLE } from './lib/project'
@@ -109,7 +111,15 @@ export function endSprint() {
 
 const BACKED = 'plume.backed-up'
 
-/** A zip of the whole book (without Plume's own folder), kept two weeks. */
+/** The key of a book's backups: its id, so a renamed book keeps them. A book without one gets one. */
+function backupKey(book: Book): string {
+  if (book.meta.id) return book.meta.id
+  const id = newId() + newId()
+  if (useStore.getState().book?.root === book.root) useStore.getState().updateMeta({ id })
+  return id
+}
+
+/** A zip of the whole book (without Plume's own folder). The last ten are kept, then one a week for half a year. */
 export async function backupNow(book: Book): Promise<string> {
   // The folder list leaves out .plume, but these are your words.
   const files = [...await invoke<string[]>('list_all', { root: book.root }), '.plume/scratch.json', '.plume/grids.json']
@@ -118,7 +128,10 @@ export async function backupNow(book: Book): Promise<string> {
     try { entries.push({ name: rel, data: fromBase64(await invoke<string>('read_base64', { root: book.root, rel })) }) } catch { /* moved meanwhile */ }
   }
   const zip = await makeZip(entries)
-  const path = await invoke<string>('write_backup', { name: book.meta.title, date: dayKey(), data: toBase64(zip) })
+  const key = backupKey(book)
+  const path = await invoke<string>('write_backup', { name: key, date: dayKey(), data: toBase64(zip) })
+  const names = (await invoke<string[]>('list_backups', { name: key }).catch(() => [] as string[])).map(p => p.split(/[\/]/).pop()!)
+  for (const file of backupsToRemove(names)) await invoke('remove_backup', { name: key, file }).catch(() => {})
   try {
     const done = JSON.parse(localStorage.getItem(BACKED) ?? '{}')
     done[book.root] = dayKey()
@@ -135,7 +148,7 @@ export function autoBackup(book: Book) {
   backupNow(book).catch(e => useStore.getState().notify('warn', t('Backup failed: {e}', { e: String(e) })))
 }
 
-export const listBackups = (book: Book) => invoke<string[]>('list_backups', { name: book.meta.title })
+export const listBackups = (book: Book) => book.meta.id ? invoke<string[]>('list_backups', { name: book.meta.id }) : Promise.resolve([] as string[])
 
 // --- Prompts travel with the book ---------------------------------------------------------
 

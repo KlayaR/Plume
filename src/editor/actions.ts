@@ -72,9 +72,10 @@ export function currentContext(action: ActionId, instruction: string, overrides:
 /** The model the Assistant uses: its own two choices (backend, model); the effort stays per action. */
 export function assistantChoice(action: ActionId): { model: Model; effort: Effort; orModel?: string } {
   const st = useStore.getState()
-  const act = st.book!.meta.ai.actions[action]
-  if (st.prefs.assistBackend === 'openrouter' && st.prefs.assistModel) return { model: act.model, effort: act.effort, orModel: st.prefs.assistModel }
-  return { model: (['haiku', 'sonnet', 'opus'].includes(st.prefs.assistModel) ? st.prefs.assistModel : act.model) as Model, effort: act.effort }
+  const draft = st.prefs.roles.draft
+  void action // every drafting action uses the drafting model; the effort is the role's
+  if (st.prefs.assistBackend === 'openrouter' && st.prefs.assistModel) return { ...draft, orModel: st.prefs.assistModel }
+  return { ...draft }
 }
 
 export async function runAction(action: ActionId, instruction: string, overrides: Record<string, Override>) {

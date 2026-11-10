@@ -129,7 +129,7 @@ export async function checkChapter(depth: Depth) {
       : (F ? `Relis ce chapitre comme un correcteur littéraire : fautes, répétitions, lourdeurs, clichés, verbes de perception inutiles, émotions nommées, tics d’IA (contrastes « pas X mais Y », triades, comparaisons en série, « , et il… » à répétition, « comme on… »), ponctuation. Pas de remarques sur l’intrigue ni le rythme.`
         : `Read this chapter as a line editor: errors, repetitions, clunky phrasing, clichés, needless filter verbs, named emotions, AI tells ("not X but Y" contrasts, triads, strings of similes), punctuation. No remarks on plot or pacing.`)
     const reply = await ask({
-      model: 'sonnet', effort: depth === 'deep' ? 'high' : 'medium',
+      role: 'edit',
       system: F ? 'Tu es éditeur de romans. Tu relèves des problèmes précis, cités mot pour mot, sans réécrire le livre. Réponds uniquement en JSON valide, en français.' : 'You are a fiction editor. You flag precise problems, quoted word for word, without rewriting the book. Reply with valid JSON only.',
       message: [
         bible ? `<bible chapter="${n}">\n${bible}\n</bible>` : '',

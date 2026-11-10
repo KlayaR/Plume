@@ -10,6 +10,7 @@ import { typeInfo, VOICE_TYPES, type EntryType } from '../lib/types'
 import type { Rules, SceneRule, Voice } from '../lib/types'
 import { allPrompts, loadPrompts, PRESETS, promptText, savePrompts, SCENE_RULES, VARIABLES, type PromptSet } from '../lib/voice'
 import { profile } from '../lib/analysis'
+import { isVoiceSample } from '../lib/context'
 import { newId } from '../lib/text'
 import { ask } from '../ai'
 import { applyFantasyDefaults, readTextFile, refreshSnapshots } from '../library'
@@ -143,18 +144,18 @@ function StyleProfile() {
   const t = useT()
   const [busy, setBusy] = useState(false)
   const excerpts = book.entries.filter(e => e.type === 'excerpt' && e.full.trim())
-  // Your excerpts if you gave some; otherwise the scenes you marked revised or done.
-  const sample = useMemo(() => {
-    if (excerpts.length) return excerpts.map(e => e.full).join('\n')
-    return book.chapters.flatMap(c => c.scenes).filter(s => s.status !== 'draft').map(s => s.text).join('\n')
-  }, [book.chapters, excerpts])
+  // The same prose Claude is given as your voice: scenes you marked, your excerpts, scenes mostly yours.
+  const marked = book.chapters.flatMap(c => c.scenes).filter(s => s.text.trim() && isVoiceSample(s))
+  const sample = useMemo(() => [...marked.filter(s => s.voiceRef).map(s => s.text), ...excerpts.map(e => e.full), ...marked.filter(s => !s.voiceRef).map(s => s.text)].join('\n'),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [book.chapters, excerpts])
   const p = useMemo(() => profile(sample, lang), [sample, lang])
 
   const describe = async () => {
     setBusy(true)
     try {
       const text = await ask({
-        model: 'sonnet', effort: 'medium',
+        role: 'edit',
         system: lang === 'fr'
           ? 'Tu es éditeur littéraire. Décris la voix d’un auteur à partir de ses textes, pour qu’un coauteur puisse l’imiter.'
           : 'You are a literary editor. Describe an author’s voice from their prose, so a co-writer can imitate it.',
@@ -168,7 +169,7 @@ function StyleProfile() {
   }
 
   return (
-    <SettingsSection title={t('Style profile')} description={excerpts.length ? t('Measured from your {n} excerpts in the bible.', { n: excerpts.length }) : t('Measured from your revised and done scenes. Add excerpts of your prose in the bible for a better profile.')}>
+    <SettingsSection title={t('Style profile')} description={t('Measured from the prose Claude takes as your voice: the scenes you marked “Sample of my voice” (right-click a scene), your excerpts, and revised scenes mostly yours.')}>
       {p.words < 200 ? <p className="sk-hint">{t('Not enough of your prose yet (200 words at least).')}</p> : (
         <dl className="pl-stats pl-profile">
           <dt>{t('Words measured')}</dt><dd>{n(p.words)}</dd>

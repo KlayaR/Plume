@@ -3,6 +3,7 @@ import { create } from 'zustand'
 import type { Book, Chapter, Entry, EntryType, Scene, SeriesPlan } from './lib/types'
 import type { Limits, Usage } from './lib/claude'
 import { DEFAULT_PRESETS, type Fallback, type Preset } from './lib/presets'
+import { DEFAULT_ROLES, MODELS, type Model, type Role, type RoleModel } from './lib/types'
 import { findClaude, setLimitsListener } from './lib/claude'
 import { chapterLabels } from './lib/chapters'
 import { Conflict, loadBook, makeChapter, makeEntry, makeScene, reread, saveChapter, saveEntry, saveMeta, saveScene, saveSeriesPlan, seriesRootOf, trash } from './lib/project'
@@ -125,6 +126,10 @@ export interface Prefs {
   typewriter: boolean
   /** Capital letters as you type (sentence starts, English I); Ctrl+Z right after takes one back. */
   autoCapital: boolean
+  /** Which Claude model and effort answer each kind of request (Settings → Claude). */
+  roles: Record<Role, RoleModel>
+  /** Story memory: a scene you leave after changing it gets its summary (quick model), so Claude knows what happened. */
+  memory: boolean
   /** Model presets (a named backend, model and effort), and when OpenRouter takes over from the claude command line. */
   presets: Preset[]
   fallback: Fallback
@@ -202,6 +207,8 @@ export const DEFAULT_PREFS: Prefs = {
   ltLive: false,
   typewriter: false,
   autoCapital: true,
+  roles: DEFAULT_ROLES,
+  memory: true,
   presets: DEFAULT_PRESETS,
   fallback: 'off',
   fallbackPreset: '',
@@ -233,6 +240,11 @@ function loadPrefs(): Prefs {
   const p = load<Prefs>(PREFS_KEY, DEFAULT_PREFS)
   let saved: Partial<Prefs> | null = null
   try { saved = JSON.parse(localStorage.getItem(PREFS_KEY) ?? 'null') } catch { /* unreadable: defaults */ }
+  // Before model roles, the Assistant's own model was the drafting model: it stays so.
+  if (saved && !saved.roles) {
+    const was = saved.assistModel as Model | undefined
+    p.roles = { ...DEFAULT_ROLES, draft: { ...DEFAULT_ROLES.draft, model: was && MODELS.includes(was) ? was : DEFAULT_ROLES.draft.model } }
+  } else p.roles = { ...DEFAULT_ROLES, ...(saved?.roles ?? {}) }
   // Read the version from what was saved, not from the defaults merged into it.
   if (saved && (saved.v ?? 0) < 2) return { ...p, pinLeft: true, pinRight: true, simple: false, v: 2 }
   // Beginner mode is for new installs: people who already use Plume keep everything.
@@ -563,8 +575,12 @@ export const useStore = create<State>((set, get) => {
       clearTimeout(spotTimer)
       spotTimer = setTimeout(() => { const b = get().book; if (b) saveSpot(b.root, { sceneId, pos, session: sessionNow(b) }) }, 800)
     },
-    setView: view => set({ view }),
-    selectScene: id => { if (id !== get().sceneId || get().view !== 'manuscript') rememberPlace(here()); set({ sceneId: id, ...(get().prefs.dual === 'manuscript' ? {} : { view: 'manuscript' as View }), freshSceneId: get().freshSceneId === id ? id : null }) },
+    setView: view => { if (view !== get().view && get().view === 'manuscript') { const left = get().sceneId; import('./writing').then(m => m.remember(left)) } set({ view }) },
+    selectScene: id => {
+      const left = get().sceneId
+      // The scene you leave joins the story memory (its summary), if it changed.
+      if (left && left !== id) import('./writing').then(m => m.remember(left))
+      if (id !== get().sceneId || get().view !== 'manuscript') rememberPlace(here()); set({ sceneId: id, ...(get().prefs.dual === 'manuscript' ? {} : { view: 'manuscript' as View }), freshSceneId: get().freshSceneId === id ? id : null }) },
     selectEntry: slug => set({ entrySlug: slug, bibleTab: 'entry' }),
     showEntry: slug => { rememberPlace(here()); set({ entrySlug: slug, bibleTab: 'entry', ...(get().prefs.dual === 'bible' ? {} : { view: 'bible' as View }) }) },
 

@@ -39,7 +39,7 @@ export default function OutlineDialog({ onClose }: { onClose: () => void }) {
       const fresh = useStore.getState().book!
       const points = fresh.meta.structure.beats.length > 0
       const reply = await ask({
-        model: 'sonnet', effort: 'medium',
+        role: 'edit',
         system: fr
           ? 'Tu aides un romancier de fantasy à bâtir le plan de son livre. Réponds uniquement en JSON valide, en français.'
           : 'You help a fantasy novelist build the outline of their book. Reply with valid JSON only.',

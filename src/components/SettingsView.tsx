@@ -4,12 +4,12 @@ import { useLayoutEffect, useRef, useState } from 'react'
 import { BookMarked, Bot, Feather, Info, Palette, PenLine, Type, Settings as Gear } from 'lucide-react'
 import { Dialog, SettingRow, SettingsSection, Switch, ThemePicker } from '../studio-kit/shell.js'
 import { useStore } from '../store'
-import type { ActionId, Effort, MatterKey, Model, Serial } from '../lib/types'
+import type { MatterKey, Serial } from '../lib/types'
 import { isSerial, serialOf } from '../lib/serial'
 import { BACK, FRONT, MATTER_LABEL } from '../lib/matter'
 import { useT } from '../i18n'
 import ManuscriptOptions from './ManuscriptOptions'
-import { ModelPresetsSection, PresetSelect } from './ModelPresets'
+import { ModelPresetsSection, RolesSection } from './ModelPresets'
 import VoiceSettings from './VoiceSettings'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { useEffect } from 'react'
@@ -17,7 +17,6 @@ import { backupNow, joinSeries, listBackups, seriesName } from '../library'
 import { LT_DEFAULT, ltTest } from '../lib/languagetool'
 import { foldText } from '../lib/text'
 
-const ACTIONS: [ActionId, string][] = [['continue', 'Continue'], ['rewrite', 'Rewrite selection'], ['beats', 'Beats to prose']]
 type Tab = 'appearance' | 'manuscript' | 'writing' | 'voice' | 'claude' | 'book' | 'about'
 
 /** While searching: keeps the sections and rows whose words match, hides the others. Says whether any is left. */
@@ -242,6 +241,12 @@ function ClaudeTab() {
         </span>
       </SettingRow>
     </SettingsSection>
+    <RolesSection />
+    <SettingsSection title={t('Story memory')}>
+      <SettingRow label={t('Keep the story memory up to date')} description={t('When you leave a scene you changed, a small job summarises it, then its chapter. Claude reads these summaries to know what already happened in the book.')}>
+        <Switch checked={prefs.memory} onChange={v => setPrefs({ memory: v })} label={t('Keep the story memory up to date')} />
+      </SettingRow>
+    </SettingsSection>
     <ModelPresetsSection />
     </>
   )
@@ -368,7 +373,7 @@ function SeriesSection() {
   )
 }
 
-/** Daily zips of the book, kept two weeks, on top of autosave. */
+/** Daily zips of the book: the last ten, then one a week for half a year, on top of autosave. */
 function BackupSection() {
   const book = useStore(s => s.book)!
   const t = useT()
@@ -381,7 +386,7 @@ function BackupSection() {
     setBusy(false)
   }
   return (
-    <SettingsSection title={t('Backups')} description={t('A zip of the whole book once a day when you open it, kept two weeks, in Plume’s own folder on this computer.')}>
+    <SettingsSection title={t('Backups')} description={t('A zip of the whole book once a day when you open it, in Plume’s own folder on this computer. The last ten are kept, then one a week for half a year.')}>
       <SettingRow label={t('Back up now')} description={list[0] ?? t('No backup yet')}>
         <button type="button" className="sk-btn sk-btn-sm" disabled={busy} onClick={now}>{busy ? t('Backing up…') : t('Back up now')}</button>
       </SettingRow>

@@ -74,7 +74,8 @@ export function expandVariables(text: string, ctx: { book: Book; sceneTitle?: st
   const vars: Record<string, string> = {
     'book.title': book.meta.title,
     'book.author': book.meta.author,
-    'book.language': fr ? 'French' : 'English',
+    // In the language of the prompt itself: "Écris en français", "Write in English".
+    'book.language': fr ? 'français' : 'English',
     'book.tense': book.meta.voice.tense || (fr ? 'passé simple' : 'past tense'),
     'scene.title': g ? (fr ? 'la scène en cours' : 'the current scene') : ctx.sceneTitle ?? '',
     'scene.pov': g ? (fr ? 'le personnage du point de vue' : 'the point-of-view character') : povName || (fr ? 'le personnage principal' : 'the main character'),

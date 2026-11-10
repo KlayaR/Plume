@@ -64,6 +64,6 @@ export function changedKeys<T extends object>(obj: T, patch: Partial<T>, only?: 
 
 // What undo and snapshots treat as the plan: what you edit by hand, not the scene's
 // text (the editor has its own undo) nor what Plume works out by itself.
-export const SCENE_PLAN_KEYS: readonly (keyof Scene)[] = ['title', 'pov', 'status', 'note', 'time', 'place', 'lines', 'tension', 'beats', 'reveals', 'seeds', 'arc', 'pace', 'cast', 'locked']
+export const SCENE_PLAN_KEYS: readonly (keyof Scene)[] = ['title', 'pov', 'status', 'note', 'time', 'place', 'lines', 'tension', 'beats', 'reveals', 'seeds', 'arc', 'pace', 'cast', 'locked', 'voiceRef']
 export const CHAPTER_PLAN_KEYS: readonly (keyof Chapter)[] = ['title', 'kind', 'part', 'notes', 'goal', 'ending', 'hook', 'promise', 'arc']
 export const META_PLAN_KEYS: readonly (keyof BookMeta)[] = ['structure', 'foundation', 'loose', 'arcs', 'threads', 'map', 'fields']

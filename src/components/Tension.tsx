@@ -31,7 +31,7 @@ export default function Tension() {
         const part = scenes.slice(from, from + 40)
         const list = part.map((s, i) => `${i + 1}. ${s.title} : ${(s.summary || s.note || s.text.slice(0, 500)).replace(/\s+/g, ' ').trim()}`).join('\n')
         const reply = await ask({
-          model: 'sonnet', effort: 'low',
+          role: 'quick',
           system: lang === 'fr' ? 'Tu es éditeur de romans de fantasy. Réponds uniquement en JSON valide.' : 'You are a fantasy fiction editor. Reply with valid JSON only.',
           message: `<scenes>\n${list}\n</scenes>\n\n${lang === 'fr'
             ? 'Note chaque scène de 0 à 10 selon sa tension dramatique (enjeux, danger, conflit, incertitude) : 0 = calme total, 5 = tension soutenue, 10 = point culminant. Utilise toute l’échelle.'

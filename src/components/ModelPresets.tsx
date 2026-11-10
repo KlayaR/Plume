@@ -6,29 +6,11 @@ import { useEffect, useMemo, useState } from 'react'
 import { Plus, Search, Trash2 } from 'lucide-react'
 import { Dialog, SettingRow, SettingsSection } from '../studio-kit/shell.js'
 import { useStore } from '../store'
-import { CLAUDE_MODELS, DEFAULT_PRESETS, presetFor, searchModels, type Fallback, type ModelInfo, type Preset } from '../lib/presets'
-import type { ActionSettings, Effort, Model } from '../lib/types'
+import { CLAUDE_MODELS, searchModels, type Fallback, type ModelInfo, type Preset } from '../lib/presets'
+import { DEFAULT_ROLES, EFFORTS, ROLES, type Effort, type Model, type Role, type RoleModel } from '../lib/types'
 import { openRouterModels, testOpenRouterKey } from '../llm'
 import { newId } from '../lib/text'
 import { numLocale, useT } from '../i18n'
-
-/** One dropdown with the presets, instead of a model list and an effort list. */
-export function PresetSelect({ value, onChange }: { value: ActionSettings; onChange: (next: ActionSettings) => void }) {
-  const presets = useStore(s => s.prefs.presets)
-  const t = useT()
-  const current = presetFor(value, presets)
-  const pick = (id: string) => {
-    const p = presets.find(x => x.id === id)
-    if (!p) return
-    onChange(p.backend === 'claude' ? { ...value, model: p.model as Model, effort: p.effort, preset: p.id } : { ...value, preset: p.id })
-  }
-  return (
-    <select className="sk-select sk-btn-sm" value={current?.id ?? 'custom'} onChange={e => pick(e.target.value)} aria-label={t('Model')} title={t('Model presets are set in Settings → Claude')}>
-      {!current && <option value="custom">{value.model} · {value.effort}</option>}
-      {presets.map(p => <option key={p.id} value={p.id}>{p.name}{p.backend === 'openrouter' ? ' · OpenRouter' : ''}</option>)}
-    </select>
-  )
-}
 
 /** Search OpenRouter's models and pick one. */
 export function ModelPicker({ onPick, onClose }: { onPick: (m: ModelInfo) => void; onClose: () => void }) {
@@ -70,8 +52,10 @@ export function BackendModelSelect({ scope = 'chat' }: { scope?: 'chat' | 'assis
   const t = useT()
   const [picking, setPicking] = useState(false)
   const backend = scope === 'chat' ? prefs.chatBackend : prefs.assistBackend
-  const model = scope === 'chat' ? prefs.chatModel : prefs.assistModel
-  const put = (b: 'claude' | 'openrouter', m: string) => setPrefs(scope === 'chat' ? { chatBackend: b, chatModel: m } : { assistBackend: b, assistModel: m })
+  // The Assistant on Claude is the drafting model of Settings → Claude.
+  const model = scope === 'chat' ? prefs.chatModel : backend === 'claude' ? prefs.roles.draft.model : prefs.assistModel
+  const put = (b: 'claude' | 'openrouter', m: string) => setPrefs(scope === 'chat' ? { chatBackend: b, chatModel: m }
+    : { assistBackend: b, assistModel: m, ...(b === 'claude' && CLAUDE_MODELS.includes(m as Model) ? { roles: { ...prefs.roles, draft: { ...prefs.roles.draft, model: m as Model } } } : {}) })
   const saved = [...new Set([...prefs.presets.filter(p => p.backend === 'openrouter').map(p => p.model), ...(backend === 'openrouter' && model ? [model] : [])])]
   const nameOf = (id: string) => prefs.presets.find(p => p.backend === 'openrouter' && p.model === id)?.name ?? id
   const setBackend = (b: 'claude' | 'openrouter') => b === 'claude' ? put('claude', CLAUDE_MODELS.includes(model as Model) ? model : 'sonnet') : put('openrouter', saved[0] ?? '')
@@ -106,6 +90,39 @@ export function BackendModelSelect({ scope = 'chat' }: { scope?: 'chat' | 'assis
   )
 }
 
+const ROLE_LABELS: Record<Role, [string, string]> = {
+  draft: ['Writing', 'The Assistant: continue, rewrite, beats, quick actions, a scene or a chapter from the plan.'],
+  edit: ['Editing and planning', 'Reading and fixing a chapter, the outline and its check, bible entries, beta readers, agent tasks. Rarer calls, where a stronger model pays off.'],
+  quick: ['Small jobs', 'Summaries for the story memory, short versions of entries, synonyms, tension ratings.'],
+}
+const EFFORT_LABELS: Record<Effort, string> = { low: 'Low effort', medium: 'Medium effort', high: 'High effort', xhigh: 'Very high effort', max: 'Maximum effort' }
+
+/** Settings → Claude: which model and effort answer each kind of request. */
+export function RolesSection() {
+  const roles = useStore(s => s.prefs.roles)
+  const t = useT()
+  const set = (r: Role, patch: Partial<RoleModel>) => useStore.getState().setPrefs({ roles: { ...roles, [r]: { ...roles[r], ...patch } } })
+  return (
+    <SettingsSection title={t('Models')} description={t('Which Claude model answers each kind of request, and how hard it thinks. A stronger model and more effort use more of your plan.')}>
+      {ROLES.map(r => (
+        <SettingRow key={r} label={t(ROLE_LABELS[r][0])} description={t(ROLE_LABELS[r][1])}>
+          <span className="pl-row">
+            <select className="sk-select" value={roles[r].model} aria-label={t('Model')} onChange={e => set(r, { model: e.target.value as Model })}>
+              {CLAUDE_MODELS.map(m => <option key={m} value={m}>{m[0].toUpperCase() + m.slice(1)}</option>)}
+            </select>
+            <select className="sk-select" value={roles[r].effort} aria-label={t('Effort')} onChange={e => set(r, { effort: e.target.value as Effort })}>
+              {EFFORTS.map(x => <option key={x} value={x}>{t(EFFORT_LABELS[x])}</option>)}
+            </select>
+          </span>
+        </SettingRow>
+      ))}
+      <SettingRow label={t('Reset')} description={t('Sonnet for writing, Opus with high effort for editing and planning, Haiku for small jobs.')}>
+        <button type="button" className="sk-btn sk-btn-sm" onClick={() => useStore.getState().setPrefs({ roles: DEFAULT_ROLES })}>{t('Reset')}</button>
+      </SettingRow>
+    </SettingsSection>
+  )
+}
+
 /** Settings → Claude: OpenRouter, and the presets. */
 export function ModelPresetsSection() {
   const prefs = useStore(s => s.prefs)
@@ -121,7 +138,6 @@ export function ModelPresetsSection() {
     setResult(t('Testing…'))
     try { setResult(`✓ ${await testOpenRouterKey(key.trim())}`) } catch (e) { setResult(`✕ ${(e as Error).message}`) }
   }
-  const addClaude = () => setPresets([...prefs.presets, { id: newId(), name: t('New preset'), backend: 'claude', model: 'sonnet', effort: 'low' }])
   const add = (m: ModelInfo) => {
     const existing = prefs.presets.find(p => p.id === picking)
     const id = existing?.id ?? newId()
@@ -160,23 +176,10 @@ export function ModelPresetsSection() {
         {prefs.presets.filter(p => p.backend === 'openrouter').map(p => (
           <div key={p.id} className="pl-preset">
             <input className="sk-input" value={p.name} aria-label={t('Name')} onChange={e => patch(p.id, { name: e.target.value })} />
-            {p.backend === 'claude'
-              ? (
-                <>
-                  <select className="sk-select" value={p.model} aria-label={t('Model')} onChange={e => patch(p.id, { model: e.target.value })}>
-                    {CLAUDE_MODELS.map(m => <option key={m} value={m}>{m[0].toUpperCase() + m.slice(1)}</option>)}
-                  </select>
-                  <select className="sk-select" value={p.effort} aria-label={t('Effort')} onChange={e => patch(p.id, { effort: e.target.value as Effort })}>
-                    <option value="low">{t('Low effort')}</option><option value="medium">{t('Medium effort')}</option><option value="high">{t('High effort')}</option>
-                  </select>
-                </>
-              )
-              : (
-                <>
-                  <button type="button" className="sk-btn pl-preset-model" onClick={() => setPicking(p.id)} title={p.model}>{p.model}</button>
-                  <span className="sk-badge">OpenRouter</span>
-                </>
-              )}
+            <>
+            <button type="button" className="sk-btn pl-preset-model" onClick={() => setPicking(p.id)} title={p.model}>{p.model}</button>
+            <span className="sk-badge">OpenRouter</span>
+            </>
             <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm sk-btn-icon" aria-label={t('Delete')} 
               onClick={() => { setPresets(prefs.presets.filter(x => x.id !== p.id)); if (prefs.fallbackPreset === p.id) setPrefs({ fallbackPreset: '' }) }}><Trash2 size={13} /></button>
           </div>
