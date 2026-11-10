@@ -136,7 +136,14 @@ export default function App() {
   useEffect(() => {
     let unlisten = () => {}
     try {
-      getCurrentWindow().onCloseRequested(async () => { keepSession(); await useStore.getState().flush() })
+      getCurrentWindow().onCloseRequested(async event => {
+        keepSession()
+        if (await useStore.getState().flush()) return
+        // A write failed: the window stays open unless you choose to lose those changes.
+        const { ask } = await import('@tauri-apps/plugin-dialog')
+        const go = await ask(t('Some changes could not be saved: {e}. Close the book anyway? They will be lost.', { e: useStore.getState().saveError }), { title: t('Not saved'), kind: 'warning' }).catch(() => false)
+        if (!go) event.preventDefault()
+      })
         .then(u => { unlisten = u }).catch(() => {})
     } catch { /* browser preview */ }
     return () => unlisten()
@@ -173,6 +180,7 @@ export default function App() {
         {!book ? <StartScreen version={version} /> : prefs.dual && prefs.dual !== view ? <DualView view={view} other={prefs.dual} /> : <ViewBody view={view} />}
       </main>
       {book && <BottomBar />}
+      {book && <SaveFailed />}
       {zen && (
         <div className="pl-zenbar" onMouseDown={e => e.preventDefault()}>
           <button type="button" className="pl-quiet" aria-pressed={prefs.dimPara} onClick={() => useStore.getState().setPrefs({ dimPara: !prefs.dimPara })}>{t('Dim the rest')}</button>
@@ -238,6 +246,21 @@ function MovedCard() {
       <div className="pl-row">
         <button type="button" className="sk-btn sk-btn-sm sk-btn-primary" onClick={done}>{t('Got it')}</button>
       </div>
+    </div>
+  )
+}
+
+/** While a write keeps failing: a bar that stays above everything, focus mode or not, until it succeeds. */
+function SaveFailed() {
+  const saving = useStore(s => s.saving)
+  const error = useStore(s => s.saveError)
+  const t = useT()
+  if (saving !== 'error') return null
+  return (
+    <div className="pl-savefail" role="alert">
+      <CircleAlert size={15} />
+      <span className="pl-grow">{t('Some changes are not saved: {e}', { e: error })}</span>
+      <button type="button" className="sk-btn sk-btn-sm" onClick={() => useStore.getState().retrySave()}>{t('Retry')}</button>
     </div>
   )
 }

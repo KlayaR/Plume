@@ -295,7 +295,8 @@ interface State {
 
   open: (root: string) => Promise<void>
   setBook: (b: Book) => void
-  close: () => void
+  /** Writes what is waiting, then closes the book; asks first if something could not be saved. */
+  close: () => Promise<void>
   /** The cursor moved in a scene: remembered (after a pause) to reopen the book there. */
   noteSpot: (sceneId: string, pos: number) => void
   setView: (v: View) => void
@@ -421,7 +422,8 @@ export const useStore = create<State>((set, get) => {
     progressAt = Date.now()
     import('./library').then(m => { const b = get().book; if (b) { m.recordProgress(b); m.noteOnShelf(b) } })
   }
-  const metaLater = () => later('plume.json', () => saveMeta(get().book!))
+  // The book is read when the write runs: once it is closed there is nothing left to write.
+  const metaLater = () => later('plume.json', async () => { const b = get().book; if (b) await saveMeta(b) })
   const fail = (err: unknown) => { useStore.setState({ saving: 'error', saveError: String(err) }); get().notify('error', t('Could not save: {e}', { e: String(err) })) }
 
   // What goes to the trash can come back: it is written again from memory (the trash keeps its own copy).
@@ -532,6 +534,9 @@ export const useStore = create<State>((set, get) => {
       session = { root: book.root, words: bookCounts(book.chapters).words, start: Date.now() }
       steps.clear()
       set({ book, recent, view: 'manuscript', sceneId, unlocked: [], jump: back ? { sceneId: back.sceneId, from: back.pos, to: back.pos } : null, entrySlug: null, freshSceneId: null, bibleTab: 'entry', planTab: 'outline' })
+      // Changes and proposals kept for the scenes of the last book don't follow you into this one.
+      import('./edit').then(m => m.useEdit.setState({ pending: {} }))
+      import('./editor/actions').then(m => m.forgetProposals())
       import('./chat').then(m => m.loadChat(book))
       import('./writing').then(m => m.loadNotes(book))
       import('./scratch').then(m => m.loadScratch(book))
@@ -540,9 +545,13 @@ export const useStore = create<State>((set, get) => {
       // Library and safety: the lock for synced folders, today's backup, progress, the shelf card.
       import('./library').then(m => { m.takeLock(book); m.autoBackup(book); m.recordProgress(get().book!); m.noteOnShelf(get().book!); m.refreshSnapshots(get().book!); m.applyFantasyDefaults(get().book!); steps.clear() })
     },
-    close: () => {
+    close: async () => {
       const b = get().book
-      get().flush()
+      // Every waiting write runs while the book is still open: they read it to know what to write.
+      if (!(await get().flush()) && b) {
+        const go = await import('@tauri-apps/plugin-dialog').then(d => d.ask(t('Some changes could not be saved: {e}. Close the book anyway? They will be lost.', { e: get().saveError }), { title: t('Not saved'), kind: 'warning' })).catch(() => false)
+        if (!go) return
+      }
       if (b) import('./library').then(m => { m.noteOnShelf(b); m.releaseLock(b) })
       const done = b ? sessionNow(b) : undefined
       if (b && done) saveSpot(b.root, { session: done })
@@ -827,11 +836,18 @@ export const useStore = create<State>((set, get) => {
     },
     notify: (kind, msg, action) => set({ toast: { kind, msg, action } }),
     flush: async () => {
-      const all = [...pending.values()]
-      pending.clear()
-      let ok = true
-      for (const p of all) { clearTimeout(p.timer); await p.run().catch(() => { ok = false }) }
-      return ok
+      // What is waiting, and what failed before: both are tried now.
+      // A write can queue another (today's progress after a scene): rounds until nothing waits.
+      for (let round = 0; round < 5 && (pending.size || (round === 0 && failed.size)); round++) {
+        const all: [string, () => Promise<unknown>][] = [...[...pending].map(([k, p]) => { clearTimeout(p.timer); return [k, p.run] as [string, () => Promise<unknown>] }), ...(round === 0 ? failed : [])]
+        pending.clear()
+        if (round === 0) failed.clear()
+        for (const [key, run] of all) {
+          await run().catch(e => { failed.set(key, run); useStore.setState({ saveError: String(e) }) })
+        }
+      }
+      syncSave()
+      return failed.size === 0
     },
     bumpEditor: () => set(s => ({ editorTick: s.editorTick + 1 })),
   }

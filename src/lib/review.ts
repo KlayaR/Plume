@@ -87,6 +87,16 @@ function nameSpellings(text: string, book: Book): Finding[] {
     .map(w => ({ from: w.from, to: w.to, note: w.w }))
 }
 
+/** Every word of the bible's names and aliases, folded: a name said twice is not an echo. */
+function nameWords(book: Book): Set<string> {
+  const out = new Set<string>()
+  for (const e of book.entries) {
+    if (['style', 'wordlist', 'excerpt'].includes(e.type)) continue
+    for (const raw of [e.name, ...e.aliases]) for (const tok of raw.replace(/!$/, '').split(/[\s'’-]+/)) if (tok) out.add(foldText(tok))
+  }
+  return out
+}
+
 const firstWord = (s: string) => foldText((s.replace(/^[—–«“"\s]+/, '').match(/[\p{L}’'-]+/u) ?? [''])[0])
 
 /** Dialogue tags: a speech verb right after a line of dialogue (« … », dit-il / "…," she said). */
@@ -177,7 +187,7 @@ export const REPORTS: ReportDef[] = [
   // Repetition
   { id: 'echoes', category: 'repetition', label: 'Echoes', unit: 'per1000', target: 12,
     help: 'The same word again within about 40 words.',
-    find: (text, lang) => echoes(text, lang) },
+    find: (text, lang, book) => echoes(text, lang, 40, nameWords(book)) },
   { id: 'phrases', category: 'repetition', label: 'Repeated phrases', unit: 'per1000', target: 1.5,
     help: 'Phrases of three to five words used more than once.',
     find: (text, lang) => repeatedPhrases(text, lang) },

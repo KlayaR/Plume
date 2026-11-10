@@ -14,11 +14,11 @@ import { languageToolExt, refreshLT } from './lt'
 import { showMenu } from '../contextMenu'
 import { editorMenu } from '../menus'
 import { enterStartsScene } from '../lib/chapters'
-import { proposalField, sceneExtensions, setNames } from './cm'
+import { proposalField, sceneExtensions, setNames, setProposal } from './cm'
 import { captureExt } from './captures'
 import { draftExt, useDraft } from './draft'
 import CommentColumn, { commentColumnExt } from './CommentColumn'
-import { accept, discard, fillPlaceholder, getEditorView, runAction, setEditorView, syncProposalState, useAI } from './actions'
+import { accept, discard, fillPlaceholder, getEditorView, keepProposal, runAction, setEditorView, syncProposalState, takeProposal, useAI } from './actions'
 import { changesField, inlineExt, marksExt, placeholderExt, setChanges, setHighlights, trackedChangesExt, unknownNamesExt, type Highlight } from './marks'
 import { takePending, useEdit } from '../edit'
 import type { Comment, EntryType } from '../lib/types'
@@ -275,7 +275,15 @@ export default function Editor({ scene }: { scene: Scene }) {
     viewRef.current = view
     setView(view)
     view.dispatch({ effects: names(useStore.getState().book!.entries) })
+    // A proposal left waiting when this scene was closed comes back.
+    const back = takeProposal(scene.id)
+    if (back && back.to <= view.state.doc.length) view.dispatch({ effects: setProposal.of({ ...back, streaming: false }) })
     return () => {
+      // Changes and a finished proposal still waiting for you are kept for when the scene opens again.
+      const changes = view.state.field(changesField)
+      if (changes.length) useEdit.setState(s => ({ pending: { ...s.pending, [scene.id]: [...changes.map(c => ({ ...c, was: view.state.doc.sliceString(c.from, c.to) })), ...(s.pending[scene.id] ?? [])] } }))
+      const p = view.state.field(proposalField, false)
+      if (p && !p.streaming) keepProposal(scene.id, p)
       if (getEditorView() === view) setEditorView(null)
       setView(null)
       view.destroy()
@@ -329,9 +337,19 @@ export default function Editor({ scene }: { scene: Scene }) {
     if (!v || !fixes) return
     const list = takePending(scene.id)
     if (list) {
+      // Changes kept while the scene was closed find their words again (they may have moved); those whose words are gone are dropped.
+      const doc = v.state.doc.toString()
+      const placed = list.flatMap(c => {
+        if (c.was === undefined) return c.to <= doc.length ? [c] : []
+        if (doc.slice(c.from, c.to) === c.was) return [c]
+        const at = c.was ? locateQuote(doc, c.was, c.from) : -1
+        return at < 0 ? [] : [{ ...c, from: at, to: at + c.was.length }]
+      })
       // Changes still waiting for you stay; a new one on the same words waits for them to be settled.
       const have = v.state.field(changesField)
-      v.dispatch({ effects: setChanges.of([...have, ...list.filter(c => c.to <= v.state.doc.length && !have.some(h => c.from <= h.to && c.to >= h.from))]) })
+      const fresh: typeof placed = []
+      for (const c of placed) if (![...have, ...fresh].some(h => c.from <= h.to && c.to >= h.from)) fresh.push(c)
+      v.dispatch({ effects: setChanges.of([...have, ...fresh]) })
     }
   }, [fixes, scene.id])
 

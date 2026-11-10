@@ -336,6 +336,10 @@ export function buildContext(input: ContextInput): Built {
   for (const m of findMentions(scan, matcher)) counts.set(m.slug, (counts.get(m.slug) ?? 0) + 1)
   const atFull = new Set(findMentions(input.instruction, buildMatcher(book.entries, true)).filter(m => input.instruction[m.from - 1] === '@').map(m => m.slug))
   for (const slug of atFull) if (!counts.has(slug)) counts.set(slug, 1)
+  // The scene's plan card: names in its note and beats count as mentions, and who is there and where it happens are sent.
+  const card = input.scene && !isRewrite(input.action) ? input.scene : undefined
+  if (card) for (const m of findMentions([card.note ?? '', ...(card.beats ?? [])].join('\n'), matcher)) counts.set(m.slug, (counts.get(m.slug) ?? 0) + 1)
+  const cast = new Set(card?.cast?.length ? findMentions(card.cast.join('\n'), buildMatcher(book.entries, true)).map(m => m.slug) : [])
 
   const picked = new Map<string, Picked>()
   const add = (e: Entry, mode: Mode, reason: string, linked = false) => {
@@ -355,6 +359,11 @@ export function buildContext(input: ContextInput): Built {
   }
   const pov = input.pov ? bySlug.get(input.pov) : undefined
   if (pov && pov.include !== 'secret') add(pov, 'full', 'POV')
+  const sendable = (e: Entry | undefined): e is Entry => !!e && !UNNAMED.has(e.type) && e.include !== 'secret' && e.include !== 'never'
+  // Writing the scene from its plan: the cast in full (with their voice cards), the place in short.
+  for (const slug of cast) { const e = bySlug.get(slug); if (sendable(e) && slug !== input.pov) add(e, input.action === 'scene' ? 'full' : 'short', 'in the scene') }
+  const place = card?.place ? bySlug.get(card.place) : undefined
+  if (sendable(place)) add(place, 'short', 'place of the scene')
   for (const [slug, n] of counts) {
     const e = bySlug.get(slug)
     if (!e || e.include === 'secret' || (e.include === 'never' && !atFull.has(slug))) continue

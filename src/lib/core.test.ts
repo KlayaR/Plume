@@ -26,7 +26,7 @@ import { allowedKinds, chapterLabels, enterStartsScene } from './chapters'
 import { countSigns, textStats } from './stats'
 import type { Book, Entry, Scene } from './types'
 import { DEFAULT_AI, DEFAULT_VOICE, ENTRY_TYPES, FAMILIES, VOICE_TYPES, familyOf } from './types'
-import { adverbs, passives, echoes } from './analysis'
+import { adverbs, passives, echoes, sentences } from './analysis'
 import { aiTells, checkRules, expandVariables } from './voice'
 import { review, reviewChecks, topProblems } from './review'
 import { applyFixes, fixGuard, fixRequest, placeFixes } from './fixes'
@@ -167,6 +167,19 @@ describe('context', () => {
     const b = buildContext({ ...base, pov: 'elise', overrides: { elise: 'short', aube: 'drop' } })
     expect(b.picked.find(p => p.slug === 'elise')!.mode).toBe('short')
     expect(b.message).not.toContain('silver sword')
+  })
+  it('sends the cast, the place and the names on the plan card when writing the scene', () => {
+    const scene = { id: 'w1', path: 'manuscript/c/w.md', title: 'Flight', pov: 'elise', status: 'draft' as const, text: '', note: 'They flee towards the Maison Varenne.', beats: ['Rose opens the gate.'], cast: ['Élise', 'Rose'], place: 'varenne', lines: [], comments: [], extra: {} }
+    const b = buildContext({ ...base, action: 'scene', pov: 'elise', scene })
+    const p = Object.fromEntries(b.picked.map(x => [x.slug, x]))
+    expect(p.rose.mode).toBe('full')
+    expect(p.rose.reasons).toContain('in the scene')
+    expect(p.varenne.reasons).toContain('place of the scene')
+    expect(p['maison-varenne'].dropped).toBe(false)
+    expect(p.elise.reasons).toEqual(['POV'])
+    // A rewrite only reads the passage.
+    const r = buildContext({ ...base, action: 'rewrite', selection: 'She ran.', scene })
+    expect(r.picked.some(x => x.slug === 'rose' || x.slug === 'varenne')).toBe(false)
   })
   it('cuts linked entries first when over budget', () => {
     const tight = { ...book, meta: { ...book.meta, ai: { ...book.meta.ai, bibleBudget: 20 } } }
@@ -337,6 +350,28 @@ describe('French checks on real prose', () => {
   })
   it('does not call être forms echoes', () => {
     expect(echoes('Les lettres furent brûlées. Les murs furent détruits.', 'fr').length).toBe(0)
+  })
+  // The twelve sentences of the November 2026 audit: no passive, no adverb in any of them.
+  const clean = 'Elle s’était levée avant l’aube. Le ciel était bleu, presque blanc au-dessus des toits. Marc était petit pour un garde, mais têtu. Il était apparu à la grille sans un bruit. Un haussement d’épaules, un froncement de sourcils : rien d’autre. Le battement de son cœur couvrait le claquement des sabots. Elle s’était mise à courir. Le vieux était décédé l’hiver dernier. Un frémissement parcourut les feuilles, puis un chuchotement. Il s’était approché du mur. Elle était montée sur le banc. Ils s’étaient tus.'
+  it('finds no passive in pronominal verbs, être verbs and adjectives', () => {
+    expect(passives(clean, 'fr').map(f => clean.slice(f.from, f.to))).toEqual([])
+    expect(passives('La porte fut ouverte par le vent.', 'fr').length).toBe(1)
+  })
+  it('takes a -ment word after an article or a possessive for a noun', () => {
+    expect(adverbs(clean, 'fr')).toEqual([])
+    const t = 'Il avançait lentement, avec un étonnement sincère, puis s’arrêta brusquement.'
+    expect(adverbs(t, 'fr').map(f => t.slice(f.from, f.to))).toEqual(['lentement', 'brusquement'])
+  })
+  it('keeps a line of dialogue and its tag, and a title, in one sentence', () => {
+    expect(sentences('— Tu viens ? demanda-t-il.').length).toBe(1)
+    expect(sentences('M. Dupont attend. Il pleut.').map(s => s.s)).toEqual(['M. Dupont attend.', 'Il pleut.'])
+    expect(sentences('He looked at me. Then he left.').length).toBe(2)
+    expect(sentences('Tu viens ?\n— Non.').length).toBe(2)
+  })
+  it('does not count a name said twice as an echo', () => {
+    const t = 'Marc ouvrit la porte. Marc ne dit rien.'
+    expect(echoes(t, 'fr', 40, new Set(['marc'])).length).toBe(0)
+    expect(echoes(t, 'fr').length).toBe(1)
   })
 })
 
@@ -932,7 +967,7 @@ describe('writing from the plan', () => {
     const three = bookOf([scene('a', ''), scene('b', ''), scene('c', '')], [])
     expect(sceneWords(three, 'b')).toEqual([1000, 1500])
     const b = buildContext({ book: one, chapter: 1, pov: null, action: 'scene', instruction: '', before: '', selection: '', after: '', overrides: {}, scene: one.chapters[0].scenes[0] })
-    expect(b.message).toContain('at least 3000 words, up to about 4500')
+    expect(b.message).toContain('between about 3000 and 4500 words')
     expect(b.message).toContain('Jasper wants a calm morning.')
     expect(b.message).toContain('<scope>')
   })

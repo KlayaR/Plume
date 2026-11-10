@@ -5,7 +5,6 @@ import type { EditorView } from '@codemirror/view'
 import { isRewrite, type ActionId, type Book, type Lang } from '../lib/types'
 import { buildContext, scenePlace, systemPrompt, type Built, type Override } from '../lib/context'
 import { reviewChecks } from '../lib/review'
-import { lastWords } from '../lib/text'
 import { checkRules, fixDirection, type Check } from '../lib/voice'
 import { ask, effective, isCheap, stopAsk } from '../ai'
 import { diffWords, noteTaste } from '../writing'
@@ -92,7 +91,7 @@ export async function runAction(action: ActionId, instruction: string, overrides
   if (!ctx) return
   useAI.setState({ last: { action, instruction, overrides } })
   const sid = st.sceneId
-  await stream(action, ctx.from, ctx.to, ctx.system, ctx.message, action === 'scene' && sid ? { sceneId: sid, message: ctx.message } : undefined)
+  await stream(action, ctx.from, ctx.to, ctx.system, ctx.message, sid ?? undefined)
 }
 
 const wordCount = (s: string) => (s.match(/\S+/g) ?? []).length
@@ -108,64 +107,56 @@ function fixMessage(text: string, failed: Check[], lang: Lang): string {
     : 'Change only the sentences concerned; keep every other sentence word for word, with the same length and meaning. Reply with the whole corrected passage only.'}\n</task>`
 }
 
-/** Words still missing when a scene written from the plan came out under its length, or 0. */
-function missingWords(book: Book, sceneId: string, text: string): number {
+/**
+ * A scene written from the plan that came out well under the chapter's length: said
+ * once, so you decide. It is never carried on by itself, since the reply has already
+ * ended the scene and a second request would write past that ending.
+ */
+function sayIfShort(book: Book, sceneId: string, text: string) {
   const [least] = scenePlace(book, sceneId).range
   const n = wordCount(text)
-  return n < least * 0.85 ? least - n : 0
+  if (n < least * 0.85) useStore.getState().notify('warn', t('Shorter than the chapter length asked ({n} of about {a} words). To lengthen it, select a passage and use Expand.', { n, a: least }))
 }
 
-/** The follow-up request that carries an unfinished scene on to its end. */
-function moreMessage(message: string, text: string, missing: number, lang: Lang): string {
-  const fr = lang === 'fr'
-  return `${message}\n\n<written_so_far>\n${lastWords(text, 700)}\n</written_so_far>\n\n<task>\n${fr
-    ? `La scène n’est pas finie : <written_so_far> en est la fin pour l’instant. Continue-la exactement là où elle s’arrête, jusqu’à ce que dit sa note, sans rien répéter. Environ ${missing} mots de plus. Réponds uniquement avec la suite.`
-    : `The scene isn’t finished: <written_so_far> is where it stands. Continue it from exactly where it stops, on to what its note says, repeating nothing. About ${missing} more words. Reply with the continuation only.`}\n</task>`
-}
+// Proposals whose scene was closed before you decided, by scene id: they come back when it opens again.
+const kept = new Map<string, { from: number; to: number; text: string }>()
+/** Keeps a finished proposal for its scene (the editor is closing). */
+export const keepProposal = (sceneId: string, p: { from: number; to: number; text: string }) => { if (p.text.trim()) kept.set(sceneId, p) }
+/** The proposal kept for a scene, once. */
+export function takeProposal(sceneId: string) { const p = kept.get(sceneId); kept.delete(sceneId); return p ?? null }
+/** A new book: what was kept for the last one goes. */
+export const forgetProposals = () => kept.clear()
 
-/**
- * Streams a reply into a proposal between from and to, then scores it. A scene
- * written from the plan that comes out well under its length is carried on with
- * one more request, appended to the same proposal.
- */
-async function stream(action: ActionId, from: number, to: number, system: string, message: string, extend?: { sceneId: string; message: string }) {
+/** Streams a reply into a proposal between from and to, then scores it. */
+async function stream(action: ActionId, from: number, to: number, system: string, message: string, sceneId?: string) {
   if (!view) return
   const chosen = assistantChoice(action)
   const settings = effective(chosen.model, chosen.effort)
   const v = view
+  const sid = sceneId ?? useStore.getState().sceneId
   v.dispatch({ effects: setProposal.of({ from, to, text: '', streaming: true }) })
   useAI.setState({ hasProposal: true, running: 'starting', checks: [] })
-  let written = ''
-  const go = async (msg: string, round: number) => {
-    const id = await runLLM(
-      { model: settings.model, effort: settings.effort, orModel: chosen.orModel, system, message: msg },
-      // The reply goes to the scene it was asked for, even if another scene is active by now.
-      text => { if (v.dom.isConnected) v.dispatch({ effects: appendProposal.of(text) }) },
-      r => {
-        useAI.setState({ running: null })
-        if (r.usage) useStore.getState().recordUsage(r.usage)
-        if (!r.ok && !r.stopped) useStore.getState().notify('error', r.error ?? t('The request failed.'))
-        if (!v.dom.isConnected) return
-        written += (written && r.text.trim() ? '\n\n' : '') + r.text.trim()
-        const b = useStore.getState().book
-        const missing = b && extend && r.ok && !r.stopped && round === 0 ? missingWords(b, extend.sceneId, written) : 0
-        if (missing && b) {
-          // Keep the proposal open and ask for the rest of the scene.
-          v.dispatch({ effects: appendProposal.of('\n\n') })
-          useAI.setState({ running: 'starting' })
-          go(moreMessage(extend!.message, written, missing, b.meta.language), 1)
-          return
-        }
-        if (written) {
-          v.dispatch({ effects: endStream.of(null) })
-          if (b) useAI.setState({ checks: scorecard(written, b) })
-        } else discardProposal(v)
-        syncProposalState()
-      },
-    )
-    if (useAI.getState().running === 'starting') useAI.setState({ running: id })
-  }
-  await go(message, 0)
+  const id = await runLLM(
+    { model: settings.model, effort: settings.effort, orModel: chosen.orModel, system, message },
+    // The reply goes to the scene it was asked for, even if another scene is active by now.
+    text => { if (v.dom.isConnected) v.dispatch({ effects: appendProposal.of(text) }) },
+    r => {
+      useAI.setState({ running: null })
+      if (r.usage) useStore.getState().recordUsage(r.usage)
+      if (!r.ok && !r.stopped) useStore.getState().notify('error', r.error ?? t('The request failed.'))
+      const written = r.text.trim()
+      // Its scene was closed while Claude wrote: the proposal waits for it.
+      if (!v.dom.isConnected) { if (sid && written) keepProposal(sid, { from, to, text: written }); syncProposalState(); return }
+      const b = useStore.getState().book
+      if (written) {
+        v.dispatch({ effects: endStream.of(null) })
+        if (b) useAI.setState({ checks: scorecard(written, b) })
+        if (b && sceneId && action === 'scene' && r.ok && !r.stopped) sayIfShort(b, sceneId, written)
+      } else discardProposal(v)
+      syncProposalState()
+    },
+  )
+  if (useAI.getState().running === 'starting') useAI.setState({ running: id })
 }
 
 // A timer, not requestAnimationFrame: frames don't come while the window is hidden or minimised.
@@ -219,12 +210,9 @@ export async function writeChapter(chapterId: string) {
       const c = assistantChoice('scene')
       const e = effective(c.model, c.effort)
       st.notify('ok', t('Writing “{title}”… ({i} of {n})', { title: s.title, i: done + 1, n: todo.length }))
-      const call = (message: string) => ask({ model: e.model, effort: e.effort, orModel: c.orModel, system: built.system, message })
-      let text = (await call(built.message)).trim()
+      let text = (await ask({ model: e.model, effort: e.effort, orModel: c.orModel, system: built.system, message: built.message })).trim()
       if (!text || useAI.getState().running !== 'chapter') break
-      const missing = missingWords(b2, s.id, text)
-      if (missing) text += '\n\n' + (await call(moreMessage(built.message, text, missing, b2.meta.language))).trim()
-      text = fixTypography(text.trim(), b2.meta.language)
+      text = fixTypography(text, b2.meta.language)
       useStore.getState().updateScene(s.id, { text, extra: { ...f.scene.extra, aiWords: wordCount(text) } })
       if (scorecard(text, b2).some(x => !x.ok)) toFix.push(s.id)
       done++

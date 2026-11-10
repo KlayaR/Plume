@@ -16,6 +16,9 @@ export function words(text: string): (Span & { w: string })[] {
   return out
 }
 
+/** Titles whose full stop doesn't end a sentence, as written (without the stop). */
+const ABBREVIATIONS = new Set(['M', 'MM', 'Mme', 'Mmes', 'Mlle', 'Mlles', 'Dr', 'Pr', 'Me', 'St', 'Ste', 'Mr', 'Mrs', 'Ms', 'Jr', 'Sr', 'Prof', 'Gen', 'Col', 'Capt', 'Lt', 'Sgt', 'cf', 'vs'])
+
 /** Sentences with their place; a line break always ends one. */
 export function sentences(text: string): (Span & { s: string; words: number })[] {
   const out: (Span & { s: string; words: number })[] = []
@@ -26,6 +29,17 @@ export function sentences(text: string): (Span & { s: string; words: number })[]
     const s = raw.trim()
     if (!/\p{L}/u.test(s)) continue
     const from = m.index! + lead
+    const prev = out[out.length - 1]
+    // On the same line, "— Tu viens ? demanda-t-il." (a lower-case word after ? ! …) and "M. Dupont" are one sentence.
+    const sameLine = !!prev && !text.slice(prev.to, from).includes('\n')
+    const lowerAfter = sameLine && /[?!…][»”"’)]*$/.test(prev.s) && /^\p{Ll}/u.test(s)
+    const title = sameLine && ABBREVIATIONS.has((/(?:^|[^\p{L}])(\p{L}+)\.$/u.exec(prev.s) ?? ['', ''])[1])
+    if (lowerAfter || title) {
+      prev.to = from + s.length
+      prev.s = text.slice(prev.from, prev.to)
+      prev.words = (prev.s.match(WORD) ?? []).length
+      continue
+    }
     out.push({ from, to: from + s.length, s, words: (s.match(WORD) ?? []).length })
   }
   return out
@@ -55,17 +69,29 @@ export function dialogue(text: string): Finding[] {
 
 const FR_MENT_NOUNS = new Set(('moment comment element appartement gouvernement sentiment mouvement monument instrument vetement testament firmament document argument aliment ciment serment tourment segment regiment jument chatiment logement batiment evenement roulement departement raisonnement enseignement comportement fragment ornement parlement supplement complement temperament medicament paiement equipement changement commencement developpement traitement jugement ' +
   'accompagnement agrandissement amendement amusement arrangement avertissement bouleversement chargement classement craquement deplacement eclaircissement effondrement egarement emerveillement emplacement emportement encouragement engagement enlevement ensevelissement entrainement envoutement epuisement etonnement evanouissement froncement gemissement glissement grincement grondement habillement hurlement isolement jaillissement licenciement mecontentement pressentiment rassemblement recueillement reglement remerciement renseignement ressentiment retournement sifflement soulagement soulevement tremblement vieillissement agacement alignement aboiement ' +
-  'clement dement vehement').split(/\s+/))
+  'clement dement vehement ' +
+  // Sounds and movements a scene describes, common in fiction.
+  'haussement hochement battement claquement chuchotement fremissement froissement frottement ronflement grognement bourdonnement crissement raclement ruissellement scintillement miroitement crepitement clapotement bruissement picotement fourmillement elancement tatonnement pietinement balancement effleurement renfoncement enfoncement encadrement entrebaillement emportement etranglement halement eboulement ecroulement affaissement allongement abaissement abattement accablement acharnement affolement apaisement assouplissement aveuglement balbutiement bavardage clignement claquement cognement degagement denouement deroulement desarroi detachement durcissement eblouissement ecartement eclatement ecoulement effarement egorgement elargissement embrasement emerveillement empressement encerclement endormissement enervement engourdissement enlacement ensorcellement entassement envoutement epanouissement errement essoufflement etirement evitement fourmillement fremissement gonflement grondement jaillissement lancement mugissement noircissement pressentiment raidissement ralentissement rapprochement recueillement redressement refroidissement relachement reniflement repliement resserrement retentissement rougissement ruissellement saignement sanglot serrement sifflement soubresaut soupcon sursaut tintement tressaillement tremoussement vacillement vagissement vrombissement').split(/\s+/))
+/** A word before a -ment word that makes it a noun ("un battement", "son hochement", "d’étonnement"). */
+const FR_DETERMINERS = new Set('le la les un une des du de au aux ce cet cette ces mon ma mes ton ta tes son sa ses notre nos votre vos leur leurs chaque quel quelle quelques aucun aucune nul nulle'.split(' '))
 const EN_LY_NOT = new Set('only family early holy ugly lonely friendly silly reply apply supply belly jelly fly july italy ally rally bully lily daily weekly monthly yearly likely unlikely costly lovely lively deadly elderly orderly jolly folly melancholy curly surly burly hilly chilly woolly wily oily rely assembly anomaly butterfly dragonfly emily molly sally kelly billy willy holly dolly gully homily monopoly'.split(' '))
 
 export function isAdverb(word: string, lang: Lang): boolean {
-  // French elisions (l’, d’, qu’) belong to the next word, not to the adverb.
-  const w = lang === 'fr' ? foldText(word).replace(/^[a-z]{1,3}'/, '') : foldText(word)
+  const folded = foldText(word)
+  // "l’étonnement", "d’agacement": after an elided article, a -ment word is a noun.
+  if (lang === 'fr' && /^[ld]'/.test(folded)) return false
+  // Other elisions (qu’, s’) belong to the next word, not to the adverb.
+  const w = lang === 'fr' ? folded.replace(/^[a-z]{1,3}'/, '') : folded
   if (lang === 'fr') return w.length > 6 && w.endsWith('ment') && !FR_MENT_NOUNS.has(w.replace(/s$/, ''))
   return w.length > 4 && w.endsWith('ly') && !EN_LY_NOT.has(w)
 }
 
-export const adverbs = (text: string, lang: Lang): Finding[] => words(text).filter(x => isAdverb(x.w, lang)).map(({ from, to }) => ({ from, to }))
+/** Adverbs in a text. In French, a -ment word right after an article or a possessive is a noun. */
+export const adverbs = (text: string, lang: Lang): Finding[] => {
+  const ws = words(text)
+  return ws.filter((x, i) => isAdverb(x.w, lang) && !(lang === 'fr' && i > 0 && FR_DETERMINERS.has(foldText(ws[i - 1].w)) && /^\s+$/.test(text.slice(ws[i - 1].to, x.from))))
+    .map(({ from, to }) => ({ from, to }))
+}
 
 // --- Passive voice ---------------------------------------------------------
 
@@ -76,12 +102,28 @@ const FR_NOT_PASSIVE = /^(?:né|née|nés|nées|allé|allée|allés|allées|venu
 const EN_PASSIVE = /\b(?:am|is|are|was|were|be|been|being)\s+(?:\w+ly\s+)?(\w+(?:ed|en)|built|bought|brought|caught|done|felt|found|given|held|kept|known|left|lost|made|meant|met|paid|put|said|seen|sent|set|shot|shown|sold|spent|struck|taken|taught|told|thought|torn|thrown|understood|won|worn|written|hidden|beaten|bitten|broken|chosen|driven|eaten|fallen|forgotten|frozen|gotten|ridden|risen|shaken|stolen|sworn|woken)\b/gi
 const EN_NOT_PASSIVE = /^(?:been|seen|open|often|even|garden|golden|wooden|sudden|tired|scared|worried|excited|interested|bored|married|used|supposed|born|gone|done|dressed|engaged|pleased|surprised|ashamed|amazed|annoyed|confused|convinced|determined|exhausted|frightened|terrified|delighted|disappointed)$/i
 
+// More French verbs conjugated with être, and adjectives shaped like participles ("était bleu", "était petit"):
+// their base form, matched with or without the feminine and plural endings.
+const FR_NOT_PASSIVE_BASES = new Set(foldText(
+  'apparu disparu reapparu demeure decede intervenu parvenu survenu advenu redevenu ressorti reparti retombe remonte redescendu accouru convenu ' +
+  'bleu petit tetu pointu touffu barbu poilu ventru charnu dodu feuillu bossu chevelu joufflu moussu trapu absolu ambigu aigu dru fichu inconnu ' +
+  'etroit droit adroit maladroit subit gratuit exquis gris precis joli poli hardi inoui ravi surpris epris confus diffus ' +
+  'age aise doue sense ruse desole presse fatigue occupe habille ose pose reserve decide').split(' '))
+const frBase = (w: string) => foldText(w).replace(/(?:es|e|s)$/, '')
+/** A reflexive pronoun before être: "s’était levée", "se sont tus" are pronominal verbs, not passives. */
+const FR_REFLEXIVE_BEFORE = /(?:^|[^\p{L}])(?:s|m|t)['’]$|(?:^|[^\p{L}])(?:se|me|te)\s+$/iu
+
 export function passives(text: string, lang: Lang): Finding[] {
   const out: Finding[] = []
   const re = lang === 'fr' ? FR_PASSIVE : EN_PASSIVE
   const not = lang === 'fr' ? FR_NOT_PASSIVE : EN_NOT_PASSIVE
   for (const m of text.matchAll(re)) {
     if (not.test(m[1])) continue
+    if (lang === 'fr') {
+      const w = foldText(m[1])
+      if (FR_NOT_PASSIVE_BASES.has(w) || FR_NOT_PASSIVE_BASES.has(frBase(m[1]))) continue
+      if (FR_REFLEXIVE_BEFORE.test(text.slice(Math.max(0, m.index! - 4), m.index!))) continue
+    }
     out.push({ from: m.index!, to: m.index! + m[0].length })
   }
   return out
@@ -149,14 +191,14 @@ export function phrases(text: string, list: string[]): Finding[] {
   return out
 }
 
-/** The same meaningful word again within `window` words (echoes). */
-export function echoes(text: string, lang: Lang, window = 40): Finding[] {
+/** The same meaningful word again within `window` words (echoes). `names`: folded words that are names, never echoes. */
+export function echoes(text: string, lang: Lang, window = 40, names?: Set<string>): Finding[] {
   const ws = words(text)
   const out: Finding[] = []
   const last = new Map<string, number>()
   ws.forEach((x, i) => {
     const w = foldText(x.w)
-    if (w.length < 4 || STOPWORDS[lang].has(w) || /^\d+$/.test(w)) return
+    if (w.length < 4 || STOPWORDS[lang].has(w) || /^\d+$/.test(w) || names?.has(w)) return
     const stem = w.slice(0, Math.max(4, w.length - 2)) // "regard", "regarda", "regards" echo each other
     const prev = last.get(stem)
     if (prev !== undefined && i - prev <= window) out.push({ from: x.from, to: x.to, note: ws[prev].w })

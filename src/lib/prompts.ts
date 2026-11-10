@@ -129,12 +129,12 @@ export function taskMessage(lang: Lang, action: ActionId, instruction: string, s
   }
   if (action === 'scene') {
     const [a, b] = at?.range ?? ai.chapterWords
-    const range = fr ? `au moins ${a} mots, jusqu’à environ ${b}` : `at least ${a} words, up to about ${b}`
+    const range = fr ? `entre ${a} et ${b} mots environ` : `between about ${a} and ${b} words`
     return [
       storyBlock,
       fr
-        ? `<task>\nÉcris cette scène en entier d'après son plan (<scene>)${story.before.trim() ? ", en reprenant exactement là où le texte s'arrête" : ''} : entre dans le moment, mène-la jusqu'à ce que sa note dit qui change, et termine là. Longueur indicative : ${range} ; plus courte ou plus longue si la scène le demande.\n${craft(lang, at ?? { range: ai.chapterWords, first: true, last: true })}${dir ? `\nConsigne de l'auteur : ${dir}` : ''}\n</task>`
-        : `<task>\nWrite this scene in full from its plan (<scene>)${story.before.trim() ? ', picking up exactly where the story stops' : ''}: go into the moment, carry it to what its note says changes, and end there. Length as a guide: ${range}; shorter or longer if the scene needs it.\n${craft(lang, at ?? { range: ai.chapterWords, first: true, last: true })}${dir ? `\nAuthor's direction: ${dir}` : ''}\n</task>`,
+        ? `<task>\nÉcris cette scène en entier d'après son plan (<scene>)${story.before.trim() ? ", en reprenant exactement là où le texte s'arrête" : ''} : entre dans le moment, mène-la jusqu'à ce que sa note dit qui change, et termine là. Longueur visée : ${range}. Pour l'atteindre, joue chaque étape en entier (ce que les personnages font et se disent, ce qui leur résiste) au lieu de la résumer ; n'ajoute aucun événement que le plan ne contient pas.\n${craft(lang, at ?? { range: ai.chapterWords, first: true, last: true })}${dir ? `\nConsigne de l'auteur : ${dir}` : ''}\n</task>`
+        : `<task>\nWrite this scene in full from its plan (<scene>)${story.before.trim() ? ', picking up exactly where the story stops' : ''}: go into the moment, carry it to what its note says changes, and end there. Length to aim for: ${range}. To get there, play each beat in full (what the characters do and say, what resists them) rather than summing it up; add no event the plan doesn't hold.\n${craft(lang, at ?? { range: ai.chapterWords, first: true, last: true })}${dir ? `\nAuthor's direction: ${dir}` : ''}\n</task>`,
     ].join('\n\n')
   }
   if (action === 'beats') {

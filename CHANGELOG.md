@@ -7,6 +7,14 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.45.1
+Fixes from the November audit: nothing you write is lost at the edges of a session, and scenes written from the plan are better informed.
+- **Switching books no longer loses changes.** Everything still waiting to be saved is written before the book closes. If a save fails, Plume asks before closing the book or the window instead of closing anyway, and a red bar stays at the top until the save succeeds.
+- **Claude's changes wait for you.** Tracked changes and a proposal you haven't decided on now stay when you go to the Plan, the Bible or another scene, and come back when you return.
+- **Writing a scene from its plan sends who is in it and where.** The bible entries of the card's cast (in full, with their voice cards), its place, and the names in its note and beats now go with the request. Before, only the point-of-view character's entry went, and Claude made up the rest.
+- **No more second ending.** A scene written from the plan that came out short is no longer carried on by a second request, which wrote past the end the scene already had. Claude is asked for a length range and to play each beat in full; if it is still short, Plume says so and you lengthen what you choose with Expand.
+- **The French checks are right.** "S'était levée", "était bleu" and "était apparu" are no longer counted as passives; "un battement", "son hochement" and "d'étonnement" are no longer counted as adverbs; "— Tu viens ? demanda-t-il." and "M. Dupont" stay one sentence; a character's name said twice is no longer an echo. These counts are also what "Retry fixing these" sends to Claude, so it no longer asks it to rewrite correct sentences.
+
 ## 0.45.0
 Last of the six interface releases: reach and comfort.
 - **Everything in Ctrl+K.** View choices, switches, every Settings tab, the panes, side-by-side views, and whatever right-click offers on the scene, chapter or entry you are in. Type a few letters.

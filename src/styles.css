@@ -274,6 +274,9 @@ html[data-theme="light"] .pl-bookpage-slot > .pl-bookpage { box-shadow: 0 2px 18
 .pl-bar, .pl-pane, .pl-head-meta, .pl-sheet-meta { transition: opacity 0.5s ease, transform 0.18s ease; }
 body.pl-typing .pl-bar, body.pl-typing .pl-pane:not([data-pinned="true"]), body.pl-typing .pl-head-meta, body.pl-typing .pl-sheet-meta { opacity: 0.08; }
 body.pl-typing .pl-pane[data-pinned="true"] { opacity: 0.35; }
+/* A write that keeps failing: never faded, always on top, until it succeeds. */
+.pl-savefail { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); z-index: 900; display: flex; align-items: center; gap: 10px; max-width: min(720px, calc(100vw - 32px)); padding: 8px 10px 8px 14px; border-radius: 8px; background: #7a2626; color: #fff; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4); font-size: 13px; }
+.pl-savefail .pl-grow { overflow-wrap: anywhere; }
 @media (prefers-reduced-motion: reduce) { .pl-bar, .pl-pane, .pl-scroll { transition: none; } .pl-stage { animation: none; } }
 
 /* ---- Chapter tree (left pane) ---------------------------------------------- */

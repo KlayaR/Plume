@@ -62,6 +62,12 @@ const FR: Record<string, string> = {
   'Usage limit reached: {said}': 'Limite d’utilisation atteinte : {said}',
   'The claude command stopped (code {code}).': 'La commande claude s’est arrêtée (code {code}).',
   'Could not save: {e}': 'Enregistrement impossible : {e}',
+  'Some changes could not be saved: {e}. Close the book anyway? They will be lost.': 'Des modifications n’ont pas pu être enregistrées : {e}. Fermer le livre quand même ? Elles seront perdues.',
+  'Not saved': 'Non enregistré',
+  'Some changes are not saved: {e}': 'Des modifications ne sont pas enregistrées : {e}',
+  'Shorter than the chapter length asked ({n} of about {a} words). To lengthen it, select a passage and use Expand.': 'Plus court que la longueur de chapitre demandée ({n} mots sur environ {a}). Pour l’allonger, sélectionnez un passage et utilisez Développer.',
+  'in the scene': 'dans la scène',
+  'place of the scene': 'lieu de la scène',
   // Review
   'Words': 'Mots', 'Signs': 'Signes', 'Feuillets (1 500 signs)': 'Feuillets (1 500 signes)', 'Paragraphs': 'Paragraphes',
   'Sentences': 'Phrases', 'Average sentence': 'Phrase moyenne', 'Longest sentence': 'Phrase la plus longue', 'Dialogue': 'Dialogue',

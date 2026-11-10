@@ -195,7 +195,8 @@ export const marksExt = [highlightField]
 
 // --- Tracked changes ------------------------------------------------------------
 
-export interface Change { id: string; from: number; to: number; insert: string; why: string }
+/** `was`: the words it replaces, kept while its scene is closed, to find them again when it opens. */
+export interface Change { id: string; from: number; to: number; insert: string; why: string; was?: string }
 export const setChanges = StateEffect.define<Change[]>()
 
 class InsertWidget extends WidgetType {
