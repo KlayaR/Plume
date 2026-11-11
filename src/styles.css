@@ -1161,6 +1161,12 @@ body.pl-typing .pl-draftbar { opacity: 0.08; }
 .pl-curve-bars span.pl-warn { background: var(--danger, #c0392b); }
 .pl-letter { margin: 8px 0; }
 .pl-letter-text { white-space: pre-wrap; line-height: 1.55; max-height: 22rem; overflow: auto; padding: 8px 0; }
+.pl-pitch { margin: 6px 0 12px; }
+.pl-pitch .pl-letter-text { max-height: 16rem; }
+.pl-reads { gap: 4px; }
+.pl-reads-ch > summary { cursor: pointer; padding: 3px 0; }
+.pl-reads-ch > summary .sk-badge { margin-left: 6px; }
+.pl-reads-row { display: flex; align-items: baseline; gap: 6px; padding: 2px 0 2px 14px; cursor: pointer; }
 /* Outline: what a written scene became, beside its plan. */
 .pl-ol-written { border-left: 2px solid var(--accent); padding-left: 6px; }
 .pl-ol-drift { color: var(--danger, #c0392b); }

@@ -9,7 +9,8 @@ import { EMPTY_VOICE, ENTRY_TYPES, typeInfo } from './lib/types'
 import { aiBlocks, aiFull, toBlocks } from './lib/blocks'
 import { parseFact } from './lib/bible'
 import { estimateTokens, newId } from './lib/text'
-import { buildMatcher, findMentions } from './lib/context'
+import { buildMatcher, findMentions, renderEntry } from './lib/context'
+import { chosenScenes, type Reads } from './lib/editorial'
 import { ask, parseJSON, stopAsk } from './ai'
 import { foundationText, outlineText, chapterText } from './lib/outline'
 import { lastWords } from './lib/text'
@@ -56,7 +57,7 @@ function readCharacter(p: Partial<Proposal> & Record<string, unknown>): Pick<Pro
 }
 
 /** One conversation: kept with the book, so old brainstorms can be reopened. */
-export interface Chat { id: string; title: string; date: string; interview: string | null; messages: Message[] }
+export interface Chat { id: string; title: string; date: string; interview: string | null; messages: Message[]; persona?: string | null; reads?: Reads | null }
 
 interface ChatState {
   /** The open conversation's messages (also held in `chats`). */
@@ -64,16 +65,20 @@ interface ChatState {
   streaming: string | null
   /** Interview mode: the entry Claude asks questions about. */
   interview: string | null
+  /** Talking to a character: the entry Claude answers as. */
+  persona: string | null
+  /** What this conversation was told to read in full (scenes and entries); null: the chat picks. */
+  reads: Reads | null
   proposals: Proposal[]
   busy: string | null
   chats: Chat[]
   chatId: string
 }
 
-const blank = (interview: string | null = null): Chat => ({ id: newId(), title: '', date: new Date().toISOString(), interview, messages: [] })
+const blank = (interview: string | null = null, persona: string | null = null): Chat => ({ id: newId(), title: '', date: new Date().toISOString(), interview, persona, messages: [] })
 const first = blank()
 
-export const useChat = create<ChatState>(() => ({ messages: [], streaming: null, interview: null, proposals: [], busy: null, chats: [first], chatId: first.id }))
+export const useChat = create<ChatState>(() => ({ messages: [], streaming: null, interview: null, persona: null, reads: null, proposals: [], busy: null, chats: [first], chatId: first.id }))
 
 const CHATS = '.plume/chats.json'
 const OLD_CHAT = '.plume/chat.json'
@@ -94,7 +99,7 @@ export async function loadChat(book: Book) {
   const chats = (saved.chats ?? []).filter(c => c.messages.length)
   const fresh = blank()
   // The book opens on a new empty conversation; the old ones are one click away.
-  useChat.setState({ chats: [...chats, fresh], chatId: fresh.id, messages: [], interview: null, proposals: await read<Proposal[]>(REVIEW, []), streaming: null, busy: null })
+  useChat.setState({ chats: [...chats, fresh], chatId: fresh.id, messages: [], interview: null, persona: null, reads: null, proposals: await read<Proposal[]>(REVIEW, []), streaming: null, busy: null })
 }
 
 const titleOf = (ms: Message[]) => {
@@ -122,14 +127,14 @@ function commit(chatId: string, messages: Message[]) {
 
 export function newChat() {
   const { chats, chatId } = useChat.getState()
-  if (chats.find(c => c.id === chatId)?.messages.length === 0) return useChat.setState({ interview: null })
+  if (chats.find(c => c.id === chatId)?.messages.length === 0) return useChat.setState({ interview: null, persona: null, reads: null, chats: chats.map(c => c.id === chatId ? { ...c, interview: null, persona: null, reads: null } : c) })
   const c = blank()
-  useChat.setState({ chats: [...chats, c], chatId: c.id, messages: [], interview: null })
+  useChat.setState({ chats: [...chats, c], chatId: c.id, messages: [], interview: null, persona: null, reads: null })
 }
 
 export function openChat(id: string) {
   const c = useChat.getState().chats.find(x => x.id === id)
-  if (c) useChat.setState({ chatId: id, messages: c.messages, interview: c.interview })
+  if (c) useChat.setState({ chatId: id, messages: c.messages, interview: c.interview, persona: c.persona ?? null, reads: c.reads ?? null })
   saveChats()
 }
 
@@ -143,27 +148,68 @@ export function deleteChat(id: string) {
   let rest = chats.filter(c => c.id !== id)
   if (!rest.some(c => !c.messages.length)) rest = [...rest, blank()]
   const open = id === chatId ? rest[rest.length - 1] : rest.find(c => c.id === chatId)!
-  useChat.setState({ chats: rest, chatId: open.id, messages: open.messages, interview: open.interview })
+  useChat.setState({ chats: rest, chatId: open.id, messages: open.messages, interview: open.interview, persona: open.persona ?? null, reads: open.reads ?? null })
   saveChats()
 }
 const saveReview = () => save(REVIEW, useChat.getState().proposals)
 
 const NAMED = (e: Entry) => !['style', 'wordlist', 'excerpt'].includes(e.type) && e.include !== 'secret'
 
-/** Every named entry in short, and the ones the chat talks about in full; never secrets. */
-function bibleFor(book: Book, recent: string): string {
-  const named = book.entries.filter(NAMED)
+/** Every named entry in short, and the ones the chat talks about in full; never secrets. The ticked ones come first, in full, whatever their size. */
+function bibleFor(book: Book, recent: string, chosen: string[] = [], skip?: string): string {
+  const named = book.entries.filter(e => NAMED(e) && e.slug !== skip)
+  const ticked = new Set(chosen)
   const talked = new Set(findMentions(recent, buildMatcher(named)).map(m => m.slug))
-  const lines: string[] = []
+  const full = (e: Entry) => [e.short, aiFull(e), e.facts.map(f => `- ${f.text}`).join('\n')].filter(s => s.trim()).join('\n')
+  const lines = named.filter(e => ticked.has(e.slug)).map(e => `<entry type="${e.type}" name="${e.name}" chosen="true">\n${full(e).trim()}\n</entry>`)
   let used = 0
-  for (const e of [...named].sort((a, b) => Number(talked.has(b.slug)) - Number(talked.has(a.slug)))) {
-    const body = talked.has(e.slug) ? [e.short, aiFull(e), e.facts.map(f => `- ${f.text}`).join('\n')].filter(s => s.trim()).join('\n') : e.short || aiBlocks(e).first
+  for (const e of named.filter(x => !ticked.has(x.slug)).sort((a, b) => Number(talked.has(b.slug)) - Number(talked.has(a.slug)))) {
+    const body = talked.has(e.slug) ? full(e) : e.short || aiBlocks(e).first
     const block = `<entry type="${e.type}" name="${e.name}">\n${body.trim()}\n</entry>`
     used += estimateTokens(block)
     if (used > 6000) break
     lines.push(block)
   }
   return lines.join('\n')
+}
+
+/** What the ticks add to each request of the conversation, in tokens (read from the cache after the first message). */
+export function readsTokens(book: Book, reads: Reads | null): number {
+  if (!reads) return 0
+  const want = new Set(reads.entries)
+  return estimateTokens(chosenScenes(book, reads.scenes)) + book.entries.filter(e => want.has(e.slug) && NAMED(e)).reduce((n, e) => n + estimateTokens([e.short, aiFull(e)].join('\n')), 0)
+}
+
+/** The chapter the conversation stands at: the open scene's, else the last one with text. */
+function chapterNow(book: Book): number {
+  const id = useStore.getState().sceneId
+  const open = book.chapters.findIndex(c => c.scenes.some(s => s.id === id))
+  if (open >= 0) return open + 1
+  let last = 0
+  book.chapters.forEach((c, i) => { if (c.scenes.some(s => s.text.trim())) last = i + 1 })
+  return Math.max(1, last)
+}
+
+/**
+ * Talking to a character: Claude answers as them, in their voice, with what they know
+ * at this chapter (their entry in full, the facts that hold by then, what they know
+ * and don't) and what has happened so far. The plan of what comes next is not sent.
+ */
+function personaSystem(book: Book, e: Entry, recent: string, reads: Reads | null): string {
+  const fr = book.meta.language === 'fr'
+  const n = chapterNow(book)
+  const happened = book.chapters.slice(0, n).map((c, i) => (c.summary?.trim() ? `${i + 1}. ${c.title || '…'} : ${c.summary.trim()}` : '')).filter(Boolean).join('\n')
+  const scenes = reads?.scenes.length ? chosenScenes(book, reads.scenes) : ''
+  const head = fr
+    ? `Tu joues ${e.name}, personnage du roman « ${book.meta.title} », pour que son auteur puisse l’interroger. Réponds à la première personne, avec la voix de ${e.name} (sa carte <voice> : registre, longueur des phrases, tics, ce qu’il ou elle ne dit jamais), tel qu’il ou elle est au chapitre ${n}. Tu ne sais que ce que ${e.name} sait à ce moment : sa fiche (<you>), les faits listés, et ce qui s’est passé dans <story_so_far> s’il ou elle y était ou a pu l’apprendre. Ce qui figure sous « Ignore », tu l’ignores vraiment : réponds comme quelqu’un qui ne sait pas. <bible> est le monde tel que l’auteur le connaît : n’en utilise que ce que ${e.name} connaîtrait. Tu peux mentir, esquiver ou refuser de répondre comme ${e.name} le ferait. Pas de narration, pas de didascalies au-delà d’un geste bref, pas de résumé de l’intrigue. Des réponses courtes, comme on parle. Quand l’auteur écrit entre [crochets], sors du rôle et réponds en assistant : ce que tu as inventé et que la bible ne dit pas, ce qu’il vaudrait la peine de décider. Réponds en français.`
+    : `You play ${e.name}, a character of the novel "${book.meta.title}", so that their author can question them. Answer in the first person, in ${e.name}'s voice (their <voice> card: register, sentence length, tics, what they never say), as they are at chapter ${n}. You know only what ${e.name} knows at that point: their entry (<you>), the facts listed, and what happened in <story_so_far> if they were there or could have heard of it. What is listed under "Does not know", you really don't know: answer as someone unaware. <bible> is the world as the author knows it: use only what ${e.name} would know of it. You may lie, dodge or refuse to answer as ${e.name} would. No narration, no stage directions beyond a brief gesture, no plot summary. Short replies, the way people talk. When the author writes in [square brackets], step out of the role and answer as an assistant: what you made up that the bible doesn't say, what would be worth deciding. Reply in English.`
+  return [
+    head,
+    `<you>\n${renderEntry(e, 'full', n, book.meta.language, book.meta.series?.index ?? 1, true, book.meta.fields?.[e.type])}\n</you>`,
+    happened ? `<story_so_far>\n${happened}\n</story_so_far>` : '',
+    scenes ? `<chosen_scenes>\n${scenes}\n</chosen_scenes>` : '',
+    `<bible>\n${bibleFor(book, recent, reads?.entries, e.slug)}\n</bible>`,
+  ].filter(Boolean).join('\n\n')
 }
 
 /**
@@ -176,8 +222,13 @@ const ENTRIES_HOW = {
   fr: 'Créer des fiches de bible : tu ne peux pas modifier la bible toi-même, mais Plume le peut. Quand l\'auteur te demande de créer ou de compléter des fiches, écris-les en entier dans ta réponse, une par fiche : un titre avec le nom et le type (personnage, lieu, objet, créature, univers, magie, événement, faction, intrigue, thème), un résumé d\'une ou deux lignes, puis les détails utiles pour écrire, un court paragraphe titré pour chacun (apparence, caractère, relations, règles, histoire, secrets). Pour un personnage, ajoute sa façon de parler (registre, longueur des phrases, tic de langage, geste signature, ce qu’il ne dit jamais, voix intérieure, quelques répliques types) et ce qu’il sait et ignore. Si le livre prolonge une œuvre publiée ou s\'y déroule, appuie-toi sur ce que tu sais de son canon, et signale ce qui est incertain. N\'y répète pas ce que la bible dit déjà, sauf si l\'auteur le demande. Dis-lui ensuite d\'appuyer sur « Transformer en fiches » pour les mettre en brouillon dans la liste à relire. Ne dis jamais que tu ne peux pas créer de fiches.',
 }
 
-function systemFor(book: Book, recent: string, interview: Entry | null): string {
+function systemFor(book: Book, recent: string, interview: Entry | null, persona: Entry | null = null, reads: Reads | null = null): string {
+  if (persona) return personaSystem(book, persona, recent, reads)
   const fr = book.meta.language === 'fr'
+  const scenes = reads?.scenes.length ? chosenScenes(book, reads.scenes) : ''
+  const ticked = scenes || reads?.entries.length
+    ? (fr ? 'L’auteur a coché ce que cette conversation doit lire en entier : les scènes de <chosen_scenes> et les fiches marquées chosen="true" dans <bible>. Réponds d’abord à partir d’elles.' : 'The author ticked what this conversation must read in full: the scenes in <chosen_scenes> and the entries marked chosen="true" in <bible>. Answer from them first.')
+    : ''
   const style = book.entries.find(e => e.type === 'style')
   const head = interview
     ? (fr
@@ -188,10 +239,12 @@ function systemFor(book: Book, recent: string, interview: Entry | null): string 
       : `You are the brainstorming partner of the author of the novel "${book.meta.title}". You know their story bible (<bible>), their plan (<foundation>, <outline>) and the open scene (<open_scene>). Offer specific ideas, ask questions that move things forward, point out what contradicts the bible. Short answers, no flattery. Reply in English.\n\n${ENTRIES_HOW.en}`)
   return [
     head,
+    ticked,
     storyFor(book),
     style?.full.trim() ? `<style_guide>\n${style.full.trim()}\n</style_guide>` : '',
     interview ? `<entry_to_complete type="${interview.type}" name="${interview.name}">\n${[interview.short, aiFull(interview)].join('\n\n').trim()}\n</entry_to_complete>` : '',
-    `<bible>\n${bibleFor(book, recent)}\n</bible>`,
+    scenes ? `<chosen_scenes>\n${scenes}\n</chosen_scenes>` : '',
+    `<bible>\n${bibleFor(book, recent, reads?.entries)}\n</bible>`,
   ].filter(Boolean).join('\n\n')
 }
 
@@ -238,13 +291,16 @@ export async function send(text: string) {
   useChat.setState({ streaming: '' })
   const recent = messages.slice(-6).map(m => m.text).join('\n')
   const target = book.entries.find(e => e.slug === useChat.getState().interview) ?? null
+  const who = book.entries.find(e => e.slug === useChat.getState().persona && e.include !== 'secret') ?? null
+  const reads = useChat.getState().reads
   // The last 20 messages, as a transcript; the CLI keeps no session.
   const history = messages.slice(-20)
   try {
     const reply = await ask({
       ...chatChoice(),
-      system: systemFor(book, recent, target),
-      message: [openScene(book), `<conversation>\n${transcript(history.slice(0, -1))}\n</conversation>`, history[history.length - 1].text].filter(Boolean).join('\n\n'),
+      system: systemFor(book, recent, target, who, reads),
+      // In character, the open scene is not sent: it may hold what they have not lived yet.
+      message: [who ? '' : openScene(book), `<conversation>\n${transcript(history.slice(0, -1))}\n</conversation>`, history[history.length - 1].text].filter(Boolean).join('\n\n'),
       onText: chunk => useChat.setState(s => ({ streaming: (s.streaming ?? '') + chunk })),
     })
     commit(chatId, [...(useChat.getState().chats.find(c => c.id === chatId)?.messages ?? messages), { role: 'assistant', text: reply.trim() }])
@@ -288,7 +344,7 @@ export const clearChat = () => deleteChat(useChat.getState().chatId)
 /** Interview mode for one entry: the chat opens on Claude's first question. */
 export function startInterview(slug: string) {
   const c = blank(slug)
-  useChat.setState(s => ({ chats: [...s.chats.filter(x => x.messages.length || x.id !== s.chatId), c], chatId: c.id, messages: [], interview: slug }))
+  useChat.setState(s => ({ chats: [...s.chats.filter(x => x.messages.length || x.id !== s.chatId), c], chatId: c.id, messages: [], interview: slug, persona: null, reads: null }))
   useStore.getState().setPrefs({ chatOpen: true })
   const book = useStore.getState().book!
   const e = book.entries.find(x => x.slug === slug)!
@@ -296,6 +352,26 @@ export function startInterview(slug: string) {
 }
 export const endInterview = () => {
   useChat.setState(s => ({ interview: null, chats: s.chats.map(c => c.id === s.chatId ? { ...c, interview: null } : c) }))
+  saveChats()
+}
+
+/** Talk to a character: a new conversation where Claude answers as them. */
+export function startTalk(slug: string) {
+  const e = useStore.getState().book?.entries.find(x => x.slug === slug)
+  if (!e || e.include === 'secret') return
+  const c = { ...blank(null, slug), title: e.name }
+  useChat.setState(s => ({ chats: [...s.chats.filter(x => x.messages.length || x.id !== s.chatId), c], chatId: c.id, messages: [], interview: null, persona: slug, reads: null }))
+  useStore.getState().setPrefs({ chatOpen: true })
+}
+export const endTalk = () => {
+  useChat.setState(s => ({ persona: null, chats: s.chats.map(c => c.id === s.chatId ? { ...c, persona: null } : c) }))
+  saveChats()
+}
+
+/** Sets what the open conversation reads in full (null or nothing ticked: the chat picks on its own). */
+export function setReads(reads: Reads | null) {
+  const next = reads && (reads.scenes.length || reads.entries.length) ? reads : null
+  useChat.setState(s => ({ reads: next, chats: s.chats.map(c => c.id === s.chatId ? { ...c, reads: next } : c) }))
   saveChats()
 }
 

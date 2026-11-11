@@ -16,10 +16,11 @@ import { volumeToBook } from '../library'
 import { fromBase64, toBase64, utf8 } from '../lib/zip'
 import { imageType } from '../lib/images'
 import { pageSizeFor } from '../lib/fonts'
-import { clearDone, estimate, goTo, markDone, missingSummaries, runDrift, runManuscript, runReader, runRepeats, runSeries, runTask, stopTask, toBible, useAgents, type AgentTask } from '../agents'
+import { clearDone, estimate, goTo, markDone, missingSummaries, runDrift, runManuscript, runPitch, runReader, runRepeats, runSeries, runTask, stopTask, toBible, useAgents, type AgentTask } from '../agents'
 import { updateSummaries, useNotes } from '../writing'
 import BookView from './BookView'
 import { numLocale, translate, useT } from '../i18n'
+import { PITCH_PARTS } from '../lib/editorial'
 
 const n = (x: number) => x.toLocaleString(numLocale())
 
@@ -207,11 +208,14 @@ const TASKS: { id: AgentTask; label: string; hint: string }[] = [
   { id: 'manuscript', label: 'Editor’s letter', hint: 'Claude reads the whole manuscript in one request: a letter on what works and what to revise first, and continuity checked on the text itself.' },
   { id: 'reader', label: 'A reader’s read', hint: 'Claude reads the whole book as a reader of its genre: interest chapter by chapter, and the passages where attention drops.' },
   { id: 'drift', label: 'Where the book left the plan', hint: 'Compares each written scene’s summary with its card: what changed, and what it means for the cards after it.' },
+  { id: 'pitch', label: 'Blurb, synopsis and pitch', hint: 'Claude reads the whole manuscript and writes what presents the book: a logline, the back-cover text, a one-page synopsis that tells the ending, and a pitch.' },
   { id: 'series', label: 'Series continuity', hint: 'Checks this book against the other books of its series (through their summaries): contradictions and forgotten promises.' },
 ]
 
+const PITCH_LABELS: Record<typeof PITCH_PARTS[number], string> = { logline: 'Logline', blurb: 'Back cover', synopsis: 'Synopsis', pitch: 'Pitch' }
+
 /** The tasks that run on their own instead of through runTask. */
-const RUNNERS: Partial<Record<AgentTask, () => unknown>> = { repeats: runRepeats, manuscript: runManuscript, reader: runReader, drift: runDrift, series: runSeries }
+const RUNNERS: Partial<Record<AgentTask, () => unknown>> = { repeats: runRepeats, manuscript: runManuscript, reader: runReader, drift: runDrift, series: runSeries, pitch: runPitch }
 
 export function AgentDialog({ onClose }: { onClose: () => void }) {
   const items = useAgents(s => s.items)
@@ -219,6 +223,7 @@ export function AgentDialog({ onClose }: { onClose: () => void }) {
   const progress = useAgents(s => s.progress)
   const letter = useAgents(s => s.letter)
   const curve = useAgents(s => s.curve)
+  const pitch = useAgents(s => s.pitch)
   const book = useStore(s => s.book)
   const summarizing = useNotes(s => s.summarizing)
   const [question, setQuestion] = useState('')
@@ -265,6 +270,20 @@ export function AgentDialog({ onClose }: { onClose: () => void }) {
           <summary>{t('Editor’s letter')} <span className="sk-hint">{new Date(letter.date).toLocaleDateString(numLocale())}</span></summary>
           <div className="pl-letter-text">{letter.text}</div>
           <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm" onClick={() => { navigator.clipboard?.writeText(letter.text); useStore.getState().notify('ok', t('Copied.')) }}>{t('Copy')}</button>
+        </details>
+      )}
+      {pitch && (
+        <details className="pl-letter">
+          <summary>{t('Blurb, synopsis and pitch')} <span className="sk-hint">{new Date(pitch.date).toLocaleDateString(numLocale())}</span></summary>
+          {PITCH_PARTS.filter(k => pitch[k]).map(k => (
+            <div key={k} className="pl-pitch">
+              <div className="pl-row">
+                <span className="sk-label pl-grow">{t(PITCH_LABELS[k])} <span className="sk-hint">{n((pitch[k].match(/\S+/g) ?? []).length)} {t('words')}</span></span>
+                <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm" onClick={() => { navigator.clipboard?.writeText(pitch[k]); useStore.getState().notify('ok', t('Copied.')) }}>{t('Copy')}</button>
+              </div>
+              <div className="pl-letter-text">{pitch[k]}</div>
+            </div>
+          ))}
         </details>
       )}
       <div className="pl-row">

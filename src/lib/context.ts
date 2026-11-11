@@ -8,7 +8,7 @@ import { fieldLines } from './fields'
 import { factApplies } from './bible'
 import { estimateTokens, fold, lastWords, firstWords } from './text'
 import { taskMessage, systemRules, type ScenePart, type ScenePlace } from './prompts'
-import { expandVariables, promptFor, promptText } from './voice'
+import { expandVariables, promptFor, promptText, resolveIncludes } from './voice'
 import { aiBlocks } from './blocks'
 import { arcsOf, isLitRPG, isSerial, statsAt } from './serial'
 
@@ -194,7 +194,7 @@ export function systemPrompt(book: Book, action: ActionId, chapter: number): str
   const lang: Lang = book.meta.language
   const voice = book.meta.voice
   const prompt = promptFor(book, action)
-  const body = prompt ? promptText(prompt, lang) : ''
+  const body = prompt ? resolveIncludes(promptText(prompt, lang), book, lang) : ''
   // Scene details (POV, title, chapter) stay out, so the prompt doesn't change from scene to scene; they go with the task.
   const vars = { book, generic: true }
   const style = book.entries.find(e => e.type === 'style')

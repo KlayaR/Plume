@@ -5,7 +5,7 @@ import type { EditorView } from '@codemirror/view'
 import { isRewrite, type ActionId, type Book, type Lang } from '../lib/types'
 import { buildContext, scenePlace, systemPrompt, type Built, type Override } from '../lib/context'
 import { reviewChecks } from '../lib/review'
-import { checkRules, fixable, fixDirection, type Check } from '../lib/voice'
+import { checkRules, fixable, fixDirection, promptFor, type Check } from '../lib/voice'
 import { ask, effective, isCheap, parseJSON, stopAsk } from '../ai'
 import { movementsOf, nudgeMessage, readNudges, type Nudge } from '../lib/editorial'
 import type { ScenePart } from '../lib/prompts'
@@ -83,8 +83,9 @@ export function currentContext(action: ActionId, instruction: string, overrides:
 /** The model the Assistant uses: its own two choices (backend, model); the effort stays per action. */
 export function assistantChoice(action: ActionId): { model: Model; effort: Effort; orModel?: string } {
   const st = useStore.getState()
-  const draft = st.prefs.roles.draft
-  void action // every drafting action uses the drafting model; the effort is the role's
+  // Every drafting action uses the drafting model, unless its prompt names its own; the effort is the role's.
+  const own = st.book ? promptFor(st.book, action)?.model : undefined
+  const draft = own ? { ...st.prefs.roles.draft, model: own } : st.prefs.roles.draft
   if (st.prefs.assistBackend === 'openrouter' && st.prefs.assistModel) return { ...draft, orModel: st.prefs.assistModel }
   return { ...draft }
 }
@@ -175,26 +176,33 @@ export function takeProposal(sceneId: string) { const p = kept.get(sceneId); kep
 export const forgetProposals = () => kept.clear()
 
 /**
- * Compares a proposal with the bible entries that went with its request (the <bible> block),
- * on the quick model, and lists what contradicts them under the proposal.
+ * Compares a written passage with the bible entries that went with its request (the <bible>
+ * block), on the quick model: what it clearly contradicts, with the words that do.
  */
-async function checkAgainstBible(message: string, written: string, lang: Lang) {
+async function bibleSlips(message: string, written: string, lang: Lang): Promise<BibleSlip[]> {
   const bible = /<bible>[\s\S]*?<\/bible>/.exec(message)?.[0]
-  if (!bible || useStore.getState().prefs.factCheck === false || !view) return
+  if (!bible || useStore.getState().prefs.factCheck === false) return []
   const fr = lang === 'fr'
+  const reply = await ask({ json: 'list', role: 'quick',
+    system: fr ? 'Tu compares un passage de roman avec sa bible. Réponds uniquement en JSON valide, en français.' : 'You compare a passage of a novel with its story bible. Reply with valid JSON only.',
+    message: `${bible}\n\n<passage>\n${written}\n</passage>\n\n${fr
+      ? 'Relève seulement ce que le passage contredit clairement dans la bible : un fait, un nom, un âge, une couleur, un lien entre personnages, un lieu, une règle du monde, ce qu’un personnage sait ou ignore. Pas le style, pas ce que la bible ne dit pas. "quote" = les mots exacts du passage. Liste vide s’il n’y a rien.'
+      : 'List only what the passage clearly contradicts in the bible: a fact, a name, an age, a colour, a relationship, a place, a rule of the world, what a character knows or does not know. Not style, not what the bible is silent on. "quote" = the exact words of the passage. An empty list if there is nothing.'}\nJSON: [{"quote": "...", "problem": "..."}]`,
+  })
+  const list = parseJSON<Partial<BibleSlip>[]>(reply)
+  return Array.isArray(list) ? list.filter(x => x?.problem).map(x => ({ quote: String(x.quote ?? ''), problem: String(x.problem) })) : []
+}
+
+/** Lists under the proposal on screen what it contradicts in the bible. */
+async function checkAgainstBible(message: string, written: string, lang: Lang) {
+  if (!view || useStore.getState().prefs.factCheck === false || !message.includes('<bible>')) return
   const v = view
   useAI.setState({ facts: null })
   try {
-    const reply = await ask({ json: 'list', role: 'quick',
-      system: fr ? 'Tu compares un passage de roman avec sa bible. Réponds uniquement en JSON valide, en français.' : 'You compare a passage of a novel with its story bible. Reply with valid JSON only.',
-      message: `${bible}\n\n<passage>\n${written}\n</passage>\n\n${fr
-        ? 'Relève seulement ce que le passage contredit clairement dans la bible : un fait, un nom, un âge, une couleur, un lien entre personnages, un lieu, une règle du monde, ce qu’un personnage sait ou ignore. Pas le style, pas ce que la bible ne dit pas. "quote" = les mots exacts du passage. Liste vide s’il n’y a rien.'
-        : 'List only what the passage clearly contradicts in the bible: a fact, a name, an age, a colour, a relationship, a place, a rule of the world, what a character knows or does not know. Not style, not what the bible is silent on. "quote" = the exact words of the passage. An empty list if there is nothing.'}\nJSON: [{"quote": "...", "problem": "..."}]`,
-    })
-    const list = parseJSON<Partial<BibleSlip>[]>(reply)
+    const list = await bibleSlips(message, written, lang)
     // Only if that proposal is still the one on screen.
     const p = view === v ? v.state.field(proposalField, false) : null
-    useAI.setState({ facts: p && p.text.trim() === written && Array.isArray(list) ? list.filter(x => x?.problem).map(x => ({ quote: String(x.quote ?? ''), problem: String(x.problem) })) : [] })
+    useAI.setState({ facts: p && p.text.trim() === written ? list : [] })
   } catch { useAI.setState({ facts: [] }) }
 }
 
@@ -271,6 +279,8 @@ export async function writeFromPlan(sceneId: string) {
 /**
  * Write a whole chapter from the plan: every scene with a note and no text yet,
  * in order, straight into the scene (each one reads the end of the one before).
+ * A long scene is written in parts, like Write this scene, and each scene is checked
+ * against the bible: what it contradicts goes to the findings list.
  * A snapshot is taken first, so the chapter can be put back as it was.
  */
 export async function writeChapter(chapterId: string) {
@@ -288,21 +298,36 @@ export async function writeChapter(chapterId: string) {
   useAI.setState({ running: 'chapter' })
   let done = 0
   const toFix: string[] = []
+  const slips: { title: string; detail: string; sceneId: string; where: string; quote?: string }[] = []
   try {
     for (const s of todo) {
       const b2 = useStore.getState().book!
       const f = findScene(b2, s.id)
       if (!f) continue
-      const built = buildContext({ book: b2, chapter: f.number, pov: f.scene.pov, action: 'scene', instruction: '', before: '', selection: '', after: '', overrides: {}, scene: f.scene })
       const c = assistantChoice('scene')
       const e = effective(c.model, c.effort)
       st.notify('ok', t('Writing “{title}”… ({i} of {n})', { title: s.title, i: done + 1, n: todo.length }))
-      let text = (await ask({ model: e.model, effort: e.effort, orModel: c.orModel, system: built.system, message: built.message })).trim()
+      // Six beats or more: about three beats per request, each part reading the ones before.
+      const beats = b2.meta.ai.movements !== false ? f.scene.beats?.length ?? 0 : 0
+      const parts = movementsOf(beats)
+      let text = ''
+      let message = ''
+      for (let k = 0; k < Math.max(1, parts.length); k++) {
+        const built = buildContext({ book: b2, chapter: f.number, pov: f.scene.pov, action: 'scene', instruction: '', before: text, selection: '', after: '', overrides: {}, scene: f.scene, part: parts.length ? { from: parts[k][0], to: parts[k][1], of: beats } : undefined })
+        message = built.message
+        const piece = (await ask({ model: e.model, effort: e.effort, orModel: c.orModel, system: built.system, message })).trim()
+        // Stopped or empty in the middle: the scene is left unwritten, not half written.
+        if (!piece || useAI.getState().running !== 'chapter') { text = ''; break }
+        text = [text, piece].filter(Boolean).join('\n\n')
+      }
       if (!text || useAI.getState().running !== 'chapter') break
       text = fixTypography(text, b2.meta.language)
       useStore.getState().updateScene(s.id, { text, extra: { ...f.scene.extra, aiWords: wordCount(text) } })
       if (fixable(scorecard(text, b2)).length) toFix.push(s.id)
       done++
+      try {
+        for (const x of await bibleSlips(message, text, b2.meta.language)) slips.push({ title: x.problem, detail: x.quote ? `“${x.quote}”` : '', sceneId: s.id, where: `${chapter.title || '…'} · ${s.title}`, quote: x.quote || undefined })
+      } catch { /* the check is a bonus: the scene is written */ }
     }
   } catch (err) {
     st.notify('error', (err as Error).message)
@@ -310,6 +335,11 @@ export async function writeChapter(chapterId: string) {
     useAI.setState({ running: null })
   }
   if (!done) return
+  if (slips.length) {
+    const { addFindings } = await import('../agents')
+    addFindings('written', slips, true)
+    useStore.getState().notify('warn', t('{n} passage(s) of the chapter contradict the bible: they are in Agent tasks.', { n: slips.length }), { label: t('Open'), run: () => useStore.setState({ dialog: 'agents' }) })
+  }
   if (toFix.length) {
     useStore.getState().notify('warn', t('{n} scene(s) written; {k} miss some of your rules or targets. Snapshots can put the chapter back as it was.', { n: done, k: toFix.length }), { label: t('Fix them'), run: () => fixFlagged(toFix) })
   } else useStore.getState().notify('ok', t('{n} scene(s) written. Snapshots can put the chapter back as it was.', { n: done }), { label: t('Read it'), run: () => useStore.getState().selectScene(todo[0].id) })

@@ -6,9 +6,9 @@ import { Copy, Plus, Sparkles, Trash2 } from 'lucide-react'
 import { SettingRow, SettingsSection, Switch } from '../studio-kit/shell.js'
 import { useStore } from '../store'
 import { EntryEditor } from './BibleView'
-import { typeInfo, VOICE_TYPES, type EntryType } from '../lib/types'
+import { MODELS, typeInfo, VOICE_TYPES, type EntryType, type Model } from '../lib/types'
 import type { Rules, SceneRule, Voice } from '../lib/types'
-import { allPrompts, loadPrompts, PRESETS, promptText, savePrompts, SCENE_RULES, VARIABLES, type PromptSet } from '../lib/voice'
+import { choosablePrompts, loadPrompts, PRESETS, promptText, savePrompts, SCENE_RULES, VARIABLES, type PromptSet } from '../lib/voice'
 import { profile } from '../lib/analysis'
 import { isVoiceSample } from '../lib/context'
 import { newId } from '../lib/text'
@@ -100,7 +100,8 @@ function PromptLibrary() {
     setEditing(p.id)
   }
   const current = mine.find(p => p.id === editing)
-  const all = allPrompts()
+  const all = choosablePrompts()
+  const patch = (id: string, x: Partial<PromptSet>) => save(mine.map(p => p.id === id ? { ...p, ...x } : p))
 
   return (
     <SettingsSection title={t('3. Your prompt')} description={t('Your own instruction sets, kept on this computer for all your books. Each book picks one; each action can override it in the Claude panel.')}>
@@ -119,7 +120,7 @@ function PromptLibrary() {
         ))}
         {mine.map(p => (
           <div key={p.id} className={`pl-promptrow ${editing === p.id ? 'pl-active' : ''}`}>
-            <button type="button" className="pl-quiet pl-grow pl-left" onClick={() => setEditing(editing === p.id ? null : p.id)}>{p.name}</button>
+            <button type="button" className="pl-quiet pl-grow pl-left" onClick={() => setEditing(editing === p.id ? null : p.id)}>{p.name}{p.fragment ? <> <span className="sk-badge">{t('fragment')}</span></> : p.model ? <> <span className="sk-badge">{p.model}</span></> : null}</button>
             <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm sk-btn-icon" title={t('Delete')} onClick={() => { save(mine.filter(x => x.id !== p.id)); if (editing === p.id) setEditing(null) }}><Trash2 size={13} /></button>
           </div>
         ))}
@@ -132,6 +133,15 @@ function PromptLibrary() {
           <textarea className="sk-input pl-full" rows={10} value={current.text} placeholder={t('Paste your instructions here: voice, rules, what to avoid…')}
             onChange={e => save(mine.map(p => p.id === current.id ? { ...p, text: e.target.value } : p))} />
           <span className="sk-hint">{t('Variables:')} {VARIABLES.join(' ')}</span>
+          <div className="pl-row">
+            <label className="sk-hint pl-grow"><input type="checkbox" checked={!!current.fragment} onChange={e => patch(current.id, { fragment: e.target.checked || undefined, ...(e.target.checked ? { model: undefined } : {}) })} /> {t('A fragment: a piece for other prompts, pulled in with {tag}; not offered as a prompt', { tag: `{include.${current.name}}` })}</label>
+            {!current.fragment && (
+              <select className="sk-select sk-btn-sm" value={current.model ?? ''} aria-label={t('Model')} title={t('The Claude model this prompt writes with; otherwise the drafting model of Settings → Claude')} onChange={e => patch(current.id, { model: (e.target.value || undefined) as Model | undefined })}>
+                <option value="">{t('The drafting model')}</option>
+                {MODELS.map(m => <option key={m} value={m}>{m[0].toUpperCase() + m.slice(1)}</option>)}
+              </select>
+            )}
+          </div>
         </div>
       )}
     </SettingsSection>

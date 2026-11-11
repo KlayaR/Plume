@@ -31,8 +31,8 @@ import { adverbs, passives, echoes, sentences } from './analysis'
 import { backupsToRemove, versionsToRemove } from './backups'
 import { bookRepeats } from './repeats'
 import { promiseList } from './promises'
-import { driftText, dropsOf, manuscriptText, movementsOf, nudgeMessage, readCurve, readNudges } from './editorial'
-import { aiTells, checkRules, expandVariables } from './voice'
+import { chosenScenes, driftText, dropsOf, manuscriptText, movementsOf, nudgeMessage, readCurve, readNudges, readPitch } from './editorial'
+import { aiTells, checkRules, expandVariables, resolveIncludes, usedPromptIds } from './voice'
 import { review, reviewChecks, topProblems } from './review'
 import { applyFixes, fixGuard, fixRequest, placeFixes } from './fixes'
 import { EditorState } from '@codemirror/state'
@@ -2108,5 +2108,34 @@ describe('EPUB identity and cover', () => {
     expect(opf).toContain('properties="cover-image"')
     expect(opf.indexOf('idref="cover"')).toBeLessThan(opf.indexOf('idref="title"'))
     expect(zip.has('OEBPS/cover.png')).toBe(true)
+  })
+})
+
+describe('0.50: selling materials, reading list, prompt fragments', () => {
+  it('reads the selling materials and refuses an empty reply', () => {
+    expect(readPitch({ logline: ' A thief. ', blurb: 'B', synopsis: 3, extra: 'x' })).toEqual({ logline: 'A thief.', blurb: 'B', synopsis: '', pitch: '' })
+    expect(readPitch({})).toBeNull()
+    expect(readPitch('junk')).toBeNull()
+  })
+  it('gives a conversation the ticked scenes in full, in the book’s order, skipping empty ones', () => {
+    const b = bookOf([scene('a', 'First text.'), scene('b', ''), scene('c', 'Third text.')], [])
+    const out = chosenScenes(b, ['c', 'b', 'a'])
+    expect(out.indexOf('First text.')).toBeLessThan(out.indexOf('Third text.'))
+    expect(out.match(/<scene /g)).toHaveLength(2)
+    expect(chosenScenes(b, [])).toBe('')
+  })
+  it('pulls a fragment into a prompt, from the library or the book’s own copy', () => {
+    const b = bookOf([scene('a', 'x')], [])
+    b.meta.voice = { ...b.meta.voice, snapshots: { f1: { name: 'My rules', text: 'No adverbs. {include.Deeper}' }, f2: { name: 'Deeper', text: 'Short sentences.' } } }
+    expect(resolveIncludes('Start. {include.my rules} End. {include.Nobody}', b, 'en')).toBe('Start. No adverbs. Short sentences. End. {include.Nobody}')
+    expect(resolveIncludes('{include.Noir}', b, 'en')).toContain('Write noir')
+    // A fragment that includes itself stops instead of looping.
+    b.meta.voice.snapshots = { f1: { name: 'Loop', text: 'a {include.Loop}' } }
+    expect(resolveIncludes('{include.Loop}', b, 'en')).toBe('a a a {include.Loop}')
+  })
+  it('keeps the book’s copy of what its prompt is', () => {
+    const b = bookOf([scene('a', 'x')], [])
+    b.meta.voice = { ...b.meta.voice, prompt: 'preset-noir', actionPrompts: { rewrite: 'preset-thriller' } }
+    expect(usedPromptIds(b).sort()).toEqual(['preset-noir', 'preset-thriller'])
   })
 })

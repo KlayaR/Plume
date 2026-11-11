@@ -7,7 +7,7 @@ import { Dialog } from '../studio-kit/shell.js'
 import { useStore } from '../store'
 import { MODELS, type Model } from '../lib/types'
 import { SAMPLE_WORDS } from '../lib/context'
-import { allPrompts } from '../lib/voice'
+import { choosablePrompts } from '../lib/voice'
 import { FANTASY_BRIEF_ID, FANTASY_ID } from '../lib/defaults'
 import { recordWin, runTrial, tallies, tallyOf, trialTask, variantName, type TrialText, type Variant } from '../trial'
 import { estimateTokens } from '../lib/text'
@@ -21,7 +21,7 @@ export default function TrialDialog({ onClose }: { onClose: () => void }) {
   const draft = useStore(s => s.prefs.roles.draft)
   const t = useT()
   const task = trialTask(book, sceneId)
-  const prompts = allPrompts()
+  const prompts = choosablePrompts()
   const mine: Variant = { prompt: book.meta.voice.prompt || FANTASY_ID, model: draft.model, samples: book.meta.ai.sampleWords ?? SAMPLE_WORDS }
   // Your setup against one that differs in one thing: the short brief if you use the long fantasy prompt, else a stronger model.
   const [variants, setVariants] = useState<Variant[]>(() => [mine, mine.prompt === FANTASY_ID ? { ...mine, prompt: FANTASY_BRIEF_ID } : { ...mine, model: mine.model === 'opus' ? 'fable' : 'opus' }])

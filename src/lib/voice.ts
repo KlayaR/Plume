@@ -2,12 +2,16 @@
 // variables inside them, scene rules, and the rule checker that scores every
 // proposal against your measurable rules, locally (zero tokens).
 import { invoke } from '@tauri-apps/api/core'
-import type { ActionId, Book, Entry, Lang, Rules, SceneRule } from './types'
+import type { ActionId, Book, Entry, Lang, Model, Rules, SceneRule } from './types'
 import { FANTASY_BRIEF, FANTASY_BRIEF_ID, FANTASY_ID, FANTASY_PROMPT } from './defaults'
 import { adverbs, dialogue, passives, phrases, sentences, words } from './analysis'
 
-/** `fr` is the French text of a preset; your own prompts have one text. */
-export interface PromptSet { id: string; name: string; text: string; fr?: string; preset?: boolean }
+/**
+ * `fr` is the French text of a preset; your own prompts have one text. A fragment is a piece
+ * other prompts pull in with {include.Name}; it is not offered as a prompt itself. `model`:
+ * the Claude model this prompt writes with, instead of the drafting model.
+ */
+export interface PromptSet { id: string; name: string; text: string; fr?: string; preset?: boolean; fragment?: boolean; model?: Model }
 
 /** The prompt's text for the book's language. */
 export const promptText = (p: PromptSet, lang: Lang) => (lang === 'fr' && p.fr ? p.fr : p.text)
@@ -43,9 +47,38 @@ export async function restorePrompts(): Promise<void> {
   } catch { if (loadPrompts().length) savePrompts(loadPrompts()) }
 }
 export const allPrompts = () => [...PRESETS, ...loadPrompts()]
+/** The prompts a book or an action can pick: all but the fragments. */
+export const choosablePrompts = () => allPrompts().filter(p => !p.fragment)
+
+const INCLUDE = /\{include\.([^}]+)\}/gi
+const sameName = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase()
+
+/** Puts the text of other prompts where {include.Name} stands (three levels deep at most); an unknown name is left as written. */
+export function resolveIncludes(text: string, book: Book, lang: Lang, depth = 0): string {
+  return text.replace(INCLUDE, (m, name: string) => {
+    if (depth >= 3) return m
+    const found = allPrompts().find(p => sameName(p.name, name))
+    // The book's own copy, when this computer's library lacks it.
+    const copy = found ? null : Object.values(book.meta.voice.snapshots ?? {}).find(c => sameName(c.name, name))
+    const inner = found ? promptText(found, lang) : copy?.text
+    return inner === undefined ? m : resolveIncludes(inner, book, lang, depth + 1)
+  })
+}
 
 /** The prompts a book points at (its own and the per-action ones). */
-export const usedPromptIds = (book: Book) => [...new Set([book.meta.voice.prompt, ...Object.values(book.meta.voice.actionPrompts)].filter((x): x is string => !!x))]
+export function usedPromptIds(book: Book): string[] {
+  const ids = new Set([book.meta.voice.prompt, ...Object.values(book.meta.voice.actionPrompts)].filter((x): x is string => !!x))
+  const all = allPrompts()
+  // And the fragments they include (a Set also visits what is added while it is walked).
+  for (const id of ids) {
+    const p = all.find(x => x.id === id)
+    for (const m of `${p?.text ?? ''}\n${p?.fr ?? ''}`.matchAll(INCLUDE)) {
+      const f = all.find(x => sameName(x.name, m[1]))
+      if (f) ids.add(f.id)
+    }
+  }
+  return [...ids]
+}
 
 /** The prompt an action uses: its own override, else the book's; the book's own copy if the library lacks it. */
 export function promptFor(book: Book, action: ActionId): PromptSet | null {
@@ -55,10 +88,10 @@ export function promptFor(book: Book, action: ActionId): PromptSet | null {
   const found = allPrompts().find(p => p.id === id)
   if (found) return found
   const copy = v.snapshots?.[id]
-  return copy ? { id, name: copy.name, text: copy.text } : null
+  return copy ? { id, name: copy.name, text: copy.text, model: copy.model } : null
 }
 
-export const VARIABLES = ['{book.title}', '{book.author}', '{book.language}', '{book.tense}', '{scene.title}', '{scene.pov}', '{chapter.number}', '{list.all}', '{list.<name>}']
+export const VARIABLES = ['{book.title}', '{book.author}', '{book.language}', '{book.tense}', '{scene.title}', '{scene.pov}', '{chapter.number}', '{list.all}', '{list.<name>}', '{include.<name>}']
 
 export const wordLists = (book: Book) => book.entries.filter(e => e.type === 'wordlist' && e.include !== 'never' && e.include !== 'secret')
 export const listWords = (e: Entry) => e.full.split('\n').map(l => l.replace(/^\s*[-*]\s*/, '').trim()).filter(Boolean)

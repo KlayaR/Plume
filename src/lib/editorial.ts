@@ -80,3 +80,23 @@ export function movementsOf(beats: number): [number, number][] {
   const parts = Math.max(2, Math.round(beats / 3))
   return Array.from({ length: parts }, (_, i) => [Math.floor(i * beats / parts) + 1, Math.floor((i + 1) * beats / parts)] as [number, number])
 }
+
+/** What sells the finished book: a logline, the back-cover text, a synopsis that tells the ending, and a pitch. */
+export interface Pitch { logline: string; blurb: string; synopsis: string; pitch: string }
+export const PITCH_PARTS = ['logline', 'blurb', 'synopsis', 'pitch'] as const
+
+/** The selling materials from Claude's reply; null when none of the four is there. */
+export function readPitch(raw: unknown): Pitch | null {
+  const o = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
+  const out = Object.fromEntries(PITCH_PARTS.map(k => [k, typeof o[k] === 'string' ? (o[k] as string).trim() : ''])) as unknown as Pitch
+  return PITCH_PARTS.some(k => out[k]) ? out : null
+}
+
+/** What a conversation was told to read, beyond what the chat picks on its own. */
+export interface Reads { scenes: string[]; entries: string[] }
+
+/** The full text of the scenes a conversation was told to read, in the book's order. */
+export function chosenScenes(book: Book, ids: string[]): string {
+  const want = new Set(ids)
+  return book.chapters.flatMap((c, i) => c.scenes.filter(s => want.has(s.id) && s.text.trim()).map(s => `<scene chapter="${i + 1}" title="${s.title}">\n${s.text.trim()}\n</scene>`)).join('\n')
+}

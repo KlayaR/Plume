@@ -16,19 +16,22 @@ import { useChat, type Proposal } from './chat'
 import { t } from './i18n'
 import { locateQuote } from './lib/text'
 import { bookRepeats, type RepeatKind } from './lib/repeats'
-import { driftText, dropsOf, manuscriptText, readCurve, type ReaderPoint } from './lib/editorial'
+import { driftText, dropsOf, manuscriptText, readCurve, readPitch, type Pitch, type ReaderPoint } from './lib/editorial'
 import { loadBook, seriesRootOf, takeBroken } from './lib/project'
 import { loadShelf } from './library'
 
-export type AgentTask = 'continuity' | 'structure' | 'audit' | 'research' | 'repeats' | 'manuscript' | 'drift' | 'reader' | 'series'
+export type AgentTask = 'continuity' | 'structure' | 'audit' | 'research' | 'repeats' | 'manuscript' | 'drift' | 'reader' | 'series' | 'pitch'
 /** Where a finding comes from: an agent task, or a check kept from elsewhere. */
-export type FindingSource = AgentTask | 'outline'
+export type FindingSource = AgentTask | 'outline' | 'written'
 export interface AgentItem { id: string; task: FindingSource; title: string; detail: string; where?: string; sceneId?: string; quote?: string; done?: boolean }
 
 /** The editor's letter from the last whole-manuscript read, and the reader's interest by chapter. */
 export interface EditorLetter { date: string; text: string }
-interface AgentState { items: AgentItem[]; busy: AgentTask | null; progress: string; letter: EditorLetter | null; curve: ReaderPoint[] }
-export const useAgents = create<AgentState>(() => ({ items: [], busy: null, progress: '', letter: null, curve: [] }))
+/** The selling materials from the last run. */
+export type SavedPitch = Pitch & { date: string }
+interface AgentState { items: AgentItem[]; busy: AgentTask | null; progress: string; letter: EditorLetter | null; curve: ReaderPoint[]; pitch: SavedPitch | null }
+export const useAgents = create<AgentState>(() => ({ items: [], busy: null, progress: '', letter: null, curve: [], pitch: null }))
+const PITCH = '.plume/pitch.json.md'
 const LETTER = '.plume/editor-letter.json.md'
 const CURVE = '.plume/reader.json.md'
 
@@ -43,6 +46,7 @@ export async function loadAgents() {
   try { useAgents.setState({ items: JSON.parse(await invoke<string>('read_text', { root, rel: FILE })) }) } catch { useAgents.setState({ items: [] }) }
   try { useAgents.setState({ letter: JSON.parse(await invoke<string>('read_text', { root, rel: LETTER })) }) } catch { useAgents.setState({ letter: null }) }
   try { useAgents.setState({ curve: JSON.parse(await invoke<string>('read_text', { root, rel: CURVE })) }) } catch { useAgents.setState({ curve: [] }) }
+  try { useAgents.setState({ pitch: JSON.parse(await invoke<string>('read_text', { root, rel: PITCH })) }) } catch { useAgents.setState({ pitch: null }) }
 }
 
 const fr = () => useStore.getState().book?.meta.language === 'fr'
@@ -71,6 +75,7 @@ export function estimate(task: AgentTask): number {
     case 'repeats': return 0
     case 'manuscript': return Math.round(bookTokens() + estimateTokens(bible()) + 2500)
     case 'reader': return Math.round(bookTokens() + 1500)
+    case 'pitch': return Math.round(bookTokens() + 1500)
     case 'drift': return estimateTokens(driftText(useStore.getState().book!)) + 900
     case 'series': return estimateTokens(summaries()) * 3 + 1500
   }
@@ -89,10 +94,10 @@ export function sceneFor(book: Book, ref?: string, title?: string): string | und
   return (byRef ?? scenes.find(s => !!title && s.title.toLowerCase() === title.trim().toLowerCase()))?.id
 }
 
-/** Adds findings from a check to the list (the older open ones from the same source go). */
-export function addFindings(task: FindingSource, list: Omit<AgentItem, 'id' | 'task'>[]) {
+/** Adds findings from a check to the list (the older open ones from the same source go, unless `keep`). */
+export function addFindings(task: FindingSource, list: Omit<AgentItem, 'id' | 'task'>[], keep = false) {
   const items = list.map(x => ({ ...x, id: newId(), task }))
-  useAgents.setState(s => ({ items: [...items, ...s.items.filter(i => i.task !== task || i.done)] }))
+  useAgents.setState(s => ({ items: [...items, ...s.items.filter(i => keep || i.task !== task || i.done)] }))
   save()
 }
 
@@ -247,6 +252,24 @@ export async function runReader() {
   const items = [...low, ...toItems(book, data.drops)]
   addFindings('reader', items)
   useStore.getState().notify('ok', t('{n} findings in Agent tasks.', { n: items.length }))
+}
+
+/** What sells the finished book: Claude reads the whole manuscript and writes a logline, the back cover, a synopsis and a pitch. */
+export async function runPitch() {
+  const book = useStore.getState().book!
+  const F = fr()
+  const data = await runObject('pitch',
+    F ? 'Tu es éditeur et tu sais vendre un roman sans le trahir. Tu lis le roman entier puis tu écris ce qui le présente, en français, dans le ton du livre. Réponds uniquement en JSON valide.' : 'You are an editor who knows how to sell a novel without betraying it. You read the whole novel, then write what presents it, in the tone of the book. Reply with valid JSON only.',
+    `<manuscript>\n${manuscriptText(book)}\n</manuscript>\n\n<task>\n${F
+      ? 'Écris, d’après ce que le texte contient vraiment (n’invente aucun événement) : "logline", une phrase de 30 mots au plus : qui, ce qu’il veut, ce qui s’y oppose, ce qu’il risque. "blurb", la quatrième de couverture, 120 à 180 mots : une accroche, la situation, l’enjeu, puis s’arrêter avant le dernier tiers du livre ; aucune révélation de la fin, pas de questions rhétoriques en série, pas de superlatifs. "synopsis", une page (450 à 600 mots) au présent, pour un éditeur : toute l’intrigue principale dans l’ordre, les retournements et la fin racontés clairement. "pitch", trois à quatre phrases à dire à voix haute : le genre, à qui le livre s’adresse, ce qui le distingue.'
+      : 'Write, from what the text really contains (invent no event): "logline", one sentence of 30 words at most: who, what they want, what stands in the way, what is at stake. "blurb", the back-cover text, 120 to 180 words: a hook, the situation, the stakes, then stop before the last third of the book; no ending revealed, no string of rhetorical questions, no superlatives. "synopsis", one page (450 to 600 words) in the present tense, for a publisher: the whole main plot in order, with the turns and the ending told plainly. "pitch", three or four sentences to say out loud: the genre, who the book is for, what sets it apart.'}\n</task>\n\nJSON: {"logline": "...", "blurb": "...", "synopsis": "...", "pitch": "..."}`)
+  if (!data) return
+  const read = readPitch(data)
+  if (!read) return useStore.getState().notify('error', t('Claude’s reply could not be read. Try again.'))
+  const pitch: SavedPitch = { ...read, date: new Date().toISOString() }
+  useAgents.setState({ pitch })
+  invoke('write_text', { root: book.root, rel: PITCH, content: JSON.stringify(pitch) }).catch(() => {})
+  useStore.getState().notify('ok', t('The blurb, synopsis and pitch are ready in Agent tasks.'))
 }
 
 /** The other books of this book's series that the shelf knows, earliest first. */

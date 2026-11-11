@@ -10,7 +10,7 @@ import { alternatives, assistantChoice, currentContext, noteAtCursor, pickAltern
 import type { Nudge } from '../lib/editorial'
 import { diffWords, learnTaste, staleScenes, useNotes } from '../writing'
 import { getEditorView } from '../editor/actions'
-import { allPrompts, fixable } from '../lib/voice'
+import { choosablePrompts, fixable } from '../lib/voice'
 import { BackendModelSelect } from './ModelPresets'
 import { isCheap } from '../ai'
 import { numLocale, useT } from '../i18n'
@@ -63,7 +63,7 @@ export default function ContextPanel() {
   const sceneNote = useStore(s => s.book?.chapters.flatMap(c => c.scenes).find(x => x.id === s.sceneId)?.note ?? '')
   const instruction = action === 'beats' && !text.beats.trim() ? sceneNote : text[action]
   const t = useT()
-  const prompts = allPrompts()
+  const prompts = choosablePrompts()
   const voice = book.meta.voice
   const prefs = useStore(s => s.prefs)
   const directions = prefs.directions

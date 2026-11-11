@@ -155,11 +155,11 @@ export const listBackups = (book: Book) => book.meta.id ? invoke<string[]>('list
 /** Keeps a copy of the prompts the book uses inside its plume.json (a different computer may not have your library). */
 export function refreshSnapshots(book: Book) {
   const used = usedPromptIds(book)
-  const snapshots: Record<string, { name: string; text: string }> = {}
+  const snapshots: Book['meta']['voice']['snapshots'] = {}
   for (const id of used) {
     const p = allPrompts().find(x => x.id === id)
     const old = book.meta.voice.snapshots?.[id]
-    if (p) snapshots[id] = { name: p.name, text: p.text }
+    if (p) snapshots[id] = { name: p.name, text: p.text, ...(p.model ? { model: p.model } : {}) }
     else if (old) snapshots[id] = old
   }
   if (JSON.stringify(snapshots) !== JSON.stringify(book.meta.voice.snapshots ?? {})) {

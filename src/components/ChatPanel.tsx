@@ -4,9 +4,10 @@
 // Past conversations are kept with the book: the clock button lists them.
 import { useEffect, useRef, useState } from 'react'
 import { ask } from '@tauri-apps/plugin-dialog'
-import { Check, History, ListPlus, MessageSquarePlus, Pencil, Pin, PinOff, Send, Square, Trash2, X } from 'lucide-react'
+import { BookOpen, Check, History, ListPlus, MessageSquarePlus, Pencil, Pin, PinOff, Send, Square, Trash2, X } from 'lucide-react'
 import { useStore } from '../store'
-import { deleteChat, endInterview, newChat, openChat, renameChat, send, sendMode, CHAT_MODES, stopChat, turnIntoEntries, useChat } from '../chat'
+import { deleteChat, endInterview, endTalk, newChat, openChat, readsTokens, renameChat, send, sendMode, setReads, CHAT_MODES, stopChat, turnIntoEntries, useChat } from '../chat'
+import { numLocale } from '../i18n'
 import { useT } from '../i18n'
 import { BackendModelSelect } from './ModelPresets'
 import { showMenu } from '../contextMenu'
@@ -43,6 +44,9 @@ export default function ChatPanel() {
   const messages = useChat(s => s.messages)
   const streaming = useChat(s => s.streaming)
   const interview = useChat(s => s.interview)
+  const persona = useChat(s => s.persona)
+  const reads = useChat(s => s.reads)
+  const [picking, setPicking] = useState(false)
   const busy = useChat(s => s.busy)
   const proposals = useChat(s => s.proposals.length)
   const chats = useChat(s => s.chats)
@@ -57,6 +61,8 @@ export default function ChatPanel() {
   const log = useRef<HTMLDivElement>(null)
   const t = useT()
   const target = book.entries.find(e => e.slug === interview)
+  const who = book.entries.find(e => e.slug === persona)
+  const ticks = (reads?.scenes.length ?? 0) + (reads?.entries.length ?? 0)
   const past = chats.filter(c => c.messages.length).sort((a, b) => b.date.localeCompare(a.date))
   const current = chats.find(c => c.id === chatId)
 
@@ -69,16 +75,18 @@ export default function ChatPanel() {
     <div className="pl-chat">
       <div className="pl-row pl-chat-head">
         <span className="sk-label pl-grow" title={current?.title}>
-          {list ? t('Past conversations') : target ? t('Interview: {name}', { name: target.name }) : current?.title || t('Brainstorm')}
+          {list ? t('Past conversations') : picking ? t('What this conversation reads') : target ? t('Interview: {name}', { name: target.name }) : who ? t('Talking to {name}', { name: who.name }) : current?.title || t('Brainstorm')}
         </span>
-        {target && !list && <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm" onClick={endInterview}>{t('End')}</button>}
-        <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm sk-btn-icon" aria-pressed={list} title={t('Past conversations')} onClick={() => setList(l => !l)}>
+        {target && !list && !picking && <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm" onClick={endInterview}>{t('End')}</button>}
+        {who && !target && !list && !picking && <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm" title={t('Back to a normal conversation')} onClick={endTalk}>{t('End')}</button>}
+        {picking && <button type="button" className="sk-btn sk-btn-primary sk-btn-sm" onClick={() => setPicking(false)}>{t('Done')}</button>}
+        <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm sk-btn-icon" aria-pressed={list} title={t('Past conversations')} onClick={() => { setList(l => !l); setPicking(false) }}>
           <History size={14} />
         </button>
-        <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm sk-btn-icon" title={t('New conversation')} disabled={streaming !== null} onClick={() => { newChat(); setList(false) }}><MessageSquarePlus size={14} /></button>
+        <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm sk-btn-icon" title={t('New conversation')} disabled={streaming !== null} onClick={() => { newChat(); setList(false); setPicking(false) }}><MessageSquarePlus size={14} /></button>
       </div>
 
-      {list ? (
+      {picking && !list ? <ReadsPicker /> : list ? (
         <div className="pl-chat-list">
           {past.length === 0 && <p className="sk-hint">{t('No past conversations yet. Each brainstorm is kept here, with the book.')}</p>}
           {past.map(c => (
@@ -94,7 +102,7 @@ export default function ChatPanel() {
                 <>
                   <button type="button" className="pl-chat-main" onClick={() => { openChat(c.id); setList(false) }}>
                     <span className="pl-chat-title">{c.title || t('Untitled')}</span>
-                    <span className="pl-chat-meta">{when(c.date, ui)} · {t('{n} messages', { n: c.messages.length })}{c.interview ? ` · ${t('interview')}` : ''}</span>
+                    <span className="pl-chat-meta">{when(c.date, ui)} · {t('{n} messages', { n: c.messages.length })}{c.interview ? ` · ${t('interview')}` : ''}{c.persona ? ` · ${t('in character')}` : ''}</span>
                   </button>
                   <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm sk-btn-icon pl-hover" title={t('Rename')} onClick={() => { setName(c.title); setRenaming(c.id) }}><Pencil size={12} /></button>
                   <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm sk-btn-icon pl-hover" title={t('Delete')} onClick={async () => { if (await ask(t('Delete this conversation?'), { title: t('Delete'), kind: 'warning' })) deleteChat(c.id) }}><Trash2 size={12} /></button>
@@ -106,7 +114,10 @@ export default function ChatPanel() {
       ) : (
         <>
           <div className="pl-chat-log" ref={log}>
-            {messages.length === 0 && streaming === null && (
+            {messages.length === 0 && streaming === null && who && (
+              <p className="sk-hint">{t('Ask {name} anything: they answer in their own voice, knowing only what they know at this point of the story. Write in [square brackets] to step out of the role.', { name: who.name })}</p>
+            )}
+            {messages.length === 0 && streaming === null && !who && (
               <p className="sk-hint">{t('Think out loud with Claude: characters, places, twists. It knows your bible. When you like something, "Turn into entries" drafts it for your review.')}</p>
             )}
             {messages.map((m, i) => <div key={i} className={`pl-msg pl-msg-${m.role}`} onContextMenu={e => showMenu(e, messageMenu(i))}>{m.text}</div>)}
@@ -117,10 +128,11 @@ export default function ChatPanel() {
             onChange={e => setText(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); go() } }} />
           <div className="pl-chips" role="group" aria-label={t('Ways to brainstorm')}>
-            {CHAT_MODES.map(m => <button key={m.id} type="button" className="pl-chip" disabled={streaming !== null} title={t(m.hint)} onClick={() => { sendMode(m.id, text); setText('') }}>{t(m.label)}</button>)}
+            {!who && CHAT_MODES.map(m => <button key={m.id} type="button" className="pl-chip" disabled={streaming !== null} title={t(m.hint)} onClick={() => { sendMode(m.id, text); setText('') }}>{t(m.label)}</button>)}
           </div>
           <div className="pl-row pl-chat-model">
             <BackendModelSelect />
+            <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm" aria-pressed={ticks > 0} title={t('Tick the scenes and bible entries this conversation must read in full')} onClick={() => setPicking(true)}><BookOpen size={13} /> {ticks ? t('Reads {n}', { n: ticks }) : t('Reads…')}</button>
             {lastBackend && <span className="sk-hint" title={t('Answered by')}>{lastBackend.kind === 'openrouter' ? `OpenRouter · ${lastBackend.name}` : `Claude · ${lastBackend.name}`}</span>}
           </div>
           <div className="pl-row">
@@ -139,6 +151,51 @@ export default function ChatPanel() {
           {t('{n} drafts waiting in the review list', { n: proposals })}
         </button>
       )}
+    </div>
+  )
+}
+
+/** Ticks for what the open conversation reads in full: written scenes, by chapter, and bible entries. */
+function ReadsPicker() {
+  const book = useStore(s => s.book)!
+  const saved = useChat(s => s.reads)
+  const reads = saved ?? { scenes: [], entries: [] }
+  const t = useT()
+  const sc = new Set(reads.scenes)
+  const en = new Set(reads.entries)
+  const tick = (kind: 'scenes' | 'entries', ids: string[], on: boolean) => {
+    const cur = new Set(reads[kind])
+    for (const id of ids) { if (on) cur.add(id); else cur.delete(id) }
+    setReads({ ...reads, [kind]: [...cur] })
+  }
+  const entries = book.entries.filter(e => !['style', 'wordlist', 'excerpt'].includes(e.type) && e.include !== 'secret')
+  const words = (s: string) => (s.match(/\S+/g) ?? []).length.toLocaleString(numLocale())
+  return (
+    <div className="pl-chat-list pl-reads">
+      <p className="sk-hint">{t('Tick what this conversation must read in full. With nothing ticked, the chat picks on its own: the entries you talk about, the plan and the end of the open scene.')}</p>
+      <div className="pl-row">
+        <span className="sk-hint pl-grow">{t('≈ {n} tokens more, read from the cache after the first message', { n: readsTokens(book, saved).toLocaleString(numLocale()) })}</span>
+        {saved && <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm" onClick={() => setReads(null)}>{t('Untick all')}</button>}
+      </div>
+      <span className="sk-label">{t('Scenes')}</span>
+      {book.chapters.map((c, i) => {
+        const written = c.scenes.filter(s => s.text.trim())
+        if (!written.length) return null
+        const on = written.filter(s => sc.has(s.id)).length
+        return (
+          <details key={c.id} className="pl-reads-ch">
+            <summary>{i + 1}. {c.title || t('Chapter')}{on ? <span className="sk-badge">{on}</span> : null}</summary>
+            <label className="pl-reads-row"><input type="checkbox" checked={on === written.length} onChange={e => tick('scenes', written.map(s => s.id), e.target.checked)} /> <i>{t('The whole chapter')}</i></label>
+            {written.map(s => (
+              <label key={s.id} className="pl-reads-row"><input type="checkbox" checked={sc.has(s.id)} onChange={e => tick('scenes', [s.id], e.target.checked)} /> <span className="pl-grow">{s.title}</span> <span className="sk-hint">{words(s.text)} {t('words')}</span></label>
+            ))}
+          </details>
+        )
+      })}
+      <span className="sk-label">{t('Bible entries')}</span>
+      {entries.map(e => (
+        <label key={e.slug} className="pl-reads-row"><input type="checkbox" checked={en.has(e.slug)} onChange={x => tick('entries', [e.slug], x.target.checked)} /> <span className="pl-grow">{e.name}</span></label>
+      ))}
     </div>
   )
 }

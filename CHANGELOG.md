@@ -7,6 +7,15 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.50.0
+What NovelCrafter and Sudowrite have that Plume lacked.
+- **Blurb, synopsis and pitch.** Agent tasks has a new whole-book read for when the book is finished: a logline, the back-cover text (which stops before the last third and reveals no ending), a one-page synopsis that tells the ending, and a pitch to say out loud. Each has its own Copy button; they are kept with the book.
+- **Talk to a character.** A character's entry has **Talk to them**: a chat where Claude answers as that character, in the first person and in their voice (their voice card), knowing only what they know at the chapter you are in: their entry, the facts that hold by then, what they know and don't, and what has happened so far. The plan of what comes next and the open scene are not sent. Write in [square brackets] to step out of the role. Secret entries cannot be talked to.
+- **Choose what the chat reads.** **Reads…** under the chat ticks the scenes (or whole chapters) and the bible entries a conversation must read in full, with the tokens it adds. With nothing ticked the chat picks on its own, as before. The ticks are kept with the conversation.
+- **Prompt fragments.** A saved prompt can be marked as a fragment: a piece that other prompts pull in with `{include.Name}` (three levels deep at most), and that is not offered as a prompt itself. The book keeps its own copy of the fragments its prompts use.
+- **A model per prompt.** A prompt of yours can name the Claude model it writes with (Settings → Voice → Your prompt); the actions that use it write with that model instead of the drafting model.
+- **Write the chapter, better.** Writing a whole chapter from the plan now writes a scene of six beats or more in parts, like Write this scene, and checks each written scene against the bible: what contradicts it goes to the findings list in Agent tasks, with the words that do.
+
 ## 0.49.0
 Claude used better in every tab, and a way to find out which prompt writes your book best. Each of these was run with real Claude in the built app.
 - **Compare prompts, blind.** Settings → Voice → Compare prompts (or Ctrl+K) writes the scene you are in with two or three setups: the prompt, the model, and how much of your prose is sent. The texts appear side by side without their labels; you pick the one you would keep, Plume says which it was and keeps count, and **Use this setup** makes the winner write your book. It starts from an empty page and, for a long scene, writes only its first beats, so a trial stays short.

@@ -285,7 +285,7 @@ export interface Voice {
   /** What the accepted and rejected proposals taught, in a few lines. */
   taste: string
   /** Copies of the prompts this book uses, so it works on a computer that lacks your library. */
-  snapshots: Record<string, { name: string; text: string }>
+  snapshots: Record<string, { name: string; text: string; model?: Model }>
   /** Which default preset this voice was set up from (so it is applied once, not again). */
   defaults?: string
 }

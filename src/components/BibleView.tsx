@@ -1,7 +1,7 @@
 // Research & Bible: every entry by type, and the entry editor.
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { ask } from '@tauri-apps/plugin-dialog'
-import { ChevronDown, ChevronRight, FileText, History, ImagePlus, MessagesSquare, Plus, Search, Sparkles, Trash2, X } from 'lucide-react'
+import { ChevronDown, ChevronRight, FileText, History, ImagePlus, MessageCircle, MessagesSquare, Plus, Search, Sparkles, Trash2, X } from 'lucide-react'
 import { MORE_TABS, useStore, type BibleTab } from '../store'
 import { EMPTY_VOICE, FAMILIES, RANKS, typeInfo, VOICE_TYPES, type Entry, type EntryType, type Include, type Rank, type Stat, type VoiceCard } from '../lib/types'
 import { isLitRPG } from '../lib/serial'
@@ -19,7 +19,7 @@ import { showMenu } from '../contextMenu'
 import { entryMenu } from '../menus'
 import { Contradictions, MapView, Relations, ReviewList, Tracker } from './BibleTools'
 import AICheck from './AICheck'
-import { startInterview, useChat } from '../chat'
+import { startInterview, startTalk, useChat } from '../chat'
 import { pickImage, useImage } from '../lib/images'
 
 const TABS: [BibleTab, string][] = [['entry', 'Entries'], ['review', 'To review'], ['aicheck', 'AI check']]
@@ -240,6 +240,7 @@ export function EntryEditor({ entry }: { entry: Entry }) {
         <input className="pl-entryname" value={entry.name} onChange={e => update({ name: e.target.value })} aria-label={t('Name')} />
         <span className="sk-badge">{t(typeInfo(entry.type).label)}</span>
         {!plain && <button type="button" className="sk-btn sk-btn-sm" title={t('Claude asks you questions to fill the gaps of this entry')} onClick={() => startInterview(entry.slug)}><MessagesSquare size={14} /> {t('Interview me')}</button>}
+        {!plain && entry.type === 'character' && entry.include !== 'secret' && <button type="button" className="sk-btn sk-btn-sm" title={t('Ask this character questions: Claude answers in their voice, with what they know at this point of the story')} onClick={() => startTalk(entry.slug)}><MessageCircle size={14} /> {t('Talk to them')}</button>}
         <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm sk-btn-icon" aria-pressed={onPaper} title={t('Read entries on paper')} aria-label={t('Read entries on paper')} onClick={() => useStore.getState().setPrefs({ entryPaper: !onPaper })}><FileText size={14} /></button>
         <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm sk-btn-icon" title={t('Earlier versions…')} aria-label={t('Earlier versions…')} onClick={() => useStore.setState({ dialog: 'history', dialogArg: entry.slug })}><History size={14} /></button>
         {!isStyle && <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm sk-btn-icon" title={t('Remove entry')} onClick={remove}><Trash2 size={14} /></button>}
