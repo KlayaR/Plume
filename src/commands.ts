@@ -114,6 +114,7 @@ export function commands(): Command[] {
     settings('about', 'About'),
     { id: 'interface-language', label: st.prefs.ui === 'fr' ? 'Interface in English' : 'Interface en français', run: () => st.setPrefs({ ui: st.prefs.ui === 'fr' ? 'en' : 'fr' }) },
     { id: 'agents', label: t('Agent tasks'), run: () => set({ dialog: 'agents' }) },
+    { id: 'trial', label: t('Compare prompts'), run: () => set({ dialog: 'trial' }) },
     { id: 'tour', label: t('Quick tour'), run: () => set({ dialog: 'tour' }) },
     { id: 'everything', label: t(st.prefs.simple ? 'Show everything' : 'Simpler view (hide the less used tabs)'), run: () => st.setPrefs({ simple: !st.prefs.simple }) },
     { id: 'help', label: t('Help'), keys: 'F1', run: () => set({ dialog: 'help' }) },

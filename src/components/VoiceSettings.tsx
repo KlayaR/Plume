@@ -124,6 +124,7 @@ function PromptLibrary() {
           </div>
         ))}
         <button type="button" className="sk-btn sk-btn-sm" onClick={() => add()}><Plus size={13} /> {t('New prompt')}</button>
+        <button type="button" className="sk-btn sk-btn-sm" title={t('Writes the scene you are in with two or three setups, shown without their labels, so you can pick the best')} onClick={() => useStore.setState({ dialog: 'trial', showSettings: false })}>{t('Compare prompts')}…</button>
       </div>
       {current && (
         <div className="pl-promptedit">

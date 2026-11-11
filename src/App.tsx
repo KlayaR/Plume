@@ -15,6 +15,7 @@ import { restoreReferences } from './lib/references'
 import { shellStrings, translate, useT } from './i18n'
 import StartScreen from './components/StartScreen'
 import SettingsView from './components/SettingsView'
+import TrialDialog from './components/TrialDialog'
 import BottomBar from './components/BottomBar'
 import { AgentDialog, ExportDialog, PrintView, TourDialog } from './components/BookDialogs'
 import FindDialog from './components/FindDialog'
@@ -195,6 +196,7 @@ export default function App() {
       {book && dialog === 'help' && <HelpDialog onClose={() => useStore.setState({ dialog: null })} />}
       {book && dialog === 'tour' && <TourDialog onClose={() => useStore.setState({ dialog: null })} />}
       {book && dialog === 'agents' && <AgentDialog onClose={() => useStore.setState({ dialog: null })} />}
+      {book && dialog === 'trial' && <TrialDialog onClose={() => useStore.setState({ dialog: null })} />}
       {book && printing && <PrintView />}
       {book && !prefs.seen?.includes('basics') && <TipCard />}
       {book && prefs.seen?.includes('basics') && !prefs.seen.includes('moved-045') && <MovedCard />}

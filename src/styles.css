@@ -1168,3 +1168,9 @@ body.pl-typing .pl-draftbar { opacity: 0.08; }
 .pl-nudges { display: flex; flex-direction: column; gap: 4px; padding: 8px; border: 1px solid var(--border); border-radius: 8px; }
 .pl-nudge { display: flex; align-items: flex-start; gap: 6px; line-height: 1.45; }
 .pl-nudge-q { font-style: italic; color: var(--text-muted); }
+/* Compare prompts: the texts side by side, unlabelled until you pick. */
+.pl-trial-row { gap: 6px; }
+.pl-trial-cols { display: grid; gap: 12px; margin-top: 8px; }
+.pl-trial-col { display: flex; flex-direction: column; gap: 4px; padding: 8px; border: 1px solid var(--border); border-radius: 8px; min-width: 0; }
+.pl-trial-won { border-color: var(--accent); }
+.pl-trial-text { white-space: pre-wrap; line-height: 1.6; max-height: 24rem; overflow: auto; font-family: var(--pl-serif, Georgia, serif); }
