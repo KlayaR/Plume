@@ -344,6 +344,39 @@ export function addDrafts(proposals: Proposal[]) {
   useStore.getState().notify('ok', t('{n} drafts in the review list.', { n: proposals.length }), { label: t('Review'), run: () => useStore.setState({ view: 'bible', entrySlug: null, bibleTab: 'review' }) })
 }
 
+/**
+ * After you write: what a scene establishes that the bible doesn't hold yet, drafted for
+ * the review list without interrupting you. Runs when the scene joins the story memory.
+ */
+export async function watchBible(sceneId: string) {
+  const book = useStore.getState().book
+  const sc = book?.chapters.flatMap(c => c.scenes).find(s => s.id === sceneId)
+  if (!book || !sc || useStore.getState().prefs.bibleWatch === false || sc.text.trim().length < 600) return
+  const fr = book.meta.language === 'fr'
+  const named = book.entries.filter(NAMED).filter(e => TYPES.includes(e.type))
+  const here = new Set(findMentions(sc.text, buildMatcher(named)).map(m => m.slug))
+  const known = named.filter(e => here.has(e.slug)).map(e => `<entry slug="${e.slug}" type="${e.type}" name="${e.name}">\n${[e.short.trim(), ...e.facts.map(f => `- ${f.text}`)].filter(Boolean).join('\n')}\n</entry>`).join('\n')
+  const others = named.filter(e => !here.has(e.slug)).map(e => e.name).join(', ')
+  const reply = await ask({ json: 'list', role: 'quick',
+    system: fr
+      ? 'Tu tiens à jour la bible d’un roman à partir de ce que l’auteur vient d’écrire. Tu ne relèves que ce que le texte établit clairement. Réponds uniquement en JSON valide, en français.'
+      : 'You keep a novel’s story bible up to date from what the author just wrote. You note only what the text clearly establishes. Reply with valid JSON only.',
+    message: `<bible_entries_in_this_scene>\n${known || '-'}\n</bible_entries_in_this_scene>\n${others ? `<other_entries>\n${others}\n</other_entries>\n` : ''}\n<scene title="${sc.title}">\n${sc.text.trim()}\n</scene>\n\n${fr
+      ? 'Relève seulement ce que cette scène établit pour de bon, que la bible ne contient pas encore et que les scènes suivantes devront respecter : un fait durable nouveau sur une fiche existante ("target" = son slug ; mets seulement les faits nouveaux dans "facts", laisse "short" vide), ou un personnage, lieu, objet ou règle nommé pour la première fois et qui comptera encore ("target": null, avec "short"). Pas les humeurs, pas les gestes passagers, rien de ce que les fiches disent déjà. Quatre au plus. Une liste vide est la réponse habituelle.'
+      : 'List only what this scene establishes for good, that the bible doesn’t hold yet and that later scenes will have to respect: a lasting new fact about an existing entry ("target" = its slug; put only the new facts in "facts", leave "short" empty), or a character, place, object or rule named for the first time that will matter again ("target": null, with "short"). No moods, no passing gestures, nothing the entries already say. Four at most. An empty list is the usual answer.'}\nJSON: [{"target": "slug or null", "type": "${TYPES.join('|')}", "name": "...", "short": "...", "facts": ["..."], "why": "${fr ? 'les mots de la scène qui le disent' : 'the words of the scene that say so'}"}]`,
+  })
+  const list = parseJSON<Partial<Proposal>[]>(reply)
+  if (!Array.isArray(list) || useStore.getState().book?.root !== book.root) return
+  const waiting = useChat.getState().proposals
+  const fresh = readDrafts(useStore.getState().book!, list.slice(0, 4))
+    .filter(p => p.facts.length || p.short.trim())
+    .filter(p => !waiting.some(q => q.name === p.name && q.target === p.target && q.facts.join('|') === p.facts.join('|')))
+    .map(p => ({ ...p, why: `${sc.title}${p.why ? ` : ${p.why}` : ''}` }))
+  if (!fresh.length) return
+  useChat.setState(s => ({ proposals: [...s.proposals, ...fresh] }))
+  saveReview()
+}
+
 export async function turnIntoEntries() {
   const book = useStore.getState().book
   const { messages, interview } = useChat.getState()

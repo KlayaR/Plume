@@ -65,7 +65,9 @@ Rules:
 interface Story { before: string; selection: string; after: string }
 
 /** Where the scene stands in its chapter, for writing from the plan; in a web novel a chapter ends on a pull to the next. */
-export interface ScenePlace { range: [number, number]; first: boolean; last: boolean; serial?: boolean }
+export interface ScenePlace { range: [number, number]; first: boolean; last: boolean; serial?: boolean; part?: ScenePart }
+/** A long scene written in several parts: the beats of this part (1-based), out of how many. */
+export interface ScenePart { from: number; to: number; of: number }
 
 /** How a scene written from the plan is built, and how the chapter opens and lands when this scene holds its opening or its end. */
 function craft(lang: Lang, at: ScenePlace): string {
@@ -75,8 +77,9 @@ function craft(lang: Lang, at: ScenePlace): string {
     fr ? '- Donne au personnage du point de vue un but concret et immédiat dans cette scène (tiré de la note), pas la grande quête.' : '- Give the point-of-view character a concrete, immediate goal in this scene (from the note), not the big quest.',
     fr ? '- Chaque tentative complique la situation : « oui, mais… » ou « non, et en plus… ». Ne la résous pas trop facilement.' : '- Every attempt complicates things: “yes, but…” or “no, and what’s more…”. Don’t resolve it too easily.',
     fr ? '- Le monde se révèle dans l’action et la difficulté, jamais dans une pause pour l’expliquer.' : '- The world shows through action and struggle, never in a pause to explain it.',
-    at.first ? (fr ? '- Cette scène ouvre le chapitre : ancre-le tout de suite dans le présent (lieu, moment, un détail sensoriel), au plus près de ce qui dérange. Pas de réveil, pas de monologue, pas de résumé du chapitre précédent.' : '- This scene opens the chapter: anchor it at once in the now (place, time, a sensory detail), as close to the disruption as possible. No waking up, no long inner monologue, no recap of the previous chapter.') : '',
-    at.last && at.serial
+    at.first && (!at.part || at.part.from === 1) ? (fr ? '- Cette scène ouvre le chapitre : ancre-le tout de suite dans le présent (lieu, moment, un détail sensoriel), au plus près de ce qui dérange. Pas de réveil, pas de monologue, pas de résumé du chapitre précédent.' : '- This scene opens the chapter: anchor it at once in the now (place, time, a sensory detail), as close to the disruption as possible. No waking up, no long inner monologue, no recap of the previous chapter.') : '',
+    at.part && at.part.to < at.part.of ? ''
+    : at.last && at.serial
       ? (fr ? '- Cette scène termine un chapitre de web novel : finis sur ce qui donne envie de cliquer sur le suivant (un cliffhanger, une révélation, une question vive, la promesse de ce qui vient), à partir de la fin prévue s’il y en a une. Pas de résumé, pas de conclusion apaisée.' : '- This scene ends a web novel chapter: land it on what makes the reader click Next (a cliffhanger, a reveal, a sharp question, the promise of what comes), from the planned ending if there is one. No summary, no settled close.')
       : at.last
       ? (fr ? '- Cette scène termine le chapitre : finis sur un tournant (le problème réglé en révèle un pire, une révélation qui oblige à revoir le plan, ou pour un chapitre calme une image forte, une prise de conscience muette, une résolution), ou sur une question à laquelle le chapitre suivant répondra. Pas de suspense coupé en pleine action, pas de résumé.' : '- This scene ends the chapter: land it on a turn (the problem solved reveals a worse one, a revelation that forces a new plan, or in a quiet chapter a striking image, an unspoken realisation, a resolve), or on a question the next chapter will answer. No mid-action cliffhanger, no summary.')
@@ -130,6 +133,19 @@ export function taskMessage(lang: Lang, action: ActionId, instruction: string, s
   if (action === 'scene') {
     const [a, b] = at?.range ?? ai.chapterWords
     const range = fr ? `entre ${a} et ${b} mots environ` : `between about ${a} and ${b} words`
+    const part = at?.part
+    if (part) {
+      const beats = fr ? `les étapes ${part.from} à ${part.to}` : `beats ${part.from} to ${part.to}`
+      const pickup = story.before.trim() ? (fr ? ", en reprenant exactement là où le texte s'arrête, sans rien répéter" : ', picking up exactly where the story stops, repeating nothing') : ''
+      const body = part.to < part.of
+        ? (fr
+          ? `Cette scène s'écrit en plusieurs parties. Écris seulement cette partie : ${beats} de son plan (<scene>)${pickup}. Joue chacune de ces étapes en entier (ce que les personnages font et se disent, ce qui leur résiste) et n'ajoute aucun événement que le plan ne contient pas. Arrête-toi juste après l'étape ${part.to}, en pleine scène : pas de fin, pas de bilan, pas de regard vers la suite. Les étapes suivantes seront écrites après ; ne les commence pas. Longueur visée : ${range}.`
+          : `This scene is written in several parts. Write only this part: ${beats} of its plan (<scene>)${pickup}. Play each of these beats in full (what the characters do and say, what resists them) and add no event the plan doesn't hold. Stop right after beat ${part.to}, in mid-scene: no ending, no summing up, no look ahead. The following beats are written next; don't start them. Length to aim for: ${range}.`)
+        : (fr
+          ? `Cette scène s'écrit en plusieurs parties ; <story> finit sur ce qui est déjà écrit. Écris sa dernière partie : ${beats} de son plan (<scene>)${pickup}. Joue chaque étape en entier, mène la scène jusqu'à ce que sa note dit qui change, et termine là ; n'ajoute aucun événement que le plan ne contient pas. Longueur visée : ${range}.`
+          : `This scene is written in several parts; <story> ends with what is already written. Write its last part: ${beats} of its plan (<scene>)${pickup}. Play each beat in full, carry the scene to what its note says changes, and end there; add no event the plan doesn't hold. Length to aim for: ${range}.`)
+      return [storyBlock, `<task>\n${body}\n${craft(lang, at!)}${dir ? `\n${fr ? "Consigne de l'auteur" : "Author's direction"} : ${dir}` : ''}\n</task>`].join('\n\n')
+    }
     return [
       storyBlock,
       fr

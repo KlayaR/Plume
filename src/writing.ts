@@ -243,6 +243,8 @@ export function remember(sceneId: string | null) {
   memory = memory.then(async () => {
     if (useStore.getState().book?.root !== root) return
     await summarizeScene(sceneId).catch(() => {})
+    // What the scene establishes that the bible lacks, for the review list.
+    await import('./chat').then(m => m.watchBible(sceneId)).catch(() => {})
     const chapter = findScene(useStore.getState().book, sceneId)?.chapter
     if (chapter) await summarizeChapter(chapter.id).catch(() => {})
   })

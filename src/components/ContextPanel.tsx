@@ -50,6 +50,7 @@ export default function ContextPanel() {
   const running = useAI(s => s.running)
   const hasProposal = useAI(s => s.hasProposal)
   const checks = useAI(s => s.checks)
+  const facts = useAI(s => s.facts)
   const [action, setAction] = useState<Tab>('continue')
   const [text, setText] = useState<Record<Tab, string>>({ continue: '', rewrite: '', beats: '' })
   const [overrides, setOverrides] = useState<Record<string, Override>>({})
@@ -195,6 +196,19 @@ export default function ContextPanel() {
           {fixable(checks).length > 0 && (
             <button type="button" className="sk-btn sk-btn-sm" onClick={retryFixing}><Wand2 size={14} /> {t('Retry fixing these')}</button>
           )}
+        </section>
+      )}
+
+      {hasProposal && !running && facts === null && <p className="sk-hint">{t('Checking it against the bible…')}</p>}
+      {hasProposal && !running && facts && facts.length > 0 && (
+        <section className="pl-scorecard" aria-label={t('Against the bible')}>
+          <span className="sk-label">{t('Against the bible')}</span>
+          {facts.map((f, i) => (
+            <div key={i} className="pl-check pl-bad">
+              <CircleX size={13} />
+              <span className="pl-grow">{f.quote ? `« ${f.quote} » : ` : ''}{f.problem}</span>
+            </div>
+          ))}
         </section>
       )}
 

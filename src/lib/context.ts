@@ -7,7 +7,7 @@ import { isRewrite, type ActionId, type Book, type Entry, type FieldDef, type La
 import { fieldLines } from './fields'
 import { factApplies } from './bible'
 import { estimateTokens, fold, lastWords, firstWords } from './text'
-import { taskMessage, systemRules } from './prompts'
+import { taskMessage, systemRules, type ScenePart, type ScenePlace } from './prompts'
 import { expandVariables, promptFor, promptText } from './voice'
 import { aiBlocks } from './blocks'
 import { arcsOf, isLitRPG, isSerial, statsAt } from './serial'
@@ -95,6 +95,8 @@ export interface ContextInput {
   overrides: Record<string, Override>
   /** The scene being written: its title, time, place and card note go with the task. */
   scene?: Scene
+  /** A long scene written in several parts: which beats this request writes. */
+  part?: ScenePart
 }
 
 export interface Built {
@@ -334,6 +336,13 @@ export function outlineLines(book: Book, sc: Scene, lang: Lang): string[] {
   ].filter(Boolean)
 }
 
+/** The place of one part of a scene: its share of the scene's length, by its share of the beats. */
+function partPlace(at: ScenePlace, part?: ScenePart): ScenePlace {
+  if (!part) return at
+  const share = (part.to - part.from + 1) / part.of
+  return { ...at, part, range: [Math.round(at.range[0] * share / 50) * 50, Math.round(at.range[1] * share / 50) * 50] }
+}
+
 /** The length to aim for, and whether the scene opens or closes its chapter. */
 export function scenePlace(book: Book, sceneId: string): { range: [number, number]; first: boolean; last: boolean; serial: boolean } {
   const scenes = book.chapters.find(c => c.scenes.some(s => s.id === sceneId))?.scenes ?? []
@@ -460,7 +469,7 @@ export function buildContext(input: ContextInput): Built {
     told ? `<chapter_so_far>\n${told}\n</chapter_so_far>` : '',
     edges,
     info ? `<scene>\n${info}\n</scene>` : '',
-    taskMessage(lang, input.action, input.instruction, story, ai, sc ? scenePlace(book, sc.id) : undefined),
+    taskMessage(lang, input.action, input.instruction, story, ai, sc ? partPlace(scenePlace(book, sc.id), input.part) : undefined),
     !isRewrite(input.action) && (edges || sc?.note?.trim() || sc?.beats?.length) ? SCOPE[lang] : '',
   ].filter(Boolean).join('\n\n')
   const parts = {

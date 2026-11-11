@@ -247,6 +247,12 @@ function ClaudeTab() {
       <SettingRow label={t('Keep the story memory up to date')} description={t('When you leave a scene you changed, a small job summarises it, then its chapter. Claude reads these summaries to know what already happened in the book.')}>
         <Switch checked={prefs.memory} onChange={v => setPrefs({ memory: v })} label={t('Keep the story memory up to date')} />
       </SettingRow>
+      <SettingRow label={t('Keep the bible up to date')} description={t('After a scene joins the story memory, a small job lists what it establishes that the bible doesn’t hold yet (a new fact, a new name). The drafts wait in Bible → To review; nothing changes without you.')}>
+        <Switch checked={prefs.bibleWatch} onChange={v => setPrefs({ bibleWatch: v })} label={t('Keep the bible up to date')} />
+      </SettingRow>
+      <SettingRow label={t('Check Claude’s text against the bible')} description={t('When Claude finishes a proposal, a small job compares it with the bible entries it was sent and lists contradictions under the proposal, before you accept.')}>
+        <Switch checked={prefs.factCheck} onChange={v => setPrefs({ factCheck: v })} label={t('Check Claude’s text against the bible')} />
+      </SettingRow>
     </SettingsSection>
     <ModelPresetsSection />
     </>
@@ -306,6 +312,12 @@ function BookTab() {
       </SettingRow>
       <SettingRow label={t('How you plan')} description={t('Your own way of planning, in your own words (“chapters end on a cliffhanger”, “two points of view that alternate”). It goes with every planning request and wins over Plume’s rules.')}>
         <textarea className="sk-input" rows={3} value={ai.planStyle ?? ''} onChange={e => setAi({ planStyle: e.target.value })} />
+      </SettingRow>
+      <SettingRow label={t('Write long scenes in several parts')} description={t('A scene with six beats or more is written a few beats at a time, in one proposal, so each beat is played in full and the end isn’t rushed. It takes one request per part.')}>
+        <Switch checked={ai.movements !== false} onChange={v => setAi({ movements: v })} label={t('Write long scenes in several parts')} />
+      </SettingRow>
+      <SettingRow label={t('Samples of your prose')} description={t('How many words of your own writing go with each request, as the voice to match (scenes you marked as your voice, your excerpts, your revised scenes). Sent once, then read from the cache.')}>
+        <span className="pl-row"><input className="sk-input pl-num" type="number" min={0} max={20000} step={500} value={ai.sampleWords ?? 6000} onChange={e => setAi({ sampleWords: Math.max(0, Math.min(20000, Number(e.target.value) || 0)) })} /><span>{t('words')}</span></span>
       </SettingRow>
       <SettingRow label={t('Words a day')}>
         <input className="sk-input pl-num" type="number" min={0} step={100} value={goal.daily} onChange={e => setGoal({ daily: Math.max(0, Number(e.target.value) || 0) })} />

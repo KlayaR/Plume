@@ -389,6 +389,8 @@ export interface BookMeta {
     planStyle?: string
     /** Words of your own prose sent as samples of your voice (cached, so cheap after the first request). */
     sampleWords?: number
+    /** A scene with six beats or more is written in several parts, a few beats each (on unless false). */
+    movements?: boolean
   }
   voice: Voice
   structure: { template: string; beats: Beat[] }

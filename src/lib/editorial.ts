@@ -70,3 +70,13 @@ export function readNudges(raw: unknown): Nudge[] {
     return text ? [{ kind: o.kind === 'question' ? 'question' as const : 'beat' as const, text }] : []
   })
 }
+
+/**
+ * A long scene is written in parts of about three beats, so each is played in full instead of
+ * the last ones being rushed. Six beats or more: the parts as [first, last] beats, 1-based.
+ */
+export function movementsOf(beats: number): [number, number][] {
+  if (beats < 6) return []
+  const parts = Math.max(2, Math.round(beats / 3))
+  return Array.from({ length: parts }, (_, i) => [Math.floor(i * beats / parts) + 1, Math.floor((i + 1) * beats / parts)] as [number, number])
+}

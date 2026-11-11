@@ -31,7 +31,7 @@ import { adverbs, passives, echoes, sentences } from './analysis'
 import { backupsToRemove, versionsToRemove } from './backups'
 import { bookRepeats } from './repeats'
 import { promiseList } from './promises'
-import { driftText, dropsOf, manuscriptText, nudgeMessage, readCurve, readNudges } from './editorial'
+import { driftText, dropsOf, manuscriptText, movementsOf, nudgeMessage, readCurve, readNudges } from './editorial'
 import { aiTells, checkRules, expandVariables } from './voice'
 import { review, reviewChecks, topProblems } from './review'
 import { applyFixes, fixGuard, fixRequest, placeFixes } from './fixes'
@@ -2033,6 +2033,26 @@ describe('whole-book reads', () => {
     expect(m).not.toContain('Continue.')
     expect(m).toContain('Do not write the next part')
     expect(readNudges([{ kind: 'beat', text: 'She opens it.' }, { kind: 'question', text: 'Why now?' }, { text: '' }])).toEqual([{ kind: 'beat', text: 'She opens it.' }, { kind: 'question', text: 'Why now?' }])
+  })
+})
+
+describe('long scenes in parts', () => {
+  it('splits six beats or more into parts of about three, covering every beat once', () => {
+    expect(movementsOf(5)).toEqual([])
+    expect(movementsOf(6)).toEqual([[1, 3], [4, 6]])
+    expect(movementsOf(10)).toEqual([[1, 3], [4, 6], [7, 10]])
+  })
+  it('asks for a part without an ending, then for the last part with one', () => {
+    const b = bookOf([scene('a', '', { note: 'She steals the key.', beats: ['1', '2', '3', '4', '5', '6'] })])
+    const ask = (from: number, to: number, before: string) => buildContext({ book: b, chapter: 1, pov: null, action: 'scene', instruction: '', before, selection: '', after: '', overrides: {}, scene: b.chapters[0].scenes[0], part: { from, to, of: 6 } }).message
+    const first = ask(1, 3, '')
+    expect(first).toContain('beats 1 to 3')
+    expect(first).toContain('no ending')
+    expect(first).not.toContain('This scene ends the chapter')
+    const last = ask(4, 6, 'What was written.')
+    expect(last).toContain('Write its last part: beats 4 to 6')
+    expect(last).toContain('This scene ends the chapter')
+    expect(last).not.toContain('This scene opens the chapter')
   })
 })
 

@@ -130,6 +130,10 @@ export interface Prefs {
   roles: Record<Role, RoleModel>
   /** Story memory: a scene you leave after changing it gets its summary (quick model), so Claude knows what happened. */
   memory: boolean
+  /** After a scene joins the story memory, what it establishes that the bible lacks is drafted for your review (quick model). */
+  bibleWatch: boolean
+  /** Each proposal Claude writes is checked against the bible entries it was sent (quick model). */
+  factCheck: boolean
   /** Model presets (a named backend, model and effort), and when OpenRouter takes over from the claude command line. */
   presets: Preset[]
   fallback: Fallback
@@ -209,6 +213,8 @@ export const DEFAULT_PREFS: Prefs = {
   autoCapital: true,
   roles: DEFAULT_ROLES,
   memory: true,
+  bibleWatch: true,
+  factCheck: true,
   presets: DEFAULT_PRESETS,
   fallback: 'off',
   fallbackPreset: '',

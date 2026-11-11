@@ -7,7 +7,8 @@ import { buildContext, scenePlace, systemPrompt, type Built, type Override } fro
 import { reviewChecks } from '../lib/review'
 import { checkRules, fixable, fixDirection, type Check } from '../lib/voice'
 import { ask, effective, isCheap, parseJSON, stopAsk } from '../ai'
-import { nudgeMessage, readNudges, type Nudge } from '../lib/editorial'
+import { movementsOf, nudgeMessage, readNudges, type Nudge } from '../lib/editorial'
+import type { ScenePart } from '../lib/prompts'
 import { diffWords, noteTaste } from '../writing'
 import { hunksOf } from '../lib/hunks'
 import { newId } from '../lib/text'
@@ -35,18 +36,21 @@ interface AIState {
   checks: Check[]
   /** Tracked changes waiting in the scene you are in. */
   changes: number
+  /** What the proposal on screen contradicts in the bible entries it was sent; null while it is being checked. */
+  facts: BibleSlip[] | null
 }
-export const useAI = create<AIState>(() => ({ running: null, hasProposal: false, last: null, checks: [], changes: 0 }))
+export interface BibleSlip { quote: string; problem: string }
+export const useAI = create<AIState>(() => ({ running: null, hasProposal: false, last: null, checks: [], changes: 0, facts: [] }))
 
 export const syncProposalState = () => {
   const has = !!view?.state.field(proposalField, false)
-  if (useAI.getState().hasProposal !== has) useAI.setState({ hasProposal: has, ...(has ? {} : { checks: [] }) })
+  if (useAI.getState().hasProposal !== has) useAI.setState({ hasProposal: has, ...(has ? {} : { checks: [], facts: [] }) })
   const changes = view?.state.field(changesField, false)?.length ?? 0
   if (useAI.getState().changes !== changes) useAI.setState({ changes })
 }
 
 /** The request as it would be sent now, for the size meter and the preview. */
-export function currentContext(action: ActionId, instruction: string, overrides: Record<string, Override>): (Built & { from: number; to: number }) | null {
+export function currentContext(action: ActionId, instruction: string, overrides: Record<string, Override>, part?: { written: string; beats: ScenePart }): (Built & { from: number; to: number }) | null {
   const { book, sceneId } = useStore.getState()
   const found = findScene(book, sceneId)
   if (!book || !found || !view) return null
@@ -65,7 +69,9 @@ export function currentContext(action: ActionId, instruction: string, overrides:
     pov: found.scene.pov,
     action,
     instruction,
-    before: doc.sliceString(0, from),
+    // A later part of a long scene: what the earlier parts wrote is the story so far.
+    before: doc.sliceString(0, from) + (part?.written ? `\n\n${part.written}` : ''),
+    part: part?.beats,
     selection: isRewrite(action) ? doc.sliceString(from, to) : '',
     after: rewrite ? doc.sliceString(to, Math.min(doc.length, to + 3000)) : '',
     overrides,
@@ -123,11 +129,16 @@ export async function runAction(action: ActionId, instruction: string, overrides
   if (isRewrite(action) && view.state.selection.main.empty) return st.notify('warn', t('Select the passage to rewrite first.'))
   if (action === 'beats' && !instruction.trim()) return st.notify('warn', t('Write the beats first, one per line.'))
   if (action === 'scene' && !findScene(st.book, st.sceneId)?.scene.note?.trim() && !findScene(st.book, st.sceneId)?.scene.beats?.length) return st.notify('warn', t('Give this scene a note in the Plan first: Claude writes it from that note.'))
-  const ctx = currentContext(action, instruction, overrides)
+  // A long scene (six beats or more) is written in parts of about three beats, each played in full.
+  const beats = action === 'scene' && st.book.meta.ai.movements !== false ? here?.scene.beats?.length ?? 0 : 0
+  const parts = movementsOf(beats)
+  const beatsOf = (k: number): ScenePart => ({ from: parts[k][0], to: parts[k][1], of: beats })
+  const ctx = currentContext(action, instruction, overrides, parts.length ? { written: '', beats: beatsOf(0) } : undefined)
   if (!ctx) return
   useAI.setState({ last: { action, instruction, overrides } })
   const sid = st.sceneId
-  await stream(action, ctx.from, ctx.to, ctx.system, ctx.message, sid ?? undefined)
+  await stream(action, ctx.from, ctx.to, ctx.system, ctx.message, sid ?? undefined,
+    parts.length ? (written, k) => (k < parts.length ? currentContext(action, instruction, overrides, { written, beats: beatsOf(k) })?.message ?? null : null) : undefined)
 }
 
 const wordCount = (s: string) => (s.match(/\S+/g) ?? []).length
@@ -163,8 +174,36 @@ export function takeProposal(sceneId: string) { const p = kept.get(sceneId); kep
 /** A new book: what was kept for the last one goes. */
 export const forgetProposals = () => kept.clear()
 
-/** Streams a reply into a proposal between from and to, then scores it. */
-async function stream(action: ActionId, from: number, to: number, system: string, message: string, sceneId?: string) {
+/**
+ * Compares a proposal with the bible entries that went with its request (the <bible> block),
+ * on the quick model, and lists what contradicts them under the proposal.
+ */
+async function checkAgainstBible(message: string, written: string, lang: Lang) {
+  const bible = /<bible>[\s\S]*?<\/bible>/.exec(message)?.[0]
+  if (!bible || useStore.getState().prefs.factCheck === false || !view) return
+  const fr = lang === 'fr'
+  const v = view
+  useAI.setState({ facts: null })
+  try {
+    const reply = await ask({ json: 'list', role: 'quick',
+      system: fr ? 'Tu compares un passage de roman avec sa bible. Réponds uniquement en JSON valide, en français.' : 'You compare a passage of a novel with its story bible. Reply with valid JSON only.',
+      message: `${bible}\n\n<passage>\n${written}\n</passage>\n\n${fr
+        ? 'Relève seulement ce que le passage contredit clairement dans la bible : un fait, un nom, un âge, une couleur, un lien entre personnages, un lieu, une règle du monde, ce qu’un personnage sait ou ignore. Pas le style, pas ce que la bible ne dit pas. "quote" = les mots exacts du passage. Liste vide s’il n’y a rien.'
+        : 'List only what the passage clearly contradicts in the bible: a fact, a name, an age, a colour, a relationship, a place, a rule of the world, what a character knows or does not know. Not style, not what the bible is silent on. "quote" = the exact words of the passage. An empty list if there is nothing.'}\nJSON: [{"quote": "...", "problem": "..."}]`,
+    })
+    const list = parseJSON<Partial<BibleSlip>[]>(reply)
+    // Only if that proposal is still the one on screen.
+    const p = view === v ? v.state.field(proposalField, false) : null
+    useAI.setState({ facts: p && p.text.trim() === written && Array.isArray(list) ? list.filter(x => x?.problem).map(x => ({ quote: String(x.quote ?? ''), problem: String(x.problem) })) : [] })
+  } catch { useAI.setState({ facts: [] }) }
+}
+
+/**
+ * Streams a reply into a proposal between from and to, then scores it. A long scene comes
+ * in parts: `next` gives the request for part k from what is written so far (null: done),
+ * and each part is appended to the same proposal.
+ */
+async function stream(action: ActionId, from: number, to: number, system: string, message: string, sceneId?: string, next?: (written: string, k: number) => string | null) {
   if (!view) return
   const chosen = assistantChoice(action)
   const settings = effective(chosen.model, chosen.effort)
@@ -172,27 +211,39 @@ async function stream(action: ActionId, from: number, to: number, system: string
   const sid = sceneId ?? useStore.getState().sceneId
   v.dispatch({ effects: setProposal.of({ from, to, text: '', streaming: true }) })
   useAI.setState({ hasProposal: true, running: 'starting', checks: [] })
+  const go = async (msg: string, k: number, earlier: string) => {
   const id = await runLLM(
-    { model: settings.model, effort: settings.effort, orModel: chosen.orModel, system, message },
+    { model: settings.model, effort: settings.effort, orModel: chosen.orModel, system, message: msg },
     // The reply goes to the scene it was asked for, even if another scene is active by now.
     text => { if (v.dom.isConnected) v.dispatch({ effects: appendProposal.of(text) }) },
     r => {
       useAI.setState({ running: null })
       if (r.usage) useStore.getState().recordUsage(r.usage)
       if (!r.ok && !r.stopped) useStore.getState().notify('error', r.error ?? t('The request failed.'))
-      const written = r.text.trim()
+      const written = [earlier, r.text.trim()].filter(Boolean).join('\n\n')
       // Its scene was closed while Claude wrote: the proposal waits for it.
       if (!v.dom.isConnected) { if (sid && written) keepProposal(sid, { from, to, text: written }); syncProposalState(); return }
+      // The next part of a long scene, in the same proposal.
+      const more = r.ok && !r.stopped && r.text.trim() && next ? next(written, k + 1) : null
+      if (more) {
+        v.dispatch({ effects: appendProposal.of('\n\n') })
+        useAI.setState({ running: 'starting' })
+        go(more, k + 1, written)
+        return
+      }
       const b = useStore.getState().book
       if (written) {
         v.dispatch({ effects: endStream.of(null) })
         if (b) useAI.setState({ checks: scorecard(written, b) })
         if (b && sceneId && action === 'scene' && r.ok && !r.stopped) sayIfShort(b, sceneId, written)
+        if (b && r.ok && !r.stopped) checkAgainstBible(message, written, b.meta.language)
       } else discardProposal(v)
       syncProposalState()
     },
   )
   if (useAI.getState().running === 'starting') useAI.setState({ running: id })
+  }
+  await go(message, 0, '')
 }
 
 // A timer, not requestAnimationFrame: frames don't come while the window is hidden or minimised.
