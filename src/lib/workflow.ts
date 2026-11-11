@@ -6,7 +6,7 @@ import { findEntrySlug } from './outline'
 
 /** A check that was run: when, and how many things it found. */
 export interface Mark { date: string; found: number }
-export interface ReadyItem { kind: string; n?: number; title: string; fix: string }
+export interface ReadyItem { kind: string; n?: number; title: string; fix: string; done?: boolean }
 export interface ReadyReport { date: string; ready: boolean; verdict: string; items: ReadyItem[] }
 /** What is remembered between sessions, in .plume/workflow.json.md. */
 export interface Marks { outlineCheck?: Mark; bibleCheck?: Mark; ready?: ReadyReport }
@@ -63,4 +63,64 @@ export function readReady(raw: unknown, chapters: number): Omit<ReadyReport, 'da
   if (!verdict && !items.length && typeof o.ready !== 'boolean') return null
   // Ready only if Claude says so and lists nothing that blocks.
   return { ready: o.ready === true && !items.length, verdict, items }
+}
+
+// --- Fixing what the report found -----------------------------------------------------------
+
+/**
+ * How each line of the report gets fixed. A chapter is detailed (its scenes kept) or redone
+ * (only when nothing in it is written yet), with the report's fix as the direction; what the
+ * bible lacks is drafted into the review list; what spans the book (an arc, a thread, a
+ * contradiction, an item with no chapter) goes to Revise the outline. Nothing is applied:
+ * each fix comes back as a proposal to accept.
+ */
+export type FixStep =
+  | { kind: 'chapter'; chapterId: string; mode: 'detail' | 'regenerate'; direction: string }
+  | { kind: 'bible'; line: string }
+  | { kind: 'revise'; line: string }
+
+export function gapFix(book: Book, g: Gap): FixStep | null {
+  const c = g.chapterId ? book.chapters.find(x => x.id === g.chapterId) : undefined
+  switch (g.code) {
+    case 'noplan': return c ? { kind: 'chapter', chapterId: c.id, mode: c.scenes.some(s => s.text.trim()) ? 'detail' : 'regenerate', direction: '' } : null
+    case 'nogoal': case 'nobeats': case 'nopov': return c ? { kind: 'chapter', chapterId: c.id, mode: 'detail', direction: '' } : null
+    case 'noentry': return { kind: 'bible', line: `Create an entry for "${g.name}" (named in ${g.count} scenes).` }
+    case 'novoice': return { kind: 'bible', line: `Add a voice card to "${g.name}" (how they speak), as an addition to their entry.` }
+  }
+}
+
+export function itemFix(book: Book, x: ReadyItem): FixStep | null {
+  const line = `${x.title}${x.fix ? ` → ${x.fix}` : ''}`
+  if (x.kind === 'bible') return { kind: 'bible', line }
+  const c = x.kind === 'chapter' && x.n ? book.chapters[x.n - 1] : undefined
+  if (c) return { kind: 'chapter', chapterId: c.id, mode: c.scenes.some(s => s.text.trim()) ? 'detail' : 'regenerate', direction: line }
+  return { kind: 'revise', line: x.n ? `Chapter ${x.n}: ${line}` : line }
+}
+
+/** Every fix at once: one request per chapter (its directions joined, redone if any step asks for it), one for the bible, one revision. */
+export function fixPlan(book: Book, found: Gap[], items: ReadyItem[]): { chapters: Extract<FixStep, { kind: 'chapter' }>[]; bible: string[]; revise: string[] } {
+  const steps = [...found.map(g => gapFix(book, g)), ...items.filter(x => !x.done).map(x => itemFix(book, x))].filter((x): x is FixStep => !!x)
+  const chapters = new Map<string, Extract<FixStep, { kind: 'chapter' }>>()
+  const bible: string[] = [], revise: string[] = []
+  for (const st of steps) {
+    if (st.kind === 'bible') bible.push(st.line)
+    else if (st.kind === 'revise') revise.push(st.line)
+    else {
+      const was = chapters.get(st.chapterId)
+      chapters.set(st.chapterId, was
+        ? { ...was, mode: was.mode === 'regenerate' || st.mode === 'regenerate' ? 'regenerate' : 'detail', direction: [was.direction, st.direction].filter(Boolean).join('\n') }
+        : st)
+    }
+  }
+  // In the book's order.
+  const order = new Map(book.chapters.map((c, i) => [c.id, i]))
+  return { chapters: [...chapters.values()].sort((a, b) => (order.get(a.chapterId) ?? 0) - (order.get(b.chapterId) ?? 0)), bible: [...new Set(bible)], revise }
+}
+
+/** The entry a line names, if one of the bible's names (or aliases) is in it. */
+export function entryIn(book: Book, text: string): string | null {
+  const low = text.toLowerCase()
+  const hit = book.entries.filter(e => NAMED.includes(e.type)).map(e => ({ e, names: [e.name, ...e.aliases].map(a => a.replace(/!$/, '')).filter(a => a.length >= 3) }))
+    .find(x => x.names.some(n => low.includes(n.toLowerCase())))
+  return hit?.e.slug ?? null
 }

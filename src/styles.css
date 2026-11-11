@@ -1194,6 +1194,10 @@ body.pl-typing .pl-draftbar { opacity: 0.08; }
 .cm-ed-pacing { --ed: #5f86b0; } .cm-ed-dialogue { --ed: #5fa58a; } .cm-ed-strong { --ed: #d39b3a; } .cm-ed-choice { --ed: #4fa3a8; } .cm-ed-repetition { --ed: #b05f96; }
 .pl-edit-loop { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; padding: 8px 10px; margin-bottom: 10px; border: 1px solid var(--border); border-radius: 6px; }
 .pl-flow-list { margin: 8px 0 0; padding-left: 18px; font-size: var(--fs-sm); display: flex; flex-direction: column; gap: 3px; }
+.pl-ready-list { list-style: none; padding-left: 0; gap: 2px; }
+.pl-ready-row { display: flex; gap: 8px; align-items: baseline; padding: 4px 0; border-top: 1px solid var(--border); }
+.pl-ready-row.pl-done > .pl-grow { text-decoration: line-through; opacity: 0.55; }
+.pl-ready-acts { flex: none; display: flex; gap: 4px; }
 .pl-ol-steps { display: flex; flex-wrap: wrap; gap: 6px; }
 .pl-pitch { margin: 6px 0 12px; }
 .pl-pitch .pl-letter-text { max-height: 16rem; }

@@ -22,8 +22,9 @@ import { askText, showMenu } from '../contextMenu'
 import { chapterMenu, sceneMenu } from '../menus'
 import { numLocale, useT } from '../i18n'
 import OutlineList from './OutlineList'
-import { runBibleCheck, runOutlineCheck, runReady, useFlow } from '../workflow'
-import { gaps, type Gap, type Mark } from '../lib/workflow'
+import { fixAll, fixGap, fixItem, markReadyDone, runBibleCheck, runOutlineCheck, runReady, useFlow } from '../workflow'
+import { entryIn, gaps, type Gap, type Mark } from '../lib/workflow'
+import { findEntrySlug } from '../lib/outline'
 
 /** What is open for editing: a scene's id, or "ch:" + a chapter's id for its goal and ending. One at a time. */
 const useEditing = create<{ id: string | null }>(() => ({ id: null }))
@@ -173,7 +174,7 @@ function ChapterBlock({ book, c, n, label, open, onFold }: { book: Book; c: Chap
   const versions = useOutline(s => s.versions[c.id] ?? [])
   const showVersions = useOutline(s => s.versionsOf === c.id)
   return (
-    <section className="pl-ol-ch" onContextMenu={more}>
+    <section className="pl-ol-ch" id={`ol-${c.id}`} onContextMenu={more}>
       <header className="pl-ol-chhead">
         <button type="button" className="pl-quiet" onClick={onFold} aria-expanded={open}>{open ? <ChevronDown size={15} /> : <ChevronRight size={15} />}</button>
         <span className="pl-ol-num">{label}</span>
@@ -409,7 +410,8 @@ function RevisePanel({ book }: { book: Book }) {
   const t = useT()
   const busy = useOutline(s => s.busy)
   const rev = useOutline(s => s.revision)
-  const [text, setText] = useState('')
+  const [text, setText] = useState(() => useOutline.getState().reviseDraft ?? '')
+  useEffect(() => { useOutline.setState({ reviseDraft: undefined }) }, [])
   /** Changes the author unticked: a chapter's key, "rm:" + an id, "order". */
   const [off, setOff] = useState<Set<string>>(new Set())
   useEffect(() => setOff(new Set()), [rev])
@@ -637,13 +639,15 @@ function StorySection({ book }: { book: Book }) {
   )
 }
 
-/** Ready to write? What the outline and the bible still lack: found here for free, then by Claude. */
+/** Ready to write? What the outline and the bible still lack: found here for free, then by Claude. Each line can be fixed, or all at once. */
 function ReadyPanel({ book }: { book: Book }) {
   const box = useRef<HTMLElement>(null)
   // Opened from the bar above: brought into view, whatever was scrolled to before.
   useEffect(() => { box.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }) }, [])
   const report = useFlow(s => s.marks.ready)
   const busy = useFlow(s => s.busy)
+  const progress = useFlow(s => s.progress)
+  const planBusy = useOutline(s => s.busy)
   const t = useT()
   const free = useMemo(() => gaps(book), [book])
   const gapText = (g: Gap) => ({
@@ -654,21 +658,42 @@ function ReadyPanel({ book }: { book: Book }) {
     noentry: t('{name} is in {k} scenes and has no bible entry.', { name: g.name ?? '', k: g.count ?? 0 }),
     novoice: t('{name} is in {k} scenes and has no voice card.', { name: g.name ?? '', k: g.count ?? 0 }),
   })[g.code]
+  const toChapter = (id?: string) => { if (id) document.getElementById(`ol-${id}`)?.scrollIntoView({ block: 'start', behavior: 'smooth' }) }
+  const toEntry = (slug: string | null) => { if (slug) useStore.getState().showEntry(slug) }
+  const where = (g: Gap) => g.chapterId ? () => toChapter(g.chapterId) : g.code === 'novoice' ? () => toEntry(findEntrySlug(book, g.name, ['character'])) : null
+  const whereItem = (x: { n?: number; title: string; fix: string; kind: string }) => {
+    if (x.kind === 'bible' || !x.n) { const slug = entryIn(book, `${x.title} ${x.fix}`); return slug ? () => toEntry(slug) : null }
+    return () => toChapter(book.chapters[x.n! - 1]?.id)
+  }
+  const working = !!busy || !!planBusy
+  const open = (report?.items.filter(x => !x.done).length ?? 0) + free.length
+  const row = (key: string, text: React.ReactNode, go: (() => void) | null, fix: () => void, done?: { on: boolean; toggle: () => void }) => (
+    <li key={key} className={`pl-ready-row ${done?.on ? 'pl-done' : ''}`}>
+      <span className="pl-grow">{text}</span>
+      <span className="pl-ready-acts">
+        {go && <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm" onClick={go}>{t('Go to')}</button>}
+        {!done?.on && <button type="button" className="sk-btn sk-btn-sm" disabled={working} title={t('Claude proposes the fix: a chapter to accept in the outline, an entry in Bible → To review, or changes to tick in Revise the outline')} onClick={fix}>{t('Fix')}</button>}
+        {done && <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm" onClick={done.toggle}>{done.on ? t('Reopen') : t('Done')}</button>}
+      </span>
+    </li>
+  )
   return (
     <section className="pl-ol-issues" ref={box}>
       <div className="pl-row">
         <b className="pl-grow">{t('Ready to write?')}</b>
-        <button type="button" className="sk-btn sk-btn-sm sk-btn-primary" disabled={!!busy} onClick={runReady}>{busy === 'ready' ? t('Checking…') : report ? t('Check again') : t('Check everything')}</button>
+        {open > 0 && <button type="button" className="sk-btn sk-btn-sm sk-btn-primary" disabled={working} title={t('Claude proposes a fix for every line: one request per chapter, one for the bible, one revision of the outline. Nothing changes until you accept.')} onClick={fixAll}>{busy === 'fix' ? t('Fixing…') : t('Fix all')}</button>}
+        <button type="button" className={`sk-btn sk-btn-sm ${open ? '' : 'sk-btn-primary'}`} disabled={working} onClick={runReady}>{busy === 'ready' ? t('Checking…') : report ? t('Check again') : t('Check everything')}</button>
         <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm" onClick={() => useFlow.setState({ open: false })}>{t('Close')}</button>
       </div>
+      {busy === 'fix' && progress && <p className="sk-hint">{progress}</p>}
       <p className="sk-hint">{t('What the outline and the bible still lack before the book is written chapter by chapter. The first lines are found on this computer; Check everything has Claude read the outline and the bible.')}</p>
-      {free.length > 0 && <ul className="pl-flow-list">{free.map((g, i) => <li key={i}>{gapText(g)}</li>)}</ul>}
+      {free.length > 0 && <ul className="pl-flow-list pl-ready-list">{free.map((g, i) => row(`g${i}`, gapText(g), where(g), () => fixGap(g)))}</ul>}
       {!free.length && !report && <p className="sk-hint">{t('Nothing found without Claude.')}</p>}
       {report && (
         <>
           <p><b>{report.ready ? t('Ready.') : t('Not ready yet.')}</b> {report.verdict} <span className="sk-hint">({new Date(report.date).toLocaleDateString(numLocale())})</span></p>
-          <ul className="pl-flow-list">
-            {report.items.map((x, i) => <li key={i}><b>{x.n ? `${t('Chapter')} ${x.n} · ` : ''}{x.title}</b>{x.fix ? <span className="sk-hint"> {x.fix}</span> : null}</li>)}
+          <ul className="pl-flow-list pl-ready-list">
+            {report.items.map((x, i) => row(`r${i}`, <><b>{x.n ? `${t('Chapter')} ${x.n} · ` : ''}{x.title}</b>{x.fix ? <span className="sk-hint"> {x.fix}</span> : null}</>, whereItem(x), () => fixItem(x, i), { on: !!x.done, toggle: () => markReadyDone(i, !x.done) }))}
           </ul>
         </>
       )}

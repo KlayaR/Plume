@@ -31,7 +31,7 @@ import { adverbs, passives, echoes, openingKind, pronounRuns, sameOpenings, sens
 import { backupsToRemove, versionsToRemove } from './backups'
 import { bookRepeats } from './repeats'
 import { promiseList } from './promises'
-import { gaps, readReady } from './workflow'
+import { entryIn, fixPlan, gaps, itemFix, readReady } from './workflow'
 import { contextOf, editBook, fixFirst, ignoreKey, ignored, readabilityScore, sceneMarks, scoreOf } from './editing'
 import { holds } from '../edit'
 import { chosenScenes, driftText, dropsOf, manuscriptText, movementsOf, nudgeMessage, readCurve, readNudges, readPitch } from './editorial'
@@ -2294,5 +2294,42 @@ describe('0.54: senses, openings and names written two ways', () => {
     expect(found.map(f => text.slice(f.from, f.to))).toEqual(['Elise', 'Grand Duc'])
     expect(found.map(f => f.note)).toEqual(['Élise', 'Grand-Duc'])
     expect(spellingVariants('Marc Delorme entra. Marc sortit.')).toEqual([])
+  })
+})
+
+describe('0.55: fixing what Ready to write? found', () => {
+  const planned = (id: string, over: Partial<Scene> = {}) => scene(id, '', { note: 'Something happens.', ...over })
+  const three = (b: Book, make: (i: number) => Scene[]) => { b.chapters = [1, 2, 3].map(i => ({ ...b.chapters[0], id: `c${i}`, title: `Ch ${i}`, scenes: make(i) })); return b }
+  it('sends each line where it is fixed: a chapter, the bible, or the outline revision', () => {
+    const b = three(bookOf([], [elise]), i => i === 1 ? [scene('w', 'Written.', { note: 'n' })] : [planned(`s${i}`)])
+    expect(itemFix(b, { kind: 'chapter', n: 2, title: 'Thin', fix: 'Add a turn' })).toEqual({ kind: 'chapter', chapterId: 'c2', mode: 'regenerate', direction: 'Thin → Add a turn' })
+    // A chapter with written text is detailed, never redone.
+    expect(itemFix(b, { kind: 'chapter', n: 1, title: 'Thin', fix: '' })).toMatchObject({ mode: 'detail' })
+    expect(itemFix(b, { kind: 'bible', n: 1, title: 'No entry for the stranger', fix: 'Create it' })).toEqual({ kind: 'bible', line: 'No entry for the stranger → Create it' })
+    expect(itemFix(b, { kind: 'arc', n: 3, title: 'Marc has no arc', fix: 'Give him one' })).toEqual({ kind: 'revise', line: 'Chapter 3: Marc has no arc → Give him one' })
+  })
+  it('fixes everything with one request per chapter, one for the bible and one revision', () => {
+    const b = three(bookOf([], [elise]), i => [planned(`s${i}`, { cast: ['Marc'] })])
+    const found = gaps(b)
+    const plan = fixPlan(b, found, [
+      { kind: 'chapter', n: 2, title: 'Thin', fix: 'Add a turn' },
+      { kind: 'chapter', n: 2, title: 'No stakes', fix: 'Raise them' },
+      { kind: 'bible', title: 'Fire magic is vague', fix: 'Say its cost' },
+      { kind: 'thread', title: 'The threat is dropped', fix: 'Keep it' },
+      { kind: 'chapter', n: 3, title: 'Done already', fix: '', done: true },
+    ])
+    expect(plan.chapters.map(c => c.chapterId)).toEqual(['c1', 'c2', 'c3'])
+    const c2 = plan.chapters.find(c => c.chapterId === 'c2')!
+    expect(c2.mode).toBe('regenerate')
+    expect(c2.direction).toBe('Thin → Add a turn\nNo stakes → Raise them')
+    expect(plan.bible).toContain('Fire magic is vague → Say its cost')
+    expect(plan.bible.some(l => l.includes('"Marc"'))).toBe(true)
+    expect(plan.revise).toEqual(['The threat is dropped → Keep it'])
+  })
+  it('finds the entry a line is about', () => {
+    const b = bookOf([], [elise, aube])
+    expect(entryIn(b, 'Lise has no voice card')).toBe('elise')
+    expect(entryIn(b, 'The sword Aube needs a rule')).toBe('aube')
+    expect(entryIn(b, 'The stranger has no entry')).toBeNull()
   })
 })

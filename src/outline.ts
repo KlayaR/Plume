@@ -31,6 +31,8 @@ export const useOutline = create<{
   /** Revise the outline: the panel is open, and Claude's changes to tick. */
   revising: boolean
   revision: OutlineRevision | null
+  /** A text to put in Revise the outline when it opens (from Ready to write?). */
+  reviseDraft?: string
 }>(() => ({ proposals: {}, busy: null, issues: null, foundation: null, points: null, versions: {}, versionsOf: null, revising: false, revision: null }))
 
 const fr = (book: Book) => book.meta.language === 'fr'

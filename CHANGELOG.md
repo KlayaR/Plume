@@ -7,6 +7,12 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.55.0
+Ready to write? now fixes what it finds.
+- **Each line has its buttons.** Go to opens the chapter in the outline, or the entry in the Bible. Fix has Claude propose the fix. Done strikes a line off until the next check.
+- **Where each fix goes.** A chapter with no plan, no goal, scenes without beats or point of view, or a card Claude found too thin: the chapter is detailed (its scenes kept), or redone if nothing in it is written yet, with the report's fix as the direction, and comes back as a proposal to accept in the outline. A missing entry, a missing voice card, an entry too vague: drafted into Bible → To review. An unfinished arc, a dropped thread, a contradiction: Revise the outline opens with the fixes written in, and proposes changes to tick.
+- **Fix all.** One click for every line: one request per chapter (its fixes together), one for the bible, one revision of the outline, with the progress shown. Nothing changes until you accept the proposals; then press Check again.
+
 ## 0.54.1
 - **Ready to write?** seemed to do nothing: its panel opened below the story foundation, out of sight. It now opens right under the outline's buttons and scrolls into view.
 

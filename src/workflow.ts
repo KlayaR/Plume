@@ -7,12 +7,13 @@ import { useStore } from './store'
 import { ask, parseJSON } from './ai'
 import { t } from './i18n'
 import { outlineText } from './lib/outline'
-import { gaps, readReady, type Marks } from './lib/workflow'
-import { checkOutline, createEntriesFromOutline, grounding, useOutline } from './outline'
-import { useChat } from './chat'
+import { fixPlan, gapFix, gaps, itemFix, readReady, type FixStep, type Gap, type Marks, type ReadyItem } from './lib/workflow'
+import { checkOutline, createEntriesFromOutline, grounding, planChapter, reviseOutline, useOutline } from './outline'
+import { addDrafts, entryFormat, readDrafts, useChat, type Proposal } from './chat'
+import type { EntryType } from './lib/types'
 
 /** `open`: the Ready to write? panel is shown in the outline. */
-export const useFlow = create<{ marks: Marks; busy: string | null; open: boolean }>(() => ({ marks: {}, busy: null, open: false }))
+export const useFlow = create<{ marks: Marks; busy: string | null; open: boolean; progress: string }>(() => ({ marks: {}, busy: null, open: false, progress: '' }))
 const FILE = '.plume/workflow.json.md'
 
 export async function loadFlow() {
@@ -99,4 +100,96 @@ Don't repeat <already_found> (the author was told). At most 15 items, most block
     mark({ ready: { ...read, ready: read.ready && !known.length, date: now() } })
   } catch (e) { useStore.getState().notify('error', (e as Error).message) }
   finally { useFlow.setState({ busy: null }) }
+}
+
+// --- Fixing what Ready to write? found --------------------------------------------------------
+
+const NAMED: EntryType[] = ['character', 'place', 'object', 'creature', 'lore', 'magic', 'event', 'faction', 'storyline', 'theme']
+
+/** Drafts what the bible lacks (new entries, or additions to existing ones) into Bible → To review, in one request. */
+async function fixBible(lines: string[]): Promise<number> {
+  const book = useStore.getState().book
+  if (!book || !lines.length) return 0
+  const F = book.meta.language === 'fr'
+  const existing = book.entries.filter(e => NAMED.includes(e.type)).map(e => `${e.slug}: ${e.name} (${e.type})${e.short.trim() ? ` — ${e.short.trim().slice(0, 160)}` : ''}`).join('\n')
+  const reply = await ask({ json: 'list', role: 'edit',
+    system: F ? 'Tu complètes la bible d’un roman d’après son plan. Réponds uniquement en JSON valide, en français.' : 'You complete the story bible of a novel from its outline. Reply with valid JSON only.',
+    message: [
+      grounding(book),
+      `<outline>\n${outlineText(book)}\n</outline>`,
+      `<existing_entries>\n${existing || '-'}\n</existing_entries>`,
+      `<to_do>\n${lines.map(l => `- ${l}`).join('\n')}\n</to_do>`,
+      F ? 'Fais ce que demande chaque ligne de <to_do>, d’après le plan et la bible : une nouvelle fiche complète (target = null) pour ce qui manque, ou un ajout à une fiche existante (target = son slug) pour ce qui y est trop vague ou absent (une carte de voix, une règle, un secret). N’invente rien que le plan contredise ; ce que le plan ne dit pas, propose-le de façon prudente et dis-le dans "why".'
+        : 'Do what each line of <to_do> asks, from the outline and the bible: a new full entry (target = null) for what is missing, or an addition to an existing entry (target = its slug) for what is too vague or absent there (a voice card, a rule, a secret). Invent nothing the outline contradicts; what the outline does not say, propose cautiously and say so in "why".',
+      entryFormat(book, true),
+    ].join('\n\n'),
+  })
+  const list = parseJSON<Partial<Proposal>[]>(reply)
+  if (!Array.isArray(list)) throw new Error(t('Claude’s reply could not be read. Try again.'))
+  const drafts = readDrafts(book, list)
+  if (drafts.length) addDrafts(drafts)
+  return drafts.length
+}
+
+/** Opens Revise the outline with these fixes as the instruction, and asks Claude for the changes to tick. */
+async function fixRevise(lines: string[]) {
+  if (!lines.length) return
+  const book = useStore.getState().book!
+  const text = `${book.meta.language === 'fr' ? 'Corrige ces problèmes relevés avant l’écriture :' : 'Fix these problems found before writing:'}\n${lines.map(l => `- ${l}`).join('\n')}`
+  useOutline.setState({ revising: true, reviseDraft: text })
+  await reviseOutline(text)
+}
+
+async function runSteps(plan: ReturnType<typeof fixPlan>) {
+  const st = useStore.getState()
+  if (useFlow.getState().busy || useOutline.getState().busy) return st.notify('warn', t('Claude is already working on the outline. Wait for it to finish.'))
+  const n = (plan.bible.length ? 1 : 0) + plan.chapters.length + (plan.revise.length ? 1 : 0)
+  if (!n) return
+  useFlow.setState({ busy: 'fix', progress: '' })
+  let k = 0, drafts = 0
+  const step = (what: string) => useFlow.setState({ progress: t('{what} ({i} of {n})…', { what, i: ++k, n }) })
+  try {
+    if (plan.bible.length) { step(t('Drafting the bible entries')); drafts = await fixBible(plan.bible) }
+    for (const c of plan.chapters) {
+      const i = useStore.getState().book!.chapters.findIndex(x => x.id === c.chapterId)
+      if (i < 0) continue
+      step(t('Chapter {n}', { n: i + 1 }))
+      await planChapter(c.chapterId, c.mode, c.direction)
+    }
+    if (plan.revise.length) { step(t('Revising the outline')); await fixRevise(plan.revise) }
+    const parts = [
+      plan.chapters.length ? t('{n} chapter proposal(s) in the outline, to accept', { n: plan.chapters.length }) : '',
+      drafts ? t('{n} draft(s) in Bible → To review', { n: drafts }) : '',
+      plan.revise.length ? t('changes to tick in Revise the outline') : '',
+    ].filter(Boolean)
+    if (parts.length) st.notify('ok', t('Done: {list}. Then press Check again.', { list: parts.join(', ') }))
+  } catch (e) { st.notify('error', (e as Error).message) }
+  finally { useFlow.setState({ busy: null, progress: '' }) }
+}
+
+/** Fixes one line of the report. */
+export async function fixOne(step: FixStep | null, item?: number) {
+  const book = useStore.getState().book
+  if (!book || !step) return
+  await runSteps(step.kind === 'chapter' ? { chapters: [step], bible: [], revise: [] } : step.kind === 'bible' ? { chapters: [], bible: [step.line], revise: [] } : { chapters: [], bible: [], revise: [step.line] })
+  if (item !== undefined) markReadyDone(item)
+}
+export const fixGap = (g: Gap) => fixOne(gapFix(useStore.getState().book!, g))
+export const fixItem = (x: ReadyItem, i: number) => fixOne(itemFix(useStore.getState().book!, x), i)
+
+/** Fixes every line at once. */
+export async function fixAll() {
+  const book = useStore.getState().book
+  const report = useFlow.getState().marks.ready
+  if (!book) return
+  const items = report?.items ?? []
+  await runSteps(fixPlan(book, gaps(book), items))
+  const r = useFlow.getState().marks.ready
+  if (r) mark({ ready: { ...r, items: r.items.map(x => ({ ...x, done: true })) } })
+}
+
+/** Strikes a line off (or back on) until the next check. */
+export function markReadyDone(i: number, done = true) {
+  const r = useFlow.getState().marks.ready
+  if (r) mark({ ready: { ...r, items: r.items.map((x, k) => (k === i ? { ...x, done } : x)) } })
 }
