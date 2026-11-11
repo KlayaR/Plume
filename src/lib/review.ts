@@ -215,6 +215,9 @@ export interface ReportResult {
 export interface Review {
   words: number
   sentences: number
+  /** Paragraphs and dialogue tags counted, the base of the reports given as a share of them. */
+  paragraphs: number
+  tags: number
   results: ReportResult[]
   readability: number
   avgSentence: number
@@ -276,6 +279,8 @@ export function review(raw: string, book: Book, refs?: Record<string, number> | 
   return {
     words: ws,
     sentences: ss.length,
+    paragraphs: ps,
+    tags: tagCount,
     results,
     readability: readability(text, lang),
     avgSentence: ss.length ? ss.reduce((a, s) => a + s.words, 0) / ss.length : 0,

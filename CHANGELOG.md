@@ -7,6 +7,16 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.52.0
+Editing that says what is wrong, where, and how much of it. Built from how AutoCrit and ProWritingAid lay out their reports.
+- **The Editing space.** A fourth space in the bottom bar analyses the whole book, or the chapter you pick on the left, with every report Plume has (pacing, dialogue, strong writing, word choice, repetition, readability). Nothing here calls Claude.
+- **A score you can read.** One score out of 100 for the book and for each chapter, and one per category. 100 means every report is within its target; a report over its target loses points. Targets are Plume's estimates for fiction, or your reference books when you have some.
+- **Fix first.** The reports furthest over their target, worst first, each with how many were found and about how many are too many.
+- **Every passage, not only a count.** Open a report to see why it matters, the flagged words with how often each comes back (click one to see only that word), which chapter has the most, and every flagged passage in its sentence with the words marked. A click on a passage opens it in the Manuscript, selected, with that report's highlights on.
+- **Chapter by chapter.** A table of every chapter against every category, to see where the book is weakest; a click analyses that chapter alone.
+- **Rewrite until it holds.** For a chapter, the editor (Claude's Deep check) and the writer take turns: the editor lists what is wrong, the writer fixes it in the text, the editor reads again, up to three reads, until it finds no error and at most two weaknesses. One snapshot is taken first; each read's findings are shown, and what the last read still finds stays listed to tick and fix. Also in Edit this chapter.
+- **The Review panel beside the text** shows all its reports again in the simpler view, and has a button to the full analysis.
+
 ## 0.51.0
 One way of working, from the first idea to an edited chapter, in the three tabs.
 - **Guided brainstorm.** In an empty chat, Start the guided brainstorm opens a conversation that Claude leads: one question at a time, from the idea to the shape of the book (protagonist, opposition, world and its rules, cast, places, ending), with what is settled and what is still open at the end of each message, until it says there is enough to structure the book. It offers options when you hesitate and never decides for you.

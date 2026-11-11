@@ -56,7 +56,7 @@ export default function BottomBar() {
   const scene = findScene(book, sceneId)?.scene
   const { words, signs } = bookCounts(book.chapters)
   const here = scene ? sceneCounts(scene) : null
-  const tabs: [View, string][] = [['bible', 'Bible'], ['plan', 'Plan'], ['manuscript', 'Manuscript']]
+  const tabs: [View, string][] = [['bible', 'Bible'], ['plan', 'Plan'], ['manuscript', 'Manuscript'], ['editing', 'Editing']]
   const claude = exe === undefined ? 'Looking for claude…' : exe === null ? 'claude not found' : running ? 'Writing…' : 'claude ready'
   const usageTip = [
     t(claude),
@@ -148,7 +148,7 @@ function DualMenu() {
   const dual = useStore(s => s.prefs.dual)
   const t = useT()
   const pick = (v: View | null) => { setOpen(false); useStore.getState().setPrefs({ dual: v }) }
-  const names: Record<View, string> = { bible: 'Bible', plan: 'Plan', manuscript: 'Manuscript' }
+  const names: Record<View, string> = { bible: 'Bible', plan: 'Plan', manuscript: 'Manuscript', editing: 'Editing' }
   return (
     <span className="pl-aa" ref={box}>
       <button type="button" className={`pl-quiet ${dual && dual !== view ? 'pl-on' : ''}`} aria-expanded={open} onClick={() => setOpen(o => !o)} title={t('Show a second view beside this one')}><PanelRight size={15} /></button>

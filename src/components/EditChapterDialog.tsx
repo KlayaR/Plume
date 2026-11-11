@@ -4,7 +4,7 @@ import { FileCheck2 } from 'lucide-react'
 import { Dialog } from '../studio-kit/shell.js'
 import { useStore } from '../store'
 import { useT } from '../i18n'
-import { checkChapter, closeEdit, editCost, fixChapter, toggleAll, toggleFinding, useEdit, type Depth, type Severity } from '../edit'
+import { checkChapter, closeEdit, editCost, fixChapter, rewriteLoop, stopLoop, toggleAll, toggleFinding, useEdit, type Depth, type Severity } from '../edit'
 import { costText } from '../cost'
 
 const GROUPS: { id: Severity; label: string }[] = [
@@ -15,7 +15,7 @@ const GROUPS: { id: Severity; label: string }[] = [
 
 export default function EditChapterDialog() {
   const t = useT()
-  const { chapterId, depth, stage, findings, placed } = useEdit()
+  const { chapterId, depth, stage, findings, placed, loop } = useEdit()
   const book = useStore(s => s.book)
   const c = book?.chapters.find(x => x.id === chapterId)
   if (!book || !c) return null
@@ -30,7 +30,7 @@ export default function EditChapterDialog() {
   const footer = stage === 'list'
     ? <>
       <button type="button" className="sk-btn sk-btn-ghost" onClick={closeEdit}>{t('Close')}</button>
-      <button type="button" className="sk-btn sk-btn-primary" disabled={!chosen} onClick={fixChapter}>{t('Fix the ticked ones ({n})', { n: chosen })}</button>
+      <button type="button" className="sk-btn sk-btn-primary" disabled={!chosen} onClick={() => fixChapter()}>{t('Fix the ticked ones ({n})', { n: chosen })}</button>
     </>
     : stage === 'done'
       ? <>
@@ -41,7 +41,17 @@ export default function EditChapterDialog() {
 
   return (
     <Dialog wide title={t('Edit “{title}”', { title })} icon={FileCheck2} onClose={closeEdit} footer={footer}>
-      {stage === 'start' && (
+      {loop && (
+        <div className="pl-edit-loop">
+          {loop.rounds.map((r, i) => (
+            <div key={i} className="sk-hint">{t('Read {i}: {e} errors, {c} weaknesses, {p} to polish.', { i: i + 1, e: r.errors, c: r.craft, p: r.polish })}{r.fixed ? ` ${t('{n} fixed.', { n: r.fixed })}` : ''}</div>
+          ))}
+          {loop.running
+            ? <button type="button" className="sk-btn sk-btn-danger sk-btn-sm" onClick={stopLoop}>{t('Stop')}</button>
+            : <b>{t(loop.verdict === 'pass' ? 'The chapter holds: the editor finds nothing serious left.' : loop.verdict === 'limit' ? 'The rounds are done. What the editor still finds is listed below: fix it by hand, or tick and fix.' : 'Stopped.')}</b>}
+        </div>
+      )}
+      {stage === 'start' && !loop?.running && (
         <div className="pl-edit">
           <p className="sk-hint">{t('Claude reads the whole chapter and lists what is wrong, each with the exact words. You untick what you disagree with; Claude fixes the rest as tracked changes you accept or reject one by one. A snapshot is taken before.')}</p>
           <div className="pl-edit-depths">
@@ -51,6 +61,10 @@ export default function EditChapterDialog() {
                 <span className="sk-hint">{d.text}</span>
               </button>
             ))}
+            <button type="button" className="pl-edit-depth" onClick={() => rewriteLoop(c.id)}>
+              <b>{t('Rewrite until it holds')}</b>
+              <span className="sk-hint">{t('The editor checks, the writer fixes, the editor checks again: up to three rounds, until nothing serious is left. The text is changed directly; a snapshot is taken first.')}</span>
+            </button>
           </div>
         </div>
       )}
@@ -85,7 +99,7 @@ export default function EditChapterDialog() {
           })}
         </div>
       )}
-      {stage === 'done' && (
+      {stage === 'done' && !loop && (
         <div className="pl-edit">
           <p>{t('{n} changes are in the text, marked: ✓ to accept, ✕ to reject. A snapshot was taken before.', { n: placed })}</p>
           {placed < chosen && <p className="sk-hint">{t('{k} could not be placed: the words were not found in the text. Check again to see what is left.', { k: chosen - placed })}</p>}

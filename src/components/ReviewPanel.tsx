@@ -70,6 +70,8 @@ export default function ReviewPanel() {
         </div>
       </section>
 
+      <button type="button" className="sk-btn sk-btn-sm" title={t('Every report over the whole book, chapter by chapter, with each flagged passage')} onClick={() => useStore.getState().setView('editing')}>{t('Full analysis of the book')}</button>
+
       <SpellingStatus />
 
       <section className="pl-cat">
@@ -77,14 +79,14 @@ export default function ReviewPanel() {
         {!r.words ? <span className="sk-hint">{t('Nothing to review yet.')}</span>
           : top.length === 0 ? <span className="sk-hint">{t('Every report is within its target.')}</span>
           : top.map(x => <ReportRow key={x.def.id} r={x} active={report === x.def.id} />)}
-        {simple ? <ShowEverything /> : (
+        {(
           <button type="button" className="pl-quiet pl-allreports" aria-expanded={all} onClick={() => setAll(!all)}>
             <ChevronDown size={14} className={all ? 'pl-rot' : ''} /> {t(all ? 'Hide the other reports' : 'All reports')}
           </button>
         )}
       </section>
 
-      {all && !simple && CATEGORIES.filter(c => c.id !== 'readability').map(c => {
+      {all && CATEGORIES.filter(c => c.id !== 'readability').map(c => {
         const rs = r.results.filter(x => x.def.category === c.id)
         const bad = rs.filter(x => x.status === 'bad').length, ok = rs.filter(x => x.status === 'ok').length
         return (
@@ -110,7 +112,7 @@ export default function ReviewPanel() {
         )
       })}
 
-      {all && !simple && <section className="pl-cat">
+      {all && <section className="pl-cat">
         <button type="button" className="pl-cat-head" onClick={() => setOpen(open === 'readability' ? null : 'readability')} aria-expanded={open === 'readability'}>
           <span className={`pl-dotstatus ${r.readability >= 50 && r.readability <= 85 ? 'pl-good' : 'pl-ok'}`} />
           <span className="pl-grow">{t('Readability')}</span>
@@ -134,6 +136,7 @@ export default function ReviewPanel() {
 
       <AIChecks sceneId={scene.id} chapterId={chapter.id} chapterText={chapter.scenes.map(s => s.text).join('\n')} fixIds={scope === 'scene' ? [scene.id] : chapter.scenes.map(s => s.id)} scopeLabel={scope === 'scene' ? t('This scene') : label} text={text} />
       <ReadAloud />
+      {simple && <ShowEverything />}
       {!simple && <RevisionSection scene={scene} />}
       {!simple && <Figures scene={scene.text} chapter={chapter.scenes.map(s => s.text).join('\n')} label={label} />}
     </aside>

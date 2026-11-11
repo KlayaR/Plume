@@ -21,7 +21,7 @@ const steps = undoStack()
 export const rememberStep = (key: string, name: string, undo: () => unknown, redo: () => unknown) => steps.push(key, name, undo, redo)
 export const forgetStep = (step: Parameters<typeof steps.takeBack>[0]) => steps.takeBack(step)
 
-export type View = 'bible' | 'plan' | 'manuscript'
+export type View = 'bible' | 'plan' | 'manuscript' | 'editing'
 export type BibleTab = 'entry' | 'review' | 'aicheck' | 'table' | 'tracker' | 'map' | 'relations' | 'contradictions'
 /** Bible tabs grouped under "More". */
 export const MORE_TABS: BibleTab[] = ['table', 'tracker', 'map', 'relations', 'contradictions']

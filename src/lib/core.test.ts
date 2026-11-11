@@ -32,6 +32,8 @@ import { backupsToRemove, versionsToRemove } from './backups'
 import { bookRepeats } from './repeats'
 import { promiseList } from './promises'
 import { gaps, readReady } from './workflow'
+import { contextOf, editBook, fixFirst, readabilityScore, scoreOf } from './editing'
+import { holds } from '../edit'
 import { chosenScenes, driftText, dropsOf, manuscriptText, movementsOf, nudgeMessage, readCurve, readNudges, readPitch } from './editorial'
 import { aiTells, checkRules, expandVariables, resolveIncludes, usedPromptIds } from './voice'
 import { review, reviewChecks, topProblems } from './review'
@@ -2165,5 +2167,56 @@ describe('0.51: ready to write?', () => {
     expect(r?.items).toEqual([{ kind: 'arc', title: 'Marc has no arc', fix: 'Give him one' }])
     expect(readReady({}, 5)).toBeNull()
     expect(readReady('junk', 5)).toBeNull()
+  })
+})
+
+describe('0.52: the Editing analysis', () => {
+  it('scores a report against its target', () => {
+    expect(scoreOf(3, 5)).toBe(100)
+    expect(scoreOf(5, 5)).toBe(100)
+    expect(scoreOf(8, 5)).toBe(64)
+    expect(scoreOf(50, 5)).toBe(0)
+    expect(readabilityScore(70)).toBe(100)
+    expect(readabilityScore(40)).toBe(50)
+  })
+  it('shows a flagged word in its sentence', () => {
+    const text = 'She waited. He suddenly ran to the door, very fast. Then nothing.'
+    const from = text.indexOf('suddenly')
+    const c = contextOf(text, from, from + 8)
+    expect(c.context).toBe('He suddenly ran to the door, very fast.')
+    expect(c.context.slice(c.at, c.at + c.len)).toBe('suddenly')
+    // A long passage is shown from its start, with no word marked.
+    const long = 'x'.repeat(300)
+    expect(contextOf(long, 0, 300)).toMatchObject({ at: 0, len: 0 })
+  })
+  it('reads the whole book, sends each passage back to its scene, and says what to fix first', () => {
+    const heavy = Array.from({ length: 30 }, () => 'He suddenly ran quickly and loudly shouted angrily at the really very old door.').join(' ')
+    const b = bookOf([scene('a', 'The rain fell on the roof. She closed the door.'), scene('b', heavy)])
+    b.chapters.push({ ...b.chapters[0], id: 'c2', title: 'Two', scenes: [scene('c', 'A short calm scene. Nothing moved in the house.'), scene('d', '')] })
+    const e = editBook(b)
+    expect(e.chapters.map(c => c.id)).toEqual(['c', 'c2'])
+    expect(e.words).toBeGreaterThan(400)
+    const adverbs = e.reports.find(r => r.def.id === 'adverbs')!
+    expect(adverbs.count).toBeGreaterThan(60)
+    expect(adverbs.excess).toBeGreaterThan(0)
+    expect(adverbs.byChapter[1]).toBe(0)
+    // Every hit sits in scene b, at the right place in that scene's own text.
+    expect(new Set(adverbs.hits.map(h => h.sceneId))).toEqual(new Set(['b']))
+    const h = adverbs.hits[0]
+    expect(heavy.slice(h.from, h.to)).toBe(h.context.slice(h.at, h.at + h.len))
+    expect(adverbs.words[0][1]).toBeGreaterThanOrEqual(30)
+    expect(fixFirst(e).map(r => r.def.id)).toContain('adverbs')
+    expect(e.chapters[0].score).toBeLessThan(e.chapters[1].score)
+    // One chapter alone.
+    const one = editBook(b, 'c2')
+    expect(one.chapters).toHaveLength(1)
+    expect(one.reports.find(r => r.def.id === 'adverbs')!.count).toBe(0)
+    expect(editBook(bookOf([scene('z', '')])).words).toBe(0)
+  })
+  it('a chapter holds with no error and at most two weaknesses', () => {
+    expect(holds([{ severity: 'polish' }, { severity: 'craft' }, { severity: 'craft' }])).toBe(true)
+    expect(holds([{ severity: 'craft' }, { severity: 'craft' }, { severity: 'craft' }])).toBe(false)
+    expect(holds([{ severity: 'error' }])).toBe(false)
+    expect(holds([])).toBe(true)
   })
 })
