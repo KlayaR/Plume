@@ -11,6 +11,8 @@ import { chapterLabels } from '../lib/chapters'
 import { pickImage, useImage } from '../lib/images'
 import { acceptProposal, checkContradictions, contradictionCost, rejectProposal, updateProposal, useChat, type Contradiction } from '../chat'
 import { numLocale, useT } from '../i18n'
+import { runBibleCheck } from '../workflow'
+import { useOutline } from '../outline'
 
 const NAMED: EntryType[] = ['character', 'place', 'object', 'lore', 'magic', 'creature', 'event', 'faction', 'storyline', 'theme']
 
@@ -20,11 +22,14 @@ export function ReviewList() {
   const proposals = useChat(s => s.proposals)
   const book = useStore(s => s.book)!
   const t = useT()
-  if (!proposals.length) return <div className="sk-empty">{t('Nothing to review. In the Claude chat, "Turn into entries" drafts entries here.')}</div>
+  const checking = useOutline(s => s.busy) === 'entries'
+  const check = <button type="button" className="sk-btn sk-btn-sm" disabled={checking || !book.chapters.length} title={t('Claude finds the characters, places, objects and rules the outline uses but the bible lacks, and writes full entries for them (personality, arc, voice…), in Bible → To review.')} onClick={runBibleCheck}>{checking ? t('Working…') : t('Bible check')}</button>
+  if (!proposals.length) return <div className="sk-empty">{t('Nothing to review. Bible check drafts here the entries the outline needs and the bible lacks; in the Claude chat, "Turn into entries" drafts what you decided.')}<div className="pl-row">{check}</div></div>
   return (
     <div className="pl-review">
       <div className="pl-row">
         <span className="pl-label pl-grow">{t('{n} drafts to review', { n: proposals.length })}</span>
+        {check}
         <button type="button" className="sk-btn sk-btn-sm" onClick={() => proposals.forEach(p => acceptProposal(p.id))}><Check size={13} /> {t('Accept all')}</button>
       </div>
       {proposals.map(p => {

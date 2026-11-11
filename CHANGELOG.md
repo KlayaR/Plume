@@ -7,6 +7,18 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.51.0
+One way of working, from the first idea to an edited chapter, in the three tabs.
+- **Guided brainstorm.** In an empty chat, Start the guided brainstorm opens a conversation that Claude leads: one question at a time, from the idea to the shape of the book (protagonist, opposition, world and its rules, cast, places, ending), with what is settled and what is still open at the end of each message, until it says there is enough to structure the book. It offers options when you hesitate and never decides for you.
+- **Essential entries first.** After the brainstorm, Draft the essential entries drafts at most twelve entries into Bible → To review: the main characters, key places, factions, rules of the world, the objects the plot turns on. What else deserves an entry is listed in the chat for later, not drafted.
+- **The outline's steps as buttons, in order.** Plan → Outline now shows Quality check, Detail all, Bible check and Ready to write? beside the Claude menu (which keeps Outline from a premise and Revise the outline). Each check's tooltip says when it was last run and what it found.
+- **Ready to write?** One check before writing. A free part runs on your computer: chapters with no plan, no goal, scenes without beats or point of view, people the cards name who have no entry or no voice card. Then Claude reads the outline and the bible and lists what still blocks, most blocking first, each with its fix: chapter cards too thin for a full chapter, entries too vague, character arcs that don't conclude, contradictions, dropped threads.
+- **A stricter quality check.** It now also judges each character's arc in proportion to their importance, and flags chapters whose card is too thin to be written in full.
+- **Bible check** is also in Bible → To review, where its drafts land.
+- **Write the chapter and Edit the chapter** are buttons in the Manuscript's toolbar, for the chapter you are in.
+- **A simpler view built for this.** The simpler view (Settings → Writing → Show everything, off) is turned on once for everyone with this version. In it the Assistant keeps Continue, Rewrite and Beats, with Expand and Shorten always shown; ×3, Suggest, the other quick actions, the draft-mode button and Compare prompts come back with Show everything.
+- **Fill the foundation** reads further back in the conversation (80 messages instead of 30), so a long brainstorm is not cut short.
+
 ## 0.50.0
 What NovelCrafter and Sudowrite have that Plume lacked.
 - **Blurb, synopsis and pitch.** Agent tasks has a new whole-book read for when the book is finished: a logline, the back-cover text (which stops before the last third and reveals no ending), a one-page synopsis that tells the ending, and a pitch to say out loud. Each has its own Copy button; they are kept with the book.

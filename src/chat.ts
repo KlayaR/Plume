@@ -57,7 +57,7 @@ function readCharacter(p: Partial<Proposal> & Record<string, unknown>): Pick<Pro
 }
 
 /** One conversation: kept with the book, so old brainstorms can be reopened. */
-export interface Chat { id: string; title: string; date: string; interview: string | null; messages: Message[]; persona?: string | null; reads?: Reads | null }
+export interface Chat { id: string; title: string; date: string; interview: string | null; messages: Message[]; persona?: string | null; reads?: Reads | null; guide?: boolean }
 
 interface ChatState {
   /** The open conversation's messages (also held in `chats`). */
@@ -69,6 +69,8 @@ interface ChatState {
   persona: string | null
   /** What this conversation was told to read in full (scenes and entries); null: the chat picks. */
   reads: Reads | null
+  /** The guided brainstorm: Claude leads, one question at a time, until there is enough to structure the book. */
+  guide: boolean
   proposals: Proposal[]
   busy: string | null
   chats: Chat[]
@@ -78,7 +80,7 @@ interface ChatState {
 const blank = (interview: string | null = null, persona: string | null = null): Chat => ({ id: newId(), title: '', date: new Date().toISOString(), interview, persona, messages: [] })
 const first = blank()
 
-export const useChat = create<ChatState>(() => ({ messages: [], streaming: null, interview: null, persona: null, reads: null, proposals: [], busy: null, chats: [first], chatId: first.id }))
+export const useChat = create<ChatState>(() => ({ messages: [], streaming: null, interview: null, persona: null, reads: null, guide: false, proposals: [], busy: null, chats: [first], chatId: first.id }))
 
 const CHATS = '.plume/chats.json'
 const OLD_CHAT = '.plume/chat.json'
@@ -99,7 +101,7 @@ export async function loadChat(book: Book) {
   const chats = (saved.chats ?? []).filter(c => c.messages.length)
   const fresh = blank()
   // The book opens on a new empty conversation; the old ones are one click away.
-  useChat.setState({ chats: [...chats, fresh], chatId: fresh.id, messages: [], interview: null, persona: null, reads: null, proposals: await read<Proposal[]>(REVIEW, []), streaming: null, busy: null })
+  useChat.setState({ chats: [...chats, fresh], chatId: fresh.id, messages: [], interview: null, persona: null, reads: null, guide: false, proposals: await read<Proposal[]>(REVIEW, []), streaming: null, busy: null })
 }
 
 const titleOf = (ms: Message[]) => {
@@ -127,14 +129,14 @@ function commit(chatId: string, messages: Message[]) {
 
 export function newChat() {
   const { chats, chatId } = useChat.getState()
-  if (chats.find(c => c.id === chatId)?.messages.length === 0) return useChat.setState({ interview: null, persona: null, reads: null, chats: chats.map(c => c.id === chatId ? { ...c, interview: null, persona: null, reads: null } : c) })
+  if (chats.find(c => c.id === chatId)?.messages.length === 0) return useChat.setState({ interview: null, persona: null, reads: null, guide: false, chats: chats.map(c => c.id === chatId ? { ...c, interview: null, persona: null, reads: null, guide: false } : c) })
   const c = blank()
-  useChat.setState({ chats: [...chats, c], chatId: c.id, messages: [], interview: null, persona: null, reads: null })
+  useChat.setState({ chats: [...chats, c], chatId: c.id, messages: [], interview: null, persona: null, reads: null, guide: false })
 }
 
 export function openChat(id: string) {
   const c = useChat.getState().chats.find(x => x.id === id)
-  if (c) useChat.setState({ chatId: id, messages: c.messages, interview: c.interview, persona: c.persona ?? null, reads: c.reads ?? null })
+  if (c) useChat.setState({ chatId: id, messages: c.messages, interview: c.interview, persona: c.persona ?? null, reads: c.reads ?? null, guide: !!c.guide })
   saveChats()
 }
 
@@ -148,7 +150,7 @@ export function deleteChat(id: string) {
   let rest = chats.filter(c => c.id !== id)
   if (!rest.some(c => !c.messages.length)) rest = [...rest, blank()]
   const open = id === chatId ? rest[rest.length - 1] : rest.find(c => c.id === chatId)!
-  useChat.setState({ chats: rest, chatId: open.id, messages: open.messages, interview: open.interview, persona: open.persona ?? null, reads: open.reads ?? null })
+  useChat.setState({ chats: rest, chatId: open.id, messages: open.messages, interview: open.interview, persona: open.persona ?? null, reads: open.reads ?? null, guide: !!open.guide })
   saveChats()
 }
 const saveReview = () => save(REVIEW, useChat.getState().proposals)
@@ -222,8 +224,21 @@ const ENTRIES_HOW = {
   fr: 'Créer des fiches de bible : tu ne peux pas modifier la bible toi-même, mais Plume le peut. Quand l\'auteur te demande de créer ou de compléter des fiches, écris-les en entier dans ta réponse, une par fiche : un titre avec le nom et le type (personnage, lieu, objet, créature, univers, magie, événement, faction, intrigue, thème), un résumé d\'une ou deux lignes, puis les détails utiles pour écrire, un court paragraphe titré pour chacun (apparence, caractère, relations, règles, histoire, secrets). Pour un personnage, ajoute sa façon de parler (registre, longueur des phrases, tic de langage, geste signature, ce qu’il ne dit jamais, voix intérieure, quelques répliques types) et ce qu’il sait et ignore. Si le livre prolonge une œuvre publiée ou s\'y déroule, appuie-toi sur ce que tu sais de son canon, et signale ce qui est incertain. N\'y répète pas ce que la bible dit déjà, sauf si l\'auteur le demande. Dis-lui ensuite d\'appuyer sur « Transformer en fiches » pour les mettre en brouillon dans la liste à relire. Ne dis jamais que tu ne peux pas créer de fiches.',
 }
 
-function systemFor(book: Book, recent: string, interview: Entry | null, persona: Entry | null = null, reads: Reads | null = null): string {
+/**
+ * The guided brainstorm: Claude leads the author from a first idea to enough material
+ * to build the bible and the outline, one question at a time, and says when it is enough.
+ */
+function guideSystem(book: Book, recent: string): string {
+  const fr = book.meta.language === 'fr'
+  const head = fr
+    ? `Tu mènes le brainstorming du roman « ${book.meta.title} » avec son auteur, de l’idée de départ jusqu’à assez de matière pour bâtir sa bible et son plan. Pose UNE question à la fois, précise et concrète, et rebondis sur la réponse. Quand l’auteur hésite, propose deux ou trois pistes différentes et laisse-le choisir ; ne décide jamais à sa place et ne présente pas tes idées comme acquises. Avance dans cet ordre, en sautant ce que <foundation> et <bible> règlent déjà : 1. l’idée, le genre, le ton, les livres comparables ; 2. le protagoniste : ce qu’il veut, ce dont il a besoin, sa faille, ce qu’il risque ; 3. l’opposition et son plan ; 4. le monde et ses règles (pour la magie : sa source, ses limites, son prix) ; 5. les autres personnages importants et leurs liens ; 6. les lieux qui comptent ; 7. la fin, et ce dont le livre parle ; 8. la forme : points de vue, longueur, nombre de chapitres. Des messages courts. Termine chaque message par une ligne « Acquis : … · Reste : … », en quelques mots. Quand tout est assez couvert pour structurer le livre (souvent après quinze à vingt-cinq échanges), dis-le clairement : « Nous avons assez de matière pour structurer le livre. », récapitule les décisions en une liste compacte, puis dis à l’auteur d’appuyer sur « Préparer les fiches essentielles ». N’écris pas de fiches avant. Réponds en français.`
+    : `You lead the brainstorm of the novel "${book.meta.title}" with its author, from the first idea to enough material to build its bible and its outline. Ask ONE question at a time, precise and concrete, and build on the answer. When the author hesitates, offer two or three different options and let them choose; never decide for them, and don't treat your own ideas as settled. Go in this order, skipping what <foundation> and <bible> already settle: 1. the idea, the genre, the tone, comparable books; 2. the protagonist: what they want, what they need, their flaw, what they risk; 3. the opposition and its plan; 4. the world and its rules (for magic: its source, its limits, its cost); 5. the other important characters and their ties; 6. the places that matter; 7. the ending, and what the book is about; 8. the shape: points of view, length, number of chapters. Short messages. End each message with one line "Settled: … · Still open: …", in a few words. When everything is covered well enough to structure the book (often after fifteen to twenty-five exchanges), say so plainly: "We have enough to structure the book.", recap the decisions as a compact list, then tell the author to press "Draft the essential entries". Don't write entries before that. Reply in English.`
+  return [head, storyFor(book), `<bible>\n${bibleFor(book, recent)}\n</bible>`].filter(Boolean).join('\n\n')
+}
+
+function systemFor(book: Book, recent: string, interview: Entry | null, persona: Entry | null = null, reads: Reads | null = null, guide = false): string {
   if (persona) return personaSystem(book, persona, recent, reads)
+  if (guide) return guideSystem(book, recent)
   const fr = book.meta.language === 'fr'
   const scenes = reads?.scenes.length ? chosenScenes(book, reads.scenes) : ''
   const ticked = scenes || reads?.entries.length
@@ -294,11 +309,13 @@ export async function send(text: string) {
   const who = book.entries.find(e => e.slug === useChat.getState().persona && e.include !== 'secret') ?? null
   const reads = useChat.getState().reads
   // The last 20 messages, as a transcript; the CLI keeps no session.
-  const history = messages.slice(-20)
+  const guide = useChat.getState().guide
+  // A guided brainstorm is one long line of decisions: it is read further back.
+  const history = messages.slice(guide ? -80 : -20)
   try {
     const reply = await ask({
       ...chatChoice(),
-      system: systemFor(book, recent, target, who, reads),
+      system: systemFor(book, recent, target, who, reads, guide),
       // In character, the open scene is not sent: it may hold what they have not lived yet.
       message: [who ? '' : openScene(book), `<conversation>\n${transcript(history.slice(0, -1))}\n</conversation>`, history[history.length - 1].text].filter(Boolean).join('\n\n'),
       onText: chunk => useChat.setState(s => ({ streaming: (s.streaming ?? '') + chunk })),
@@ -344,7 +361,7 @@ export const clearChat = () => deleteChat(useChat.getState().chatId)
 /** Interview mode for one entry: the chat opens on Claude's first question. */
 export function startInterview(slug: string) {
   const c = blank(slug)
-  useChat.setState(s => ({ chats: [...s.chats.filter(x => x.messages.length || x.id !== s.chatId), c], chatId: c.id, messages: [], interview: slug, persona: null, reads: null }))
+  useChat.setState(s => ({ chats: [...s.chats.filter(x => x.messages.length || x.id !== s.chatId), c], chatId: c.id, messages: [], interview: slug, persona: null, reads: null, guide: false }))
   useStore.getState().setPrefs({ chatOpen: true })
   const book = useStore.getState().book!
   const e = book.entries.find(x => x.slug === slug)!
@@ -360,7 +377,7 @@ export function startTalk(slug: string) {
   const e = useStore.getState().book?.entries.find(x => x.slug === slug)
   if (!e || e.include === 'secret') return
   const c = { ...blank(null, slug), title: e.name }
-  useChat.setState(s => ({ chats: [...s.chats.filter(x => x.messages.length || x.id !== s.chatId), c], chatId: c.id, messages: [], interview: null, persona: slug, reads: null }))
+  useChat.setState(s => ({ chats: [...s.chats.filter(x => x.messages.length || x.id !== s.chatId), c], chatId: c.id, messages: [], interview: null, persona: slug, reads: null, guide: false }))
   useStore.getState().setPrefs({ chatOpen: true })
 }
 export const endTalk = () => {
@@ -477,6 +494,53 @@ ${entryFormat(book, false)}`,
     const proposals = readDrafts(book, list)
     if (!proposals.length) { useStore.getState().notify('warn', t('Nothing new to draft from this conversation. Ask Claude to write the entries out first.')); useChat.setState({ busy: null }); return }
     addDrafts(proposals)
+  } catch (e) { useStore.getState().notify('error', (e as Error).message) }
+  useChat.setState({ busy: null })
+}
+
+/** The guided brainstorm: a new conversation that Claude leads. */
+export function startGuide() {
+  const book = useStore.getState().book
+  if (!book || useChat.getState().streaming !== null) return
+  const c: Chat = { ...blank(), guide: true, title: t('Guided brainstorm') }
+  useChat.setState(s => ({ chats: [...s.chats.filter(x => x.messages.length || x.id !== s.chatId), c], chatId: c.id, messages: [], interview: null, persona: null, reads: null, guide: true }))
+  useStore.getState().setPrefs({ chatOpen: true })
+  send(book.meta.language === 'fr' ? 'Commençons : aide-moi à construire mon livre.' : 'Let’s start: help me build my book.')
+}
+export const endGuide = () => {
+  useChat.setState(s => ({ guide: false, chats: s.chats.map(c => c.id === s.chatId ? { ...c, guide: false } : c) }))
+  saveChats()
+}
+
+/**
+ * After the brainstorm: the entries the book cannot be outlined without, drafted in
+ * full into the review list; what else deserves an entry is only listed, for later.
+ */
+export async function draftEssentials() {
+  const book = useStore.getState().book
+  const { messages, chatId } = useChat.getState()
+  if (!book || !messages.length || useChat.getState().busy) return
+  const fr = book.meta.language === 'fr'
+  const existing = book.entries.filter(e => TYPES.includes(e.type)).map(e => `${e.slug}: ${e.name} (${e.type})${e.short.trim() ? ` — ${e.short.trim().slice(0, 160)}` : ''}`).join('\n')
+  useChat.setState({ busy: 'entries' })
+  try {
+    const reply = await ask({ json: 'list', role: 'edit',
+      system: fr ? 'Tu transformes le brainstorming d’un roman en fiches de bible. Réponds uniquement en JSON valide.' : 'You turn the brainstorm of a novel into story-bible entries. Reply with valid JSON only.',
+      message: `<existing_entries>\n${existing || '-'}\n</existing_entries>\n\n<conversation>\n${transcript(messages.slice(-120))}\n</conversation>\n\n${fr
+        ? 'À partir de tout ce que l’auteur a décidé, prépare seulement les fiches ESSENTIELLES de la bible : ce sans quoi le livre ne peut pas être planifié. Dans cet ordre : les personnages principaux (protagoniste, antagoniste, les deux ou trois qui comptent le plus), les lieux clés, les factions, les règles du monde ou de sa magie, les objets sur lesquels l’intrigue repose. Douze fiches au plus, chacune complète : reprends tout ce qui a été décidé sans le résumer, et laisse vide ce qui ne l’a pas été plutôt que d’inventer. target = null pour une nouvelle fiche, ou le slug d’une fiche existante pour la compléter. Ensuite, pour tout ce qui mériterait une fiche plus tard (personnages secondaires, univers, lieux mineurs, événements passés, thèmes), ajoute un élément court avec "defer": true et seulement "type", "name" et "why" : ils seront listés, pas rédigés.'
+        : 'From everything the author decided, draft only the story bible’s ESSENTIAL entries: what the book cannot be outlined without. In this order: the main characters (protagonist, antagonist, the two or three who matter most), the key places, the factions, the rules of the world or of its magic, the objects the plot turns on. Twelve entries at most, each complete: keep everything that was decided without summarising it, and leave empty what was not decided rather than inventing. target = null for a new entry, or the slug of an existing one to add to it. Then, for everything else worth an entry later (secondary characters, lore, minor places, past events, themes), add one short item with "defer": true and only "type", "name" and "why": they will be listed, not drafted.'}\n${entryFormat(book, false)}`,
+    })
+    const list = parseJSON<(Partial<Proposal> & { defer?: boolean })[]>(reply)
+    if (!list || !Array.isArray(list)) throw new Error(t('Claude’s reply could not be read. Try again.'))
+    const proposals = readDrafts(book, list.filter(x => x && !x.defer))
+    const later = list.filter(x => x && x.defer && x.name)
+    if (!proposals.length) { useStore.getState().notify('warn', t('Nothing decided yet to draft entries from. Go further in the brainstorm first.')); useChat.setState({ busy: null }); return }
+    addDrafts(proposals)
+    if (later.length) {
+      const text = `${fr ? 'Fiches à créer plus tard (non rédigées) :' : 'Entries to create later (not drafted):'}\n${later.map(x => `- ${x.name} (${x.type ?? 'lore'})${x.why ? ` : ${x.why}` : ''}`).join('\n')}`
+      commit(chatId, [...(useChat.getState().chats.find(c => c.id === chatId)?.messages ?? messages), { role: 'assistant', text }])
+    }
+    useStore.getState().notify('ok', t('{n} essential entries drafted in Bible → To review.', { n: proposals.length }))
   } catch (e) { useStore.getState().notify('error', (e as Error).message) }
   useChat.setState({ busy: null })
 }

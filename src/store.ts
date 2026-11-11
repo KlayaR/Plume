@@ -238,7 +238,7 @@ export const DEFAULT_PREFS: Prefs = {
   dualW: 520,
   commandNames: {},
   commandKeys: {},
-  v: 2,
+  v: 3,
 }
 
 /** Saved prefs, upgraded once: 0.2.3 pins both panes by default. */
@@ -253,6 +253,8 @@ function loadPrefs(): Prefs {
   } else p.roles = { ...DEFAULT_ROLES, ...(saved?.roles ?? {}) }
   // Read the version from what was saved, not from the defaults merged into it.
   if (saved && (saved.v ?? 0) < 2) return { ...p, pinLeft: true, pinRight: true, simple: false, v: 2 }
+  // 0.51 rebuilt the simpler view around one way of working (brainstorm, bible, outline, write, edit): it is turned on once for everyone.
+  if (saved && (saved.v ?? 0) < 3) return { ...p, simple: true, v: 3 }
   // Beginner mode is for new installs: people who already use Plume keep everything.
   if (saved && saved.simple === undefined) return { ...p, simple: false }
   return p
@@ -564,6 +566,7 @@ export const useStore = create<State>((set, get) => {
       import('./scratch').then(m => m.loadScratch(book))
       import('./grids').then(m => m.loadGrids(book))
       import('./agents').then(m => m.loadAgents())
+      import('./workflow').then(m => m.loadFlow())
       // Library and safety: the lock for synced folders, today's backup, progress, the shelf card.
       import('./library').then(m => { m.takeLock(book); m.autoBackup(book); m.recordProgress(get().book!); m.noteOnShelf(get().book!); m.refreshSnapshots(get().book!); m.applyFantasyDefaults(get().book!); steps.clear() })
     },

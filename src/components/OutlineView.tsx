@@ -3,7 +3,7 @@
 // for editing, one at a time. Claude can detail or regenerate a chapter or a
 // scene and check the outline; what it proposes shows here first, beside what
 // is there, until you accept it.
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { create } from 'zustand'
 import { ask as askDialog } from '@tauri-apps/plugin-dialog'
 import { ArrowDown, ArrowUp, Check, CheckCheck, ChevronDown, ChevronRight, Combine, History, Lock, LockOpen, MessagesSquare, MoreHorizontal, PenLine, Plus, Scissors, Sparkles, Wand2, X } from 'lucide-react'
@@ -20,8 +20,10 @@ import { addFindings, useAgents } from '../agents'
 import { writeChapter, writeFromPlan } from '../editor/actions'
 import { askText, showMenu } from '../contextMenu'
 import { chapterMenu, sceneMenu } from '../menus'
-import { useT } from '../i18n'
+import { numLocale, useT } from '../i18n'
 import OutlineList from './OutlineList'
+import { runBibleCheck, runOutlineCheck, runReady, useFlow } from '../workflow'
+import { gaps, type Gap, type Mark } from '../lib/workflow'
 
 /** What is open for editing: a scene's id, or "ch:" + a chapter's id for its goal and ending. One at a time. */
 const useEditing = create<{ id: string | null }>(() => ({ id: null }))
@@ -40,6 +42,9 @@ export default function OutlineView() {
   const book = useStore(s => s.book)!
   const busy = useOutline(s => s.busy)
   const issues = useOutline(s => s.issues)
+  const marks = useFlow(s => s.marks)
+  const readyOpen = useFlow(s => s.open)
+  const lastRun = (m?: Mark) => m ? ' ' + t('Last run on {date}: {n} found.', { date: new Date(m.date).toLocaleDateString(numLocale()), n: m.found }) : ''
   const keepIssues = () => {
     addFindings('outline', (issues ?? []).map(x => { const c = issueChapter(book, x); return { title: x.issue, detail: `→ ${x.fix}`, where: c?.title || x.chapter, sceneId: c?.scenes[0]?.id } }))
     useStore.getState().notify('ok', t('Kept in Agent tasks.'))
@@ -76,10 +81,6 @@ export default function OutlineView() {
   const claude = (e: React.MouseEvent) => showMenu(e, [
     { label: t('Outline from a premise'), disabled: !!busy, onClick: () => useStore.setState({ dialog: 'outline' }) },
     { label: t('Revise the outline…'), title: t('Tell Claude what to change in the whole outline: add, move, merge or remove chapters, change what happens. You tick the changes to keep.'), disabled: !book.chapters.length, onClick: () => useOutline.setState({ revising: true }) },
-    { label: t('Detail all'), title: t('Claude details every chapter that has no beats yet, one after the other. Each comes back as a proposal.'), disabled: !!busy, onClick: detailAll },
-    { separator: true },
-    { label: t('Check the outline'), title: t('Claude reads the whole outline and lists gaps, dropped threads, contradictions with the bible and chapters with no turn.'), disabled: !!busy || !book.chapters.length, onClick: checkOutline },
-    { label: t('Missing entries'), title: t('Claude finds the characters, places, objects and rules the outline uses but the bible lacks, and writes full entries for them (personality, arc, voice…), in Bible → To review.'), disabled: !!busy || !book.chapters.length, onClick: createEntriesFromOutline },
   ])
   const more = (e: React.MouseEvent) => showMenu(e, [
     { label: t('Copy the outline as Markdown'), onClick: copy },
@@ -95,12 +96,21 @@ export default function OutlineView() {
         {busy === 'entries'
           ? <button type="button" className="sk-btn sk-btn-sm sk-btn-danger" onClick={stopEntries}><X size={13} /> {t('Stop creating entries')}</button>
           : <button type="button" className={`sk-btn sk-btn-sm ${book.chapters.length ? '' : 'sk-btn-primary'}`} aria-haspopup="menu" onClick={claude}><Sparkles size={13} /> {busy === 'check' ? t('Reading…') : 'Claude'} <ChevronDown size={13} /></button>}
+        {busy !== 'entries' && (
+          <span className="pl-ol-steps" role="group" aria-label={t('From the outline to the writing')}>
+            <button type="button" className="sk-btn sk-btn-sm" disabled={!!busy || !book.chapters.length} title={t('Claude reads the whole outline and lists gaps, dropped threads, contradictions with the bible and chapters with no turn.') + lastRun(marks.outlineCheck)} onClick={runOutlineCheck}>{busy === 'check' ? t('Reading…') : t('Quality check')}</button>
+            <button type="button" className="sk-btn sk-btn-sm" disabled={!!busy || !book.chapters.length} title={t('Claude details every chapter that has no beats yet, one after the other. Each comes back as a proposal.')} onClick={detailAll}>{t('Detail all')}</button>
+            <button type="button" className="sk-btn sk-btn-sm" disabled={!!busy || !book.chapters.length} title={t('Claude finds the characters, places, objects and rules the outline uses but the bible lacks, and writes full entries for them (personality, arc, voice…), in Bible → To review.') + lastRun(marks.bibleCheck)} onClick={runBibleCheck}>{t('Bible check')}</button>
+            <button type="button" className="sk-btn sk-btn-sm" aria-pressed={readyOpen} disabled={!book.chapters.length} title={t('What the outline and the bible still lack before writing the book chapter by chapter')} onClick={() => useFlow.setState({ open: !readyOpen })}>{t('Ready to write?')}</button>
+          </span>
+        )}
         {pending > 1 && <button type="button" className="sk-btn sk-btn-sm sk-btn-primary" onClick={acceptAll}><CheckCheck size={13} /> {t('Accept all ({n})', { n: pending })}</button>}
         <button type="button" className="sk-btn sk-btn-sm sk-btn-ghost sk-btn-icon" onClick={more} aria-label={t('More')}><MoreHorizontal size={14} /></button>
       </div>
 
       {book.meta.series && <SeriesSection book={book} />}
       <StorySection book={book} />
+      {readyOpen && <ReadyPanel book={book} />}
       {revising && <RevisePanel book={book} />}
 
       {issues && (
@@ -623,6 +633,42 @@ function StorySection({ book }: { book: Book }) {
           )}
         </div>
       </>}
+    </section>
+  )
+}
+
+/** Ready to write? What the outline and the bible still lack: found here for free, then by Claude. */
+function ReadyPanel({ book }: { book: Book }) {
+  const report = useFlow(s => s.marks.ready)
+  const busy = useFlow(s => s.busy)
+  const t = useT()
+  const free = useMemo(() => gaps(book), [book])
+  const gapText = (g: Gap) => ({
+    noplan: t('Chapter {n} has no plan: nothing to write it from.', { n: g.n ?? 0 }),
+    nogoal: t('Chapter {n} has no goal.', { n: g.n ?? 0 }),
+    nobeats: t('Chapter {n}: {k} scene(s) without beats. Detail the chapter.', { n: g.n ?? 0, k: g.count ?? 0 }),
+    nopov: t('Chapter {n}: {k} scene(s) without a point of view.', { n: g.n ?? 0, k: g.count ?? 0 }),
+    noentry: t('{name} is in {k} scenes and has no bible entry.', { name: g.name ?? '', k: g.count ?? 0 }),
+    novoice: t('{name} is in {k} scenes and has no voice card.', { name: g.name ?? '', k: g.count ?? 0 }),
+  })[g.code]
+  return (
+    <section className="pl-ol-issues">
+      <div className="pl-row">
+        <b className="pl-grow">{t('Ready to write?')}</b>
+        <button type="button" className="sk-btn sk-btn-sm sk-btn-primary" disabled={!!busy} onClick={runReady}>{busy === 'ready' ? t('Checking…') : report ? t('Check again') : t('Check everything')}</button>
+        <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm" onClick={() => useFlow.setState({ open: false })}>{t('Close')}</button>
+      </div>
+      <p className="sk-hint">{t('What the outline and the bible still lack before the book is written chapter by chapter. The first lines are found on this computer; Check everything has Claude read the outline and the bible.')}</p>
+      {free.length > 0 && <ul className="pl-flow-list">{free.map((g, i) => <li key={i}>{gapText(g)}</li>)}</ul>}
+      {!free.length && !report && <p className="sk-hint">{t('Nothing found without Claude.')}</p>}
+      {report && (
+        <>
+          <p><b>{report.ready ? t('Ready.') : t('Not ready yet.')}</b> {report.verdict} <span className="sk-hint">({new Date(report.date).toLocaleDateString(numLocale())})</span></p>
+          <ul className="pl-flow-list">
+            {report.items.map((x, i) => <li key={i}><b>{x.n ? `${t('Chapter')} ${x.n} · ` : ''}{x.title}</b>{x.fix ? <span className="sk-hint"> {x.fix}</span> : null}</li>)}
+          </ul>
+        </>
+      )}
     </section>
   )
 }

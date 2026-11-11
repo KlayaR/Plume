@@ -9,7 +9,8 @@ import { SettingRow } from '../studio-kit/shell.js'
 import ManuscriptOptions from './ManuscriptOptions'
 import GoalsPanel from './GoalsPanel'
 import { findScene, useStore, type Scope, type View } from '../store'
-import { useAI } from '../editor/actions'
+import { useAI, writeChapter } from '../editor/actions'
+import { openEdit } from '../edit'
 import { toggleDraft, useDraft } from '../editor/draft'
 import { toggleScratch, useScratch } from '../scratch'
 import { bookCounts, feuillets, sceneCounts } from '../lib/stats'
@@ -209,6 +210,24 @@ function Crumbs() {
   )
 }
 
+/** The chapter you are in: Claude writes what its plan holds and is not written yet, and edits what is. */
+function ChapterTools() {
+  const book = useStore(s => s.book)
+  const sceneId = useStore(s => s.sceneId)
+  const running = useAI(s => s.running)
+  const t = useT()
+  const c = findScene(book, sceneId)?.chapter
+  if (!c) return null
+  const toWrite = c.scenes.some(s => !s.text.trim() && (s.note?.trim() || s.beats?.length))
+  const written = c.scenes.some(s => s.text.trim())
+  return (
+    <>
+      {toWrite && <button type="button" className="sk-btn sk-btn-sm" disabled={!!running} title={t('Claude writes every planned scene of this chapter that has no text yet, from its card and the bible. A snapshot is taken first.')} onClick={() => writeChapter(c.id)}>{running === 'chapter' ? t('Writing…') : t('Write the chapter')}</button>}
+      {written && <button type="button" className="sk-btn sk-btn-sm" title={t('An editor’s read of this chapter: what is wrong, with the exact words, and the fixes')} onClick={() => openEdit(c.id)}>{t('Edit the chapter')}</button>}
+    </>
+  )
+}
+
 export function ManuscriptToolbar() {
   const prefs = useStore(s => s.prefs)
   const drafting = useDraft(s => s.on)
@@ -222,7 +241,8 @@ export function ManuscriptToolbar() {
         <button type="button" aria-pressed={prefs.mode === 'review'} onClick={() => st().setPrefs({ mode: 'review' })} title={t('Review: spellcheck and text figures')}>{t('Review')}</button>
       </span>
       <ViewMenu />
-      <button type="button" className="pl-quiet pl-splitbtn" aria-pressed={drafting} onMouseDown={e => e.preventDefault()} onClick={toggleDraft} title={t('Draft mode: write forward only, no going back')}><ChevronsRight size={15} /></button>
+      <ChapterTools />
+      {!prefs.simple && <button type="button" className="pl-quiet pl-splitbtn" aria-pressed={drafting} onMouseDown={e => e.preventDefault()} onClick={toggleDraft} title={t('Draft mode: write forward only, no going back')}><ChevronsRight size={15} /></button>}
       <button type="button" className="pl-quiet" onClick={() => useStore.setState({ dialog: 'find' })} title={t('Find and replace in the book') + ' (Ctrl+Shift+F)'}><Search size={15} /></button>
     </div>
   )

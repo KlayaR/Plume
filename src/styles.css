@@ -1161,6 +1161,8 @@ body.pl-typing .pl-draftbar { opacity: 0.08; }
 .pl-curve-bars span.pl-warn { background: var(--danger, #c0392b); }
 .pl-letter { margin: 8px 0; }
 .pl-letter-text { white-space: pre-wrap; line-height: 1.55; max-height: 22rem; overflow: auto; padding: 8px 0; }
+.pl-flow-list { margin: 8px 0 0; padding-left: 18px; font-size: var(--fs-sm); display: flex; flex-direction: column; gap: 3px; }
+.pl-ol-steps { display: flex; flex-wrap: wrap; gap: 6px; }
 .pl-pitch { margin: 6px 0 12px; }
 .pl-pitch .pl-letter-text { max-height: 16rem; }
 .pl-reads { gap: 4px; }

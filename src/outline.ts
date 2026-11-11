@@ -199,6 +199,8 @@ export async function checkOutline() {
 - rythme : trop de chapitres calmes ou trop de chapitres d’action à la suite (lignes Pace) ;
 - magie : un problème réglé par la magie sans que ce pouvoir ait été établi avant, une limite ou un prix qui ne coûtent jamais rien à personne ;
 - ton : des scènes ou des personnages qui trahissent le ton et les livres comparables des fondations (un personnage tout bon ou tout mauvais dans une histoire aux personnages gris, par exemple) ;
+- arcs des personnages : pour chaque personnage, à la mesure de son importance dans l’histoire, un arc qui commence, évolue et se conclut ; un personnage principal qui ne change pas, ou qui change sans cause ;
+- matière : un chapitre dont la carte est trop mince pour être écrit en entier (pas d’événement précis, pas de tension, pas de tournant) ;
 - cohérence avec la bible, le pitch et les fondations.${book.meta.series ? `
 - série : une graine que <series> demande à ce tome et qu’il ne pose jamais (lignes Seeds) ; un événement, une révélation ou un fil que <series> garde pour un tome suivant et que ce plan résout, révèle ou commence trop tôt.` : ''}
 Pour chacun : "n" (le numéro du chapitre concerné), "chapter" (son titre), le problème et une correction concrète. En français.`
@@ -209,6 +211,8 @@ Pour chacun : "n" (le numéro du chapitre concerné), "chapter" (son titre), le 
 - pace: too many quiet or too many action chapters in a row (Pace lines);
 - magic: a problem solved by magic that wasn't set up before, a limit or cost that never costs anyone anything;
 - tone: scenes or characters that break the foundation's tone and comparable books (a purely good or purely evil character in a story of gray characters, say);
+- character arcs: for each character, in proportion to their importance in the story, an arc that starts, moves and concludes; a main character who doesn't change, or changes without cause;
+- material: a chapter whose card is too thin to be written in full (no precise event, no tension, no turn);
 - consistency with the bible, the premise and the foundation.${book.meta.series ? `
 - series: a seed <series> needs from this book that it never plants (Seeds lines); an event, revelation or thread <series> keeps for a later book that this outline resolves, reveals or starts too early.` : ''}
 For each: "n" (the number of the chapter it concerns), "chapter" (its title), the problem and a concrete fix.`,
@@ -362,7 +366,7 @@ export async function proposeFoundation() {
   if (!book || useOutline.getState().busy) return
   const F = fr(book)
   const { messages } = (await import('./chat')).useChat.getState()
-  const chat = messages.slice(-30).map(m => `<${m.role}>\n${m.text}\n</${m.role}>`).join('\n')
+  const chat = messages.slice(-80).map(m => `<${m.role}>\n${m.text}\n</${m.role}>`).join('\n')
   const message = [
     grounding(book),
     chat ? `<conversation>\n${chat}\n</conversation>` : '',

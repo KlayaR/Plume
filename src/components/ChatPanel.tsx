@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from 'react'
 import { ask } from '@tauri-apps/plugin-dialog'
 import { BookOpen, Check, History, ListPlus, MessageSquarePlus, Pencil, Pin, PinOff, Send, Square, Trash2, X } from 'lucide-react'
 import { useStore } from '../store'
-import { deleteChat, endInterview, endTalk, newChat, openChat, readsTokens, renameChat, send, sendMode, setReads, CHAT_MODES, stopChat, turnIntoEntries, useChat } from '../chat'
+import { deleteChat, draftEssentials, endGuide, endInterview, endTalk, newChat, openChat, readsTokens, renameChat, send, sendMode, setReads, startGuide, CHAT_MODES, stopChat, turnIntoEntries, useChat } from '../chat'
 import { numLocale } from '../i18n'
 import { useT } from '../i18n'
 import { BackendModelSelect } from './ModelPresets'
@@ -45,6 +45,7 @@ export default function ChatPanel() {
   const streaming = useChat(s => s.streaming)
   const interview = useChat(s => s.interview)
   const persona = useChat(s => s.persona)
+  const guide = useChat(s => s.guide)
   const reads = useChat(s => s.reads)
   const [picking, setPicking] = useState(false)
   const busy = useChat(s => s.busy)
@@ -79,6 +80,7 @@ export default function ChatPanel() {
         </span>
         {target && !list && !picking && <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm" onClick={endInterview}>{t('End')}</button>}
         {who && !target && !list && !picking && <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm" title={t('Back to a normal conversation')} onClick={endTalk}>{t('End')}</button>}
+        {guide && !target && !who && !list && !picking && <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm" title={t('Back to a normal conversation')} onClick={endGuide}>{t('End')}</button>}
         {picking && <button type="button" className="sk-btn sk-btn-primary sk-btn-sm" onClick={() => setPicking(false)}>{t('Done')}</button>}
         <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm sk-btn-icon" aria-pressed={list} title={t('Past conversations')} onClick={() => { setList(l => !l); setPicking(false) }}>
           <History size={14} />
@@ -120,6 +122,9 @@ export default function ChatPanel() {
             {messages.length === 0 && streaming === null && !who && (
               <p className="sk-hint">{t('Think out loud with Claude: characters, places, twists. It knows your bible. When you like something, "Turn into entries" drafts it for your review.')}</p>
             )}
+            {messages.length === 0 && streaming === null && !who && !guide && !target && (
+              <button type="button" className="sk-btn sk-btn-sm" title={t('Claude leads: one question at a time (idea, characters, world, stakes, ending), until there is enough to build the bible and the outline')} onClick={startGuide}>{t('Start the guided brainstorm')}</button>
+            )}
             {messages.map((m, i) => <div key={i} className={`pl-msg pl-msg-${m.role}`} onContextMenu={e => showMenu(e, messageMenu(i))}>{m.text}</div>)}
             {streaming !== null && <div className="pl-msg pl-msg-assistant pl-msg-streaming">{streaming || '…'}</div>}
           </div>
@@ -128,7 +133,7 @@ export default function ChatPanel() {
             onChange={e => setText(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); go() } }} />
           <div className="pl-chips" role="group" aria-label={t('Ways to brainstorm')}>
-            {!who && CHAT_MODES.map(m => <button key={m.id} type="button" className="pl-chip" disabled={streaming !== null} title={t(m.hint)} onClick={() => { sendMode(m.id, text); setText('') }}>{t(m.label)}</button>)}
+            {!who && !guide && CHAT_MODES.map(m => <button key={m.id} type="button" className="pl-chip" disabled={streaming !== null} title={t(m.hint)} onClick={() => { sendMode(m.id, text); setText('') }}>{t(m.label)}</button>)}
           </div>
           <div className="pl-row pl-chat-model">
             <BackendModelSelect />
@@ -140,8 +145,8 @@ export default function ChatPanel() {
               ? <button type="button" className="sk-btn sk-btn-danger sk-btn-sm" onClick={stopChat}><Square size={13} /> {t('Stop')}</button>
               : <button type="button" className="sk-btn sk-btn-primary sk-btn-sm" disabled={!text.trim()} onClick={go}><Send size={13} /> {t('Send')}</button>}
             <span className="pl-grow" />
-            <button type="button" className="sk-btn sk-btn-sm" disabled={!messages.length || !!busy || streaming !== null} onClick={turnIntoEntries} title={t('Drafts entries from the conversation into the review list')}>
-              <ListPlus size={13} /> {busy === 'entries' ? t('Drafting…') : t('Turn into entries')}
+            <button type="button" className="sk-btn sk-btn-sm" disabled={!messages.length || !!busy || streaming !== null} onClick={guide ? draftEssentials : turnIntoEntries} title={guide ? t('From the open conversation: the entries the book cannot be outlined without, first; the others are listed for later') : t('Drafts entries from the conversation into the review list')}>
+              <ListPlus size={13} /> {busy === 'entries' ? t('Drafting…') : guide ? t('Draft the essential entries') : t('Turn into entries')}
             </button>
           </div>
         </>

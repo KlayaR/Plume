@@ -143,13 +143,13 @@ export default function ContextPanel() {
             <Send size={14} /> {t(LABELS[action].button)}
           </button>
         )}
-        {!running && (
+        {!running && !prefs.simple && (
           <button type="button" className="sk-btn" disabled={hasProposal} title={t('Three versions side by side; keep the one you like')}
             onClick={async () => { const r = await alternatives(action, instruction, overrides); if (r) setAlts({ ...r, original: getEditorView()?.state.doc.sliceString(r.from, r.to) ?? '' }) }}>
             <Copy size={14} /> {t('×3')}
           </button>
         )}
-        {!running && (
+        {!running && !prefs.simple && (
           <button type="button" className="sk-btn" disabled={hasProposal} title={t('Claude suggests what could come next and asks a question, and writes nothing: you write')}
             onClick={async () => { const r = await suggestNext(overrides); if (r) setNudges(r) }}>
             <Lightbulb size={14} /> {t('Suggest')}
@@ -170,10 +170,10 @@ export default function ContextPanel() {
         </section>
       )}
 
-      <details className="pl-fold" open={prefs.assistQuick} onToggle={e => setFold({ assistQuick: e.currentTarget.open })}>
+      <details className="pl-fold" open={prefs.simple || prefs.assistQuick} onToggle={e => setFold({ assistQuick: e.currentTarget.open })}>
         <summary>{t('Quick actions')}</summary>
         <div className="pl-row pl-quick" role="group" aria-label={t('Quick actions')}>
-          {QUICK.map(([id, label, hint]) => (
+          {QUICK.filter(([id]) => !prefs.simple || id === 'expand' || id === 'shorten').map(([id, label, hint]) => (
             <button key={id} type="button" className="sk-btn sk-btn-sm sk-btn-ghost" disabled={hasProposal || !!running} title={t(hint)} onClick={() => runAction(id, '', overrides)}>{t(label)}</button>
           ))}
         </div>

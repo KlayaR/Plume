@@ -31,6 +31,7 @@ import { adverbs, passives, echoes, sentences } from './analysis'
 import { backupsToRemove, versionsToRemove } from './backups'
 import { bookRepeats } from './repeats'
 import { promiseList } from './promises'
+import { gaps, readReady } from './workflow'
 import { chosenScenes, driftText, dropsOf, manuscriptText, movementsOf, nudgeMessage, readCurve, readNudges, readPitch } from './editorial'
 import { aiTells, checkRules, expandVariables, resolveIncludes, usedPromptIds } from './voice'
 import { review, reviewChecks, topProblems } from './review'
@@ -2137,5 +2138,32 @@ describe('0.50: selling materials, reading list, prompt fragments', () => {
     const b = bookOf([scene('a', 'x')], [])
     b.meta.voice = { ...b.meta.voice, prompt: 'preset-noir', actionPrompts: { rewrite: 'preset-thriller' } }
     expect(usedPromptIds(b).sort()).toEqual(['preset-noir', 'preset-thriller'])
+  })
+})
+
+describe('0.51: ready to write?', () => {
+  const planned = (id: string, over: Partial<Scene> = {}) => scene(id, '', { note: 'Something happens.', ...over })
+  const three = (b: Book, make: (i: number) => Scene[]) => { b.chapters = [1, 2, 3].map(i => ({ ...b.chapters[0], id: `c${i}`, title: `Ch ${i}`, scenes: make(i) })); return b }
+  it('finds what the plan and the bible lack, without Claude', () => {
+    const b = three(bookOf([], [elise]), i => i === 3 ? [scene('s3', '')] : [planned(`s${i}a`, { cast: ['Élise Varenne', 'Marc'], pov: i === 1 ? 'elise' : null }), planned(`s${i}b`, { cast: ['Lise', 'Marc'], beats: ['x'], pov: 'elise' })])
+    b.chapters[0].goal = 'Get in.'
+    const found = gaps(b)
+    expect(found.filter(g => g.code === 'noplan').map(g => g.n)).toEqual([3])
+    expect(found.filter(g => g.code === 'nogoal').map(g => g.n)).toEqual([2])
+    expect(found.filter(g => g.code === 'nobeats').map(g => [g.n, g.count])).toEqual([[1, 1], [2, 1]])
+    expect(found.filter(g => g.code === 'nopov').map(g => [g.n, g.count])).toEqual([[2, 1]])
+    expect(found.find(g => g.code === 'noentry')).toMatchObject({ name: 'Marc', count: 4 })
+    // Élise is named in four scenes (once by an alias) and has no voice card.
+    expect(found.find(g => g.code === 'novoice')).toMatchObject({ name: 'Élise Varenne' })
+    // A written chapter needs no preparing.
+    expect(gaps(bookOf([scene('a', 'Written.')]))).toEqual([])
+  })
+  it('reads Claude’s verdict and never calls a book ready while something blocks', () => {
+    expect(readReady({ ready: true, verdict: ' Fine. ', items: [] }, 5)).toEqual({ ready: true, verdict: 'Fine.', items: [] })
+    const r = readReady({ ready: true, verdict: 'x', items: [{ kind: 'arc', n: 9, title: 'Marc has no arc', fix: 'Give him one' }, { title: '' }, null] }, 5)
+    expect(r?.ready).toBe(false)
+    expect(r?.items).toEqual([{ kind: 'arc', title: 'Marc has no arc', fix: 'Give him one' }])
+    expect(readReady({}, 5)).toBeNull()
+    expect(readReady('junk', 5)).toBeNull()
   })
 })
