@@ -2,8 +2,9 @@
 // (or one chapter), with what a writer needs to act on it: each flagged passage with
 // its sentence and where it is, how many are over the target, a score per category
 // and per chapter, and what to fix first. Nothing here calls Claude.
-import type { Book, Chapter } from './types'
-import { CATEGORIES, review, statusOf, type Category, type ReportDef, type Status } from './review'
+import type { Book, Chapter, EdIgnore } from './types'
+import { CATEGORIES, reportsFor, review, statusOf, type Category, type ReportDef, type Status } from './review'
+import { isLitRPG, maskSystem } from './serial'
 
 /** One flagged passage: where it is, its words, and the sentence around it. */
 export interface Hit {
@@ -73,13 +74,13 @@ export function contextOf(text: string, from: number, to: number): { context: st
   return { context: text.slice(a + lead, b).trimEnd(), at: from - a - lead, len: to - from }
 }
 
-const written = (c: Chapter) => c.scenes.filter(s => s.text.trim())
 
 /**
- * The analysis of the book, or of one chapter. Each chapter is read as one text (so
+ * The analysis of the book, of one chapter, or of one scene of it. Each chapter is read as one text (so
  * echoes and repeated openings across its scenes count), then the chapters are added up.
  */
-export function editBook(book: Book, chapterId?: string | null, refs?: Record<string, number> | null): BookEdit {
+export function editBook(book: Book, chapterId?: string | null, refs?: Record<string, number> | null, ignores: EdIgnore[] = [], sceneId?: string | null): BookEdit {
+  const written = (c: Chapter) => c.scenes.filter(s => s.text.trim() && (!sceneId || s.id === sceneId))
   const scope = book.chapters.map((c, i) => ({ c, n: i + 1 })).filter(x => written(x.c).length && (!chapterId || x.c.id === chapterId))
   const sums = new Map<string, ReportSum & { denom: number }>()
   const chapters: ChapterSum[] = []
@@ -95,18 +96,23 @@ export function editBook(book: Book, chapterId?: string | null, refs?: Record<st
     const cats = Object.fromEntries(CATEGORIES.map(x => [x.id, [] as number[]])) as Record<Category, number[]>
     for (const x of r.results) {
       const sum = sums.get(x.def.id) ?? { def: x.def, count: 0, rate: 0, target: x.target, fromRef: x.fromRef, status: 'good' as Status, excess: 0, score: 100, hits: [], words: [], byChapter: scope.map(() => 0), denom: 0 }
-      sum.count += x.count
-      sum.denom += denomOf(x.def.unit)
-      sum.byChapter[k] = x.count
+      let kept = 0
       for (const f of x.findings) {
         const part = [...parts].reverse().find(p => p.start <= f.from)
         if (!part) continue
         const from = f.from - part.start, to = Math.min(f.to - part.start, part.text.length)
         if (to <= from) continue
-        sum.hits.push({ sceneId: part.id, chapter: n, from, to, ...contextOf(part.text, from, to), note: f.note })
+        const ctx = contextOf(part.text, from, to)
+        if (ignored(ignores, x.def.id, part.id, part.text.slice(from, to), ctx.context)) continue
+        sum.hits.push({ sceneId: part.id, chapter: n, from, to, ...ctx, note: f.note })
+        kept++
       }
+      const denom = denomOf(x.def.unit)
+      sum.count += kept
+      sum.denom += denom
+      sum.byChapter[k] = kept
       sums.set(x.def.id, sum)
-      cats[x.def.category].push(scoreOf(x.rate, x.target))
+      cats[x.def.category].push(scoreOf(denom ? (kept / denom) * K[x.def.unit] : 0, x.target))
     }
     cats.readability.push(readabilityScore(r.readability))
     const catScore = Object.fromEntries(CATEGORIES.map(x => [x.id, mean(cats[x.id])])) as Record<Category, number>
@@ -141,4 +147,43 @@ function flaggedWords(book: Book, hits: Hit[]): [string, number][] {
 /** What to fix first: the reports furthest over their target, worst first. */
 export function fixFirst(e: BookEdit, n = 5): ReportSum[] {
   return e.reports.filter(r => r.status !== 'good' && r.excess > 0).sort((a, b) => a.score - b.score || b.excess - a.excess).slice(0, n)
+}
+
+// --- Ignored passages ------------------------------------------------------------------------
+
+/** What an "Ignore here" remembers: the flagged words and the sentence they are in. */
+export const ignoreKey = (hit: string, sentence: string) => `${hit}|${sentence.replace(/\s+/g, ' ').trim()}`
+
+/** True if a flagged passage was ignored: this one in its scene, or these words everywhere for this report. */
+export function ignored(list: EdIgnore[], report: string, sceneId: string, hit: string, sentence: string): boolean {
+  if (!list.length) return false
+  const w = hit.trim().toLowerCase()
+  const k = ignoreKey(hit, sentence)
+  return list.some(x => x.r === report && (x.w !== undefined ? x.w === w : x.s === sceneId && x.k === k))
+}
+
+// --- One scene's marks, for the highlights in the text -----------------------------------------
+
+/** A flagged passage in one scene's text: which report, and the sentence it is in. */
+export interface Mark { from: number; to: number; report: string; category: Category; note?: string; sentence: string; at: number }
+
+/**
+ * Every report's findings on one scene, except the reports switched off and the passages
+ * ignored. `only`: a single report (or "word:x", one word) instead of all of them.
+ */
+export function sceneMarks(raw: string, book: Book, sceneId: string, off: string[], ignores: EdIgnore[] = [], only?: string | null): Mark[] {
+  const text = isLitRPG(book) ? maskSystem(raw) : raw
+  const lang = book.meta.language
+  const hidden = new Set(off)
+  const out: Mark[] = []
+  for (const def of reportsFor(book)) {
+    if (only ? only !== def.id : hidden.has(def.id)) continue
+    for (const f of def.find(text, lang, book)) {
+      if (f.to <= f.from) continue
+      const c = contextOf(raw, f.from, f.to)
+      if (ignored(ignores, def.id, sceneId, raw.slice(f.from, f.to), c.context)) continue
+      out.push({ from: f.from, to: f.to, report: def.id, category: def.category, note: f.note, sentence: c.context, at: f.from - c.at })
+    }
+  }
+  return out.sort((a, b) => a.from - b.from || a.to - b.to)
 }

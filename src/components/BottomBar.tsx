@@ -56,7 +56,9 @@ export default function BottomBar() {
   const scene = findScene(book, sceneId)?.scene
   const { words, signs } = bookCounts(book.chapters)
   const here = scene ? sceneCounts(scene) : null
-  const tabs: [View, string][] = [['bible', 'Bible'], ['plan', 'Plan'], ['manuscript', 'Manuscript'], ['editing', 'Editing']]
+  const tabs: [View, string][] = [['bible', 'Bible'], ['plan', 'Plan'], ['manuscript', 'Manuscript']]
+  // Editing is the Manuscript with the editor's panel and its highlights: the same text, read instead of written.
+  const editing = useStore(s => s.prefs.mode === 'review')
   const claude = exe === undefined ? 'Looking for claude…' : exe === null ? 'claude not found' : running ? 'Writing…' : 'claude ready'
   const usageTip = [
     t(claude),
@@ -85,8 +87,9 @@ export default function BottomBar() {
 
       <nav className="pl-seg pl-seg-main" aria-label={t('Spaces')}>
         {tabs.map(([id, label]) => (
-          <button key={id} type="button" aria-pressed={view === id} onClick={() => { if (st().prefs.dual === id) st().setPrefs({ dual: view }); st().setView(id) }}>{t(label)}</button>
+          <button key={id} type="button" aria-pressed={view === id && !(id === 'manuscript' && editing)} onClick={() => { if (st().prefs.dual === id) st().setPrefs({ dual: view }); if (id === 'manuscript') st().setPrefs({ mode: 'write' }); st().setView(id) }}>{t(label)}</button>
         ))}
+        <button type="button" aria-pressed={view === 'manuscript' && editing} title={t('The text with everything the reports flag, highlighted; the editor’s panel on the right')} onClick={() => { if (st().prefs.dual === 'manuscript') st().setPrefs({ dual: view }); st().setPrefs({ mode: 'review' }); st().setView('manuscript') }}>{t('Editing')}</button>
       </nav>
 
       <div className="pl-bar-right">
@@ -148,7 +151,7 @@ function DualMenu() {
   const dual = useStore(s => s.prefs.dual)
   const t = useT()
   const pick = (v: View | null) => { setOpen(false); useStore.getState().setPrefs({ dual: v }) }
-  const names: Record<View, string> = { bible: 'Bible', plan: 'Plan', manuscript: 'Manuscript', editing: 'Editing' }
+  const names: Record<View, string> = { bible: 'Bible', plan: 'Plan', manuscript: 'Manuscript' }
   return (
     <span className="pl-aa" ref={box}>
       <button type="button" className={`pl-quiet ${dual && dual !== view ? 'pl-on' : ''}`} aria-expanded={open} onClick={() => setOpen(o => !o)} title={t('Show a second view beside this one')}><PanelRight size={15} /></button>
@@ -236,10 +239,6 @@ export function ManuscriptToolbar() {
   return (
     <div className="pl-toolbar" role="toolbar" aria-label={t('Manuscript')}>
       <Crumbs />
-      <span className="pl-switch" role="group" aria-label={t('Mode')}>
-        <button type="button" aria-pressed={prefs.mode === 'write'} onClick={() => st().setPrefs({ mode: 'write' })} title={t('Write: the AI panel, no spellcheck')}>{t('Write')}</button>
-        <button type="button" aria-pressed={prefs.mode === 'review'} onClick={() => st().setPrefs({ mode: 'review' })} title={t('Review: spellcheck and text figures')}>{t('Review')}</button>
-      </span>
       <ViewMenu />
       <ChapterTools />
       {!prefs.simple && <button type="button" className="pl-quiet pl-splitbtn" aria-pressed={drafting} onMouseDown={e => e.preventDefault()} onClick={toggleDraft} title={t('Draft mode: write forward only, no going back')}><ChevronsRight size={15} /></button>}

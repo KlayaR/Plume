@@ -233,6 +233,9 @@ export type ActionId = 'continue' | 'rewrite' | 'beats' | 'fill' | 'expand' | 's
 /** Actions that replace the selected passage (the others write at the cursor). */
 export const REWRITE_ACTIONS: ActionId[] = ['rewrite', 'expand', 'shorten', 'show', 'dialogue']
 export const isRewrite = (a: ActionId) => REWRITE_ACTIONS.includes(a)
+/** An ignored finding of the Editing reports: `w`, these words for this report everywhere; else this passage (`k`) in scene `s`. */
+export interface EdIgnore { r: string; w?: string; s?: string; k?: string }
+
 export type Model = 'haiku' | 'sonnet' | 'opus' | 'fable'
 export type Effort = 'low' | 'medium' | 'high' | 'xhigh' | 'max'
 export const MODELS: Model[] = ['haiku', 'sonnet', 'opus', 'fable']
@@ -411,6 +414,8 @@ export interface BookMeta {
   /** Words you added to the dictionary, and LanguageTool rules you turned off. */
   dictionary?: string[]
   ltIgnored?: string[]
+  /** Editing: flagged passages you chose to leave as they are. */
+  edIgnore?: EdIgnore[]
   summary?: string
   foundation?: Partial<Foundation>
   /** Scenes per chapter, as chosen in Outline from a premise; every outline request follows it. */

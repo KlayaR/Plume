@@ -32,7 +32,7 @@ import { backupsToRemove, versionsToRemove } from './backups'
 import { bookRepeats } from './repeats'
 import { promiseList } from './promises'
 import { gaps, readReady } from './workflow'
-import { contextOf, editBook, fixFirst, readabilityScore, scoreOf } from './editing'
+import { contextOf, editBook, fixFirst, ignoreKey, ignored, readabilityScore, sceneMarks, scoreOf } from './editing'
 import { holds } from '../edit'
 import { chosenScenes, driftText, dropsOf, manuscriptText, movementsOf, nudgeMessage, readCurve, readNudges, readPitch } from './editorial'
 import { aiTells, checkRules, expandVariables, resolveIncludes, usedPromptIds } from './voice'
@@ -2218,5 +2218,45 @@ describe('0.52: the Editing analysis', () => {
     expect(holds([{ severity: 'craft' }, { severity: 'craft' }, { severity: 'craft' }])).toBe(false)
     expect(holds([{ severity: 'error' }])).toBe(false)
     expect(holds([])).toBe(true)
+  })
+})
+
+describe('0.53: the reports in the text', () => {
+  const text = 'He suddenly ran to the door. She quickly followed him, very slowly at first. He suddenly stopped.'
+  it('marks every report on a scene, or one alone, minus what is switched off', () => {
+    const b = bookOf([scene('a', text)])
+    const all = sceneMarks(text, b, 'a', [])
+    const adv = all.filter(m => m.report === 'adverbs')
+    expect(adv.map(m => text.slice(m.from, m.to))).toEqual(['suddenly', 'quickly', 'slowly', 'suddenly'])
+    expect(adv[0].category).toBe('strong')
+    expect(adv[0].sentence).toBe('He suddenly ran to the door.')
+    expect(all.some(m => m.report !== 'adverbs')).toBe(true)
+    // In order of where they are, for the decorations.
+    expect(all.map(m => m.from)).toEqual([...all.map(m => m.from)].sort((x, y) => x - y))
+    expect(sceneMarks(text, b, 'a', ['adverbs']).some(m => m.report === 'adverbs')).toBe(false)
+    // "Only this report" shows it even if it is switched off in the list.
+    expect(sceneMarks(text, b, 'a', ['adverbs'], [], 'adverbs').every(m => m.report === 'adverbs')).toBe(true)
+    expect(sceneMarks(text, b, 'a', [], [], 'adverbs')).toHaveLength(4)
+  })
+  it('leaves alone what you ignored: one passage, or a word everywhere', () => {
+    const b = bookOf([scene('a', text), scene('z', 'They suddenly left.')])
+    const here = { r: 'adverbs', s: 'a', k: ignoreKey('suddenly', 'He suddenly stopped.') }
+    expect(ignored([here], 'adverbs', 'a', 'suddenly', 'He suddenly stopped.')).toBe(true)
+    expect(ignored([here], 'adverbs', 'a', 'suddenly', 'He suddenly ran to the door.')).toBe(false)
+    expect(ignored([here], 'echoes', 'a', 'suddenly', 'He suddenly stopped.')).toBe(false)
+    expect(sceneMarks(text, b, 'a', [], [here], 'adverbs').map(m => text.slice(m.from, m.to))).toEqual(['suddenly', 'quickly', 'slowly'])
+    const word = { r: 'adverbs', w: 'suddenly' }
+    expect(sceneMarks(text, b, 'a', [], [word], 'adverbs').map(m => text.slice(m.from, m.to))).toEqual(['quickly', 'slowly'])
+    // The whole-book count follows.
+    const count = (ig: Parameters<typeof editBook>[3]) => editBook(b, null, null, ig).reports.find(r => r.def.id === 'adverbs')!.count
+    expect(count([])).toBe(5)
+    expect(count([here])).toBe(4)
+    expect(count([word])).toBe(2)
+  })
+  it('reads one scene alone', () => {
+    const b = bookOf([scene('a', text), scene('z', 'They suddenly left.')])
+    const one = editBook(b, 'c', null, [], 'z')
+    expect(one.reports.find(r => r.def.id === 'adverbs')!.count).toBe(1)
+    expect(one.words).toBe(3)
   })
 })

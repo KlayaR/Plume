@@ -24,6 +24,8 @@ import { takePending, useEdit } from '../edit'
 import type { Comment, EntryType } from '../lib/types'
 import { cutToDarlings } from '../writing'
 import { useReview } from '../review'
+import { edMarksExt, setEdMarks } from './edmarks'
+import { ignoreKey, sceneMarks } from '../lib/editing'
 import { occurrences, REPORTS } from '../lib/review'
 import { isLitRPG, isLocked, isSystemLine, maskSystem } from '../lib/serial'
 
@@ -183,10 +185,18 @@ function makeState(s: Scene, lang: Lang, locked: boolean) {
       systemLinesExt,
       captureExt(s.id),
       commentColumnExt,
+      edMarksExt({
+        label: id => t(REPORTS.find(r => r.id === id)?.label ?? id),
+        help: id => t(REPORTS.find(r => r.id === id)?.help ?? ''),
+        ignoreHere: (m, hit) => { const st = useStore.getState(); st.updateMeta({ edIgnore: [...(st.book?.meta.edIgnore ?? []), { r: m.report, s: s.id, k: ignoreKey(hit, m.sentence) }] }) },
+        ignoreWord: (m, hit) => { const st = useStore.getState(); st.updateMeta({ edIgnore: [...(st.book?.meta.edIgnore ?? []), { r: m.report, w: hit.trim().toLowerCase() }] }) },
+        only: id => useReview.setState({ report: id }),
+        hide: id => { const st = useStore.getState(); st.setPrefs({ edOff: [...new Set([...(st.prefs.edOff ?? []), id])] }); if (useReview.getState().report === id) useReview.setState({ report: null }) },
+      }),
       spelling.of(spellingExt(windowsSpell())),
       languageToolExt({
         // Review mode, LanguageTool chosen, and this is the scene you are in.
-        enabled: () => { const st = useStore.getState(); return (st.prefs.mode === 'review' || st.prefs.ltLive) && st.prefs.spell === 'languagetool' && st.sceneId === s.id },
+        enabled: () => { const st = useStore.getState(); return (st.prefs.mode === 'review' ? st.prefs.edLT !== false : st.prefs.ltLive) && st.prefs.spell === 'languagetool' && st.sceneId === s.id },
         check: checkWithLT,
         addWord: w => { const st = useStore.getState(); st.updateMeta({ dictionary: [...(st.book?.meta.dictionary ?? []), w] }) },
         ignoreRule: r => { const st = useStore.getState(); st.updateMeta({ ltIgnored: [...(st.book?.meta.ltIgnored ?? []), r] }) },
@@ -311,13 +321,36 @@ export default function Editor({ scene }: { scene: Scene }) {
   useEffect(() => {
     const timer = setTimeout(() => {
       const v = viewRef.current
-      if (v) v.dispatch({ effects: setHighlights.of({ key: 'review', list: reviewHighlights(v.state.doc.toString(), report, aiFound) }) })
+      if (v) v.dispatch({ effects: setHighlights.of({ key: 'review', list: reviewHighlights(v.state.doc.toString(), report === 'ai' || report?.startsWith('word:') ? report : null, aiFound) }) })
     }, report ? 300 : 0)
     return () => clearTimeout(timer)
   }, [report, aiFound, scene.text])
+  // Editing: every report's findings on this scene (minus the reports switched off and what you ignored), or one report alone.
+  const edOff = useStore(s => s.prefs.edOff)
+  const edIgnore = useStore(s => s.book!.meta.edIgnore)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const v = viewRef.current
+      const book = useStore.getState().book
+      if (!v || !book) return
+      const on = mode === 'review' && report !== 'ai' && !report?.startsWith('word:')
+      v.dispatch({ effects: setEdMarks.of(on ? sceneMarks(v.state.doc.toString(), book, scene.id, edOff ?? [], edIgnore ?? [], report) : []) })
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [mode, report, edOff, edIgnore, scene.text, scene.id])
+  // Claude's editor: its findings on this scene stay in the text until they are fixed or cleared.
+  const edFound = useEdit(s => s.findings)
+  useEffect(() => {
+    const v = viewRef.current
+    if (!v) return
+    const doc = v.state.doc.toString()
+    const list = edFound.filter(f => f.sceneId === scene.id && f.quote).flatMap(f => { const at = doc.indexOf(f.quote); return at < 0 ? [] : [{ from: at, to: at + f.quote.length, cls: 'cm-review-ai', title: `${f.problem}${f.fix ? ` → ${f.fix}` : ''}` }] })
+    v.dispatch({ effects: setHighlights.of({ key: 'edit', list }) })
+  }, [edFound, scene.text, scene.id])
   const spell = useStore(s => s.prefs.spell)
   const ltLive = useStore(s => s.prefs.ltLive)
-  useEffect(() => { viewRef.current?.dispatch({ effects: [spelling.reconfigure(spellingExt(mode === 'review' && spell === 'windows')), refreshLT.of(null)] }) }, [mode, spell, ltLive])
+  const edLT = useStore(s => s.prefs.edLT)
+  useEffect(() => { viewRef.current?.dispatch({ effects: [spelling.reconfigure(spellingExt(mode === 'review' && spell === 'windows')), refreshLT.of(null)] }) }, [mode, spell, ltLive, edLT])
   // Coming from Find: select the match once this scene is the open one.
   const jump = useStore(s => s.jump)
   useEffect(() => {

@@ -2,12 +2,14 @@
 // category (pacing, dialogue, strong writing, word choice, repetition,
 // readability) compared with targets, each highlighted in the text with
 // next / previous. Then the AI checks on demand, read aloud, and the figures.
-import { fixFlagged, openEdit } from '../edit'
+import { closeEdit, fixChapter, fixFlagged, openEdit, useEdit } from '../edit'
 import { useEffect, useMemo, useState } from 'react'
 import { ChevronDown, ChevronLeft, ChevronRight, Pause, Play, FileCheck2, Sparkles, Users, Wand2 } from 'lucide-react'
 import { findScene, useStore } from '../store'
 import { textStats, type TextStats } from '../lib/stats'
-import { CATEGORIES, review, topProblems, type ReportResult } from '../lib/review'
+import { CATEGORIES, reportsFor, type Category } from '../lib/review'
+import { editBook, fixFirst, type BookEdit, type Hit, type ReportSum } from '../lib/editing'
+import { askText } from '../contextMenu'
 import { getEditorView, useAI } from '../editor/actions'
 import { betaCost, betaRead, continuityCheck, continuityCost, lineEdit, lineEditCost, loadVoices, PERSONAS, readAloud, stopReading, useReview, voiceCheck, voiceCheckCost, voicesFor } from '../review'
 import { refreshLT, useLT } from '../editor/lt'
@@ -20,7 +22,12 @@ import { costText } from '../cost'
 
 const n = (x: number, d = 0) => x.toLocaleString(numLocale(), { maximumFractionDigits: d, minimumFractionDigits: d })
 
-type Scope = 'scene' | 'chapter'
+type Scope = 'scene' | 'chapter' | 'book'
+const PAGE = 30
+const NONE: never[] = []
+const tone = (score: number) => score >= 85 ? 'pl-good' : score >= 60 ? 'pl-ok' : 'pl-bad'
+/** The last whole-book reading, kept while you move around (it takes a few seconds on a novel). */
+let kept: { chapters: unknown; ignores: unknown; value: BookEdit } | null = null
 
 /** A value that follows another once it has stopped changing for `ms`. */
 function useSettled<T>(value: T, ms: number): T {
@@ -35,104 +42,198 @@ export default function ReviewPanel() {
   const found = findScene(book, sceneId)!
   const { scene, chapter, label } = found
   const report = useReview(s => s.report)
-  const [scope, setScope] = useState<Scope>('scene')
-  const [open, setOpen] = useState<string | null>(null)
-  const [all, setAll] = useState(false)
   const simple = useStore(s => s.prefs.simple)
+  const off = useStore(s => s.prefs.edOff) ?? NONE
+  const sets = useStore(s => s.prefs.edSets) ?? NONE
+  const edLT = useStore(s => s.prefs.edLT)
+  const spell = useStore(s => s.prefs.spell)
+  const [scope, setScope] = useState<Scope>('chapter')
+  const [open, setOpen] = useState<string | null>(null)
+  const [word, setWord] = useState<string | null>(null)
+  const [shown, setShown] = useState(PAGE)
   const t = useT()
-  const text = scope === 'scene' ? scene.text : chapter.scenes.map(s => s.text).join('\n')
   const refList = useRefs(s => s.list)
   const refs = useMemo(() => referenceTargets(refList, book.meta.language), [refList, book.meta.language])
-  // The reports run a moment after you stop typing, not on every key.
-  const settled = useSettled(text, 400)
-  const r = useMemo(() => review(settled, book, refs?.rates), [settled, book.meta, book.entries, refs])
-  // Leaving Review takes the highlights away.
+  const ignores = book.meta.edIgnore ?? NONE
+  // The reports are read again a moment after you stop typing, not on every key.
+  const settled = useSettled(book.chapters, 500)
+  const near = useMemo(() => scope === 'book' ? null : editBook(book, chapter.id, refs?.rates, ignores, scope === 'scene' ? scene.id : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [settled, scope, scene.id, chapter.id, refs, ignores, book.meta])
+  // The whole book is read when you ask for it, and again only when you say so.
+  const [whole, setWhole] = useState<BookEdit | null>(kept?.value ?? null)
+  const fresh = !!kept && kept.chapters === book.chapters && kept.ignores === ignores
+  const readBook = () => { setWhole(null); setTimeout(() => { const b = useStore.getState().book!; const value = editBook(b, null, refs?.rates, b.meta.edIgnore ?? NONE); kept = { chapters: b.chapters, ignores: b.meta.edIgnore ?? NONE, value }; setWhole(value) }, 40) }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (scope === 'book' && !kept) readBook() }, [scope])
+  // Leaving Editing shows every report again next time.
   useEffect(() => () => useReview.setState({ report: null }), [])
+  const e = scope === 'book' ? whole : near
+  const first = useMemo(() => e ? fixFirst(e, 4) : [], [e])
+  const text = scope === 'scene' ? scene.text : chapter.scenes.map(s => s.text).join('\n')
 
-  const top = topProblems(r.results)
-  // No score to chase: how many reports are over their target.
-  const over = r.results.filter(x => x.status !== 'good').length
-  const color = over === 0 ? 'pl-good' : over <= 3 ? 'pl-ok' : 'pl-bad'
+  const defs = useMemo(() => reportsFor(book), [book.meta.kind])
+  const setOff = (list: string[]) => useStore.getState().setPrefs({ edOff: list })
+  const idsOf = (c: Category) => defs.filter(d => d.category === c).map(d => d.id)
+  const toggle = (id: string) => setOff(off.includes(id) ? off.filter(x => x !== id) : [...off, id])
+  const toggleCat = (c: Category) => { const ids = idsOf(c); setOff(ids.every(i => off.includes(i)) ? off.filter(x => !ids.includes(x)) : [...new Set([...off, ...ids])]) }
+  const onlyCat = (c: Category) => defs.filter(d => d.category !== c).map(d => d.id)
+  const same = (a: string[], b: string[]) => a.length === b.length && a.every(x => b.includes(x))
+  const choice = !off.length ? 'all' : CATEGORIES.find(c => c.id !== 'readability' && same(off, onlyCat(c.id)))?.id ?? (sets.findIndex(x => same(x.off, off)) >= 0 ? `set:${sets.findIndex(x => same(x.off, off))}` : 'custom')
+  const choose = (v: string) => {
+    useReview.setState({ report: null })
+    if (v === 'all') setOff([])
+    else if (v.startsWith('set:')) setOff(sets[Number(v.slice(4))]?.off ?? [])
+    else if (v !== 'custom') setOff(onlyCat(v as Category))
+  }
+  const saveSet = async () => { const name = (await askText(t('Name this selection of reports')))?.trim(); if (name) useStore.getState().setPrefs({ edSets: [...sets.filter(x => x.name !== name), { name, off }] }) }
+  const dropSet = (i: number) => useStore.getState().setPrefs({ edSets: sets.filter((_, k) => k !== i) })
+
+  const unit = (r: ReportSum) => r.def.unit === 'per1000' ? t('/ 1,000 words') : '%'
+  const show = (id: string) => { setOpen(open === id ? null : id); setWord(null); setShown(PAGE) }
+  /** Shows the passage in the text beside, selected (in another scene, it opens that scene). */
+  const goTo = (h: Hit) => {
+    useStore.setState({ jump: { sceneId: h.sceneId, from: h.from, to: h.to } })
+    if (h.sceneId !== useStore.getState().sceneId) useStore.getState().selectScene(h.sceneId)
+  }
+  const hitWord = (h: Hit) => h.context.slice(h.at, h.at + h.len).toLocaleLowerCase(book.meta.language)
+
   return (
     <aside className="pl-context pl-review-panel">
       <div className="pl-row">
         <span className="sk-segmented pl-grow" role="group">
           <button type="button" aria-pressed={scope === 'scene'} onClick={() => setScope('scene')}>{t('This scene')}</button>
           <button type="button" aria-pressed={scope === 'chapter'} onClick={() => setScope('chapter')}>{label}</button>
+          <button type="button" aria-pressed={scope === 'book'} onClick={() => setScope('book')}>{t('Book')}</button>
         </span>
       </div>
 
-      <section className="pl-scorebox">
-        <div className={`pl-score ${color}`}>{r.words ? over : '–'}</div>
-        <div>
-          <div className="sk-label">{t('Reports over their target')}</div>
-          <p className="sk-hint">{t('How many reports are over their target. They show what is there; whether it is a fault is yours to judge. Targets are Plume’s estimates, or your reference books.')}</p>
-        </div>
-      </section>
+      {!e && <p className="sk-hint">{t('Reading the book…')}</p>}
+      {e && !e.words && <p className="sk-hint">{t('Nothing to review yet.')}</p>}
+      {e && e.words > 0 && (
+        <>
+          <section className="pl-scorebox">
+            <div className={`pl-score ${tone(e.score)}`} title={t('100 means every report is within its target. Over a target, a report loses points; the score is the average of the six categories.')}>{e.score}</div>
+            <div>
+              <div className="sk-label">{scope === 'book' ? book.meta.title : scope === 'chapter' ? label : scene.title}</div>
+              <p className="sk-hint">{n(e.words)} {t('words')} · {t('reading ease')} {n(e.readability)} · {t('sentences of {n} words', { n: n(e.avgSentence, 1) })} · {n(e.dialogueShare * 100)} % {t('dialogue')}</p>
+            </div>
+          </section>
+          {scope === 'book' && !fresh && (
+            <div className="pl-row"><span className="sk-hint pl-grow">{t('The text changed since this reading of the book.')}</span><button type="button" className="sk-btn sk-btn-sm" onClick={readBook}>{t('Read it again')}</button></div>
+          )}
 
-      <button type="button" className="sk-btn sk-btn-sm" title={t('Every report over the whole book, chapter by chapter, with each flagged passage')} onClick={() => useStore.getState().setView('editing')}>{t('Full analysis of the book')}</button>
-
-      <SpellingStatus />
-
-      <section className="pl-cat">
-        <div className="sk-label">{t('Worth a look first')}</div>
-        {!r.words ? <span className="sk-hint">{t('Nothing to review yet.')}</span>
-          : top.length === 0 ? <span className="sk-hint">{t('Every report is within its target.')}</span>
-          : top.map(x => <ReportRow key={x.def.id} r={x} active={report === x.def.id} />)}
-        {(
-          <button type="button" className="pl-quiet pl-allreports" aria-expanded={all} onClick={() => setAll(!all)}>
-            <ChevronDown size={14} className={all ? 'pl-rot' : ''} /> {t(all ? 'Hide the other reports' : 'All reports')}
-          </button>
-        )}
-      </section>
-
-      {all && CATEGORIES.filter(c => c.id !== 'readability').map(c => {
-        const rs = r.results.filter(x => x.def.category === c.id)
-        const bad = rs.filter(x => x.status === 'bad').length, ok = rs.filter(x => x.status === 'ok').length
-        return (
-          <section key={c.id} className="pl-cat">
-            <button type="button" className="pl-cat-head" onClick={() => setOpen(open === c.id ? null : c.id)} aria-expanded={open === c.id}>
-              <span className={`pl-dotstatus ${bad ? 'pl-bad' : ok ? 'pl-ok' : 'pl-good'}`} />
-              <span className="pl-grow">{t(c.label)}</span>
-              <ChevronDown size={14} className={open === c.id ? 'pl-rot' : ''} />
-            </button>
-            {open === c.id && rs.map(x => <ReportRow key={x.def.id} r={x} active={report === x.def.id} />)}
-            {open === c.id && refs && c.id === rs[0]?.def.category && <span className="sk-hint">{t('Targets from your {n} reference books.', { n: refs.count })}</span>}
-            {open === c.id && c.id === 'repetition' && r.overused.length > 0 && (
-              <div className="pl-overused">
-                <span className="sk-hint">{t('Most used words')}</span>
-                <div className="pl-chips">
-                  {r.overused.map(([w, k]) => (
-                    <button key={w} type="button" className={`pl-chip ${report === `word:${w}` ? 'pl-chip-on' : ''}`} onClick={() => useReview.setState({ report: report === `word:${w}` ? null : `word:${w}` })}>{w} <b>{k}</b></button>
-                  ))}
-                </div>
-              </div>
+          <section className="pl-cat">
+            <div className="pl-row">
+              <span className="sk-label pl-grow">{t('Shown in the text')}</span>
+              <select className="sk-select sk-btn-sm" value={choice} onChange={x => choose(x.target.value)} aria-label={t('Shown in the text')}>
+                <option value="all">{t('Everything')}</option>
+                {CATEGORIES.filter(c => c.id !== 'readability').map(c => <option key={c.id} value={c.id}>{t('Only: {name}', { name: t(c.label) })}</option>)}
+                {sets.map((x, i) => <option key={x.name} value={`set:${i}`}>{x.name}</option>)}
+                {choice === 'custom' && <option value="custom">{t('Your selection')}</option>}
+              </select>
+              {choice === 'custom' && <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm" title={t('Keep this selection of reports under a name')} onClick={saveSet}>{t('Save')}</button>}
+              {choice.startsWith('set:') && <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm" title={t('Remove this saved selection')} onClick={() => { dropSet(Number(choice.slice(4))); setOff([]) }}>✕</button>}
+            </div>
+            {CATEGORIES.map(c => (
+              <label key={c.id} className="pl-ed-cat" title={`${t(c.label)} : ${e.cats[c.id]} / 100`}>
+                {c.id === 'readability' ? <span className="pl-ed-nocheck" /> : <input type="checkbox" className="sk-check" checked={!idsOf(c.id).every(i => off.includes(i))} onChange={() => toggleCat(c.id)} />}
+                {c.id !== 'readability' && <span className={`pl-ed-swatch cm-ed-${c.id}`} />}
+                <span className="pl-ed-catname">{t(c.label)}</span>
+                <span className="pl-ed-bar"><i className={tone(e.cats[c.id])} style={{ width: `${e.cats[c.id]}%` }} /></span>
+                <b>{e.cats[c.id]}</b>
+              </label>
+            ))}
+            {spell === 'languagetool' && (
+              <label className="pl-ed-cat">
+                <input type="checkbox" className="sk-check" checked={edLT !== false} onChange={x => useStore.getState().setPrefs({ edLT: x.target.checked })} />
+                <span className="pl-ed-catname pl-grow">{t('Spelling and grammar')} (LanguageTool)</span>
+              </label>
+            )}
+            {report && report !== 'ai' && (
+              <div className="pl-row"><span className="sk-hint pl-grow">{t('Only “{name}” is shown in the text.', { name: report.startsWith('word:') ? report.slice(5) : t(defs.find(d => d.id === report)?.label ?? report) })}</span><button type="button" className="sk-btn sk-btn-ghost sk-btn-sm" onClick={() => useReview.setState({ report: null })}>{t('Show all')}</button></div>
+            )}
+            {ignores.length > 0 && (
+              <div className="pl-row"><span className="sk-hint pl-grow">{t('{n} passage(s) ignored in this book.', { n: ignores.length })}</span><button type="button" className="sk-btn sk-btn-ghost sk-btn-sm" onClick={() => useStore.getState().updateMeta({ edIgnore: [] })}>{t('Flag them again')}</button></div>
             )}
           </section>
-        )
-      })}
 
-      {all && <section className="pl-cat">
-        <button type="button" className="pl-cat-head" onClick={() => setOpen(open === 'readability' ? null : 'readability')} aria-expanded={open === 'readability'}>
-          <span className={`pl-dotstatus ${r.readability >= 50 && r.readability <= 85 ? 'pl-good' : 'pl-ok'}`} />
-          <span className="pl-grow">{t('Readability')}</span>
-          <ChevronDown size={14} className={open === 'readability' ? 'pl-rot' : ''} />
-        </button>
-        {open === 'readability' && (
-          <div className="pl-readability">
-            <dl className="pl-stats">
-              <dt>{t('Reading ease')}</dt><dd>{n(r.readability)} <span className="pl-muted">/ 100</span></dd>
-              <dt>{t('Average sentence')}</dt><dd>{n(r.avgSentence, 1)} {t('words')}</dd>
-              <dt>{t('Dialogue')}</dt><dd>{n(r.dialogueShare * 100)} %</dd>
-            </dl>
-            <span className="sk-hint">{t('Reading ease (Flesch; Kandel–Moles in French): 60–80 reads as plain prose, below 50 asks effort.')}</span>
-            {refs && <span className="sk-hint">{t('Your reference books: reading ease {r}, sentences of {s} words, {d} % dialogue.', { r: n(refs.readability), s: n(refs.avgSentence, 1), d: n(refs.dialogueShare * 100) })}</span>}
-            <Rhythm lengths={r.sentenceLengths} />
-          </div>
-        )}
-      </section>}
+          <section className="pl-cat">
+            <div className="sk-label">{t('Fix first')}</div>
+            {first.length === 0 && <span className="sk-hint">{t('Every report is within its target.')}</span>}
+            {first.map(r => (
+              <button key={r.def.id} type="button" className="pl-ed-action" onClick={() => { setOpen(r.def.id); setWord(null); setShown(PAGE); setTimeout(() => document.getElementById(`ed-${r.def.id}`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 30) }}>
+                <span className={`pl-dotstatus pl-${r.status}`} />
+                <span className="pl-grow"><b>{t(r.def.label)}</b> : {t('{n} found, about {k} too many.', { n: n(r.count), k: n(r.excess) })}</span>
+              </button>
+            ))}
+          </section>
 
-      {all && !simple && <Speakers text={text} scenes={scope === 'scene' ? [scene] : chapter.scenes} />}
+          {CATEGORIES.filter(c => c.id !== 'readability').map(c => (
+            <section key={c.id} className="pl-cat">
+              <div className="sk-label">{t(c.label)}</div>
+              {e.reports.filter(r => r.def.category === c.id).map(r => {
+                const on = open === r.def.id
+                const hits = on ? r.hits.filter(h => !word || hitWord(h) === word) : NONE
+                return (
+                  <div key={r.def.id} id={`ed-${r.def.id}`} className={`pl-ed-report ${on ? 'pl-ed-open' : ''}`}>
+                    <div className="pl-ed-row">
+                      <input type="checkbox" className="sk-check" checked={!off.includes(r.def.id)} title={t('Show it in the text')} aria-label={t('Show it in the text')} onChange={() => toggle(r.def.id)} />
+                      <button type="button" className="pl-ed-rowmain" aria-expanded={on} title={t(r.def.help)} onClick={() => show(r.def.id)}>
+                        <span className={`pl-dotstatus pl-${r.status}`} />
+                        <span className="pl-grow">{t(r.def.label)}</span>
+                        {r.excess > 0 && <span className="pl-ed-excess">−{n(r.excess)}</span>}
+                        <span className="sk-num">{n(r.count)}</span>
+                        <ChevronDown size={14} className={on ? 'pl-rot' : ''} />
+                      </button>
+                    </div>
+                    {on && (
+                      <div className="pl-ed-detail">
+                        <p>{t(r.def.help)}</p>
+                        <p className="sk-hint">{n(r.rate, 1)} {unit(r)} · {t(r.fromRef ? 'reference' : 'target')} ≤ {n(r.target, 1)} {unit(r)}{r.excess > 0 ? ` · ${t('about {k} too many', { k: n(r.excess) })}` : ''}</p>
+                        <div className="pl-row">
+                          <button type="button" className="sk-btn sk-btn-sm" aria-pressed={report === r.def.id} disabled={!r.count} onClick={() => useReview.setState({ report: report === r.def.id ? null : r.def.id })}>{t('Only this in the text')}</button>
+                        </div>
+                        {r.words.length > 1 && (
+                          <div className="pl-chips">
+                            {r.words.map(([w, k]) => <button key={w} type="button" className={`pl-chip ${word === w ? 'pl-chip-on' : ''}`} onClick={() => { setWord(word === w ? null : w); setShown(PAGE) }}>{w} <b>{k}</b></button>)}
+                          </div>
+                        )}
+                        <ul className="pl-ed-hits">
+                          {hits.slice(0, shown).map((h, i) => (
+                            <li key={i}>
+                              <button type="button" className="pl-ed-hit" title={t('Show it in the text')} onClick={() => goTo(h)}>
+                                {scope === 'book' && <span className="pl-ed-where">{t('Ch.')} {h.chapter}</span>}
+                                <span className="pl-grow">{h.len ? <>{h.context.slice(0, h.at)}<mark>{h.context.slice(h.at, h.at + h.len)}</mark>{h.context.slice(h.at + h.len)}</> : h.context}{h.note ? <span className="sk-hint"> · {h.note}</span> : null}</span>
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                        {hits.length > shown && <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm" onClick={() => setShown(shown + PAGE * 3)}>{t('Show more ({n} left)', { n: n(hits.length - shown) })}</button>}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </section>
+          ))}
+
+          {scope === 'book' && e.chapters.length > 1 && (
+            <section className="pl-cat">
+              <div className="sk-label">{t('Chapter by chapter')}</div>
+              {e.chapters.map(c => (
+                <button key={c.id} type="button" className="pl-ed-action" title={CATEGORIES.map(x => `${t(x.label)} ${c.cats[x.id]}`).join(' · ')} onClick={() => { const s = book.chapters.find(x => x.id === c.id)?.scenes.find(x => x.text.trim()); if (s) { useStore.getState().selectScene(s.id); setScope('chapter') } }}>
+                  <span className="pl-grow">{c.n}. {c.title || t('Chapter')}</span><b className={`pl-ed-badge ${tone(c.score)}`}>{c.score}</b>
+                </button>
+              ))}
+            </section>
+          )}
+        </>
+      )}
+
+      <SpellingStatus />
+      <EditFindings />
+      {!simple && <Speakers text={text} scenes={scope === 'scene' ? [scene] : chapter.scenes} />}
 
       <AIChecks sceneId={scene.id} chapterId={chapter.id} chapterText={chapter.scenes.map(s => s.text).join('\n')} fixIds={scope === 'scene' ? [scene.id] : chapter.scenes.map(s => s.id)} scopeLabel={scope === 'scene' ? t('This scene') : label} text={text} />
       <ReadAloud />
@@ -140,6 +241,42 @@ export default function ReviewPanel() {
       {!simple && <RevisionSection scene={scene} />}
       {!simple && <Figures scene={scene.text} chapter={chapter.scenes.map(s => s.text).join('\n')} label={label} />}
     </aside>
+  )
+}
+
+/** Claude's editor: the findings of Edit this chapter, kept beside the text, each with its fix. */
+function EditFindings() {
+  const findings = useEdit(s => s.findings)
+  const stage = useEdit(s => s.stage)
+  const hidden = useEdit(s => s.hidden)
+  const book = useStore(s => s.book)!
+  const t = useT()
+  if (!hidden || !findings.length) return null
+  const jump = (f: typeof findings[number]) => {
+    const text = findScene(book, f.sceneId)?.scene.text ?? ''
+    const at = f.quote ? text.indexOf(f.quote) : -1
+    if (at >= 0) useStore.setState({ jump: { sceneId: f.sceneId, from: at, to: at + f.quote.length } })
+    if (f.sceneId !== useStore.getState().sceneId) useStore.getState().selectScene(f.sceneId)
+  }
+  return (
+    <section className="pl-cat">
+      <div className="pl-row">
+        <span className="sk-label pl-grow">{t('Claude’s editor ({n})', { n: findings.length })}</span>
+        <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm" onClick={() => useEdit.setState({ hidden: false })}>{t('Open the list')}</button>
+        <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm" onClick={closeEdit}>{t('Clear')}</button>
+      </div>
+      {findings.map(f => (
+        <div key={f.id} className="pl-ed-finding">
+          <button type="button" className="pl-aiitem" onClick={() => jump(f)}>
+            <span className="sk-hint">{f.kind}</span>
+            {f.quote && <span className="pl-aiquote">« {f.quote.slice(0, 90)}{f.quote.length > 90 ? '…' : ''} »</span>}
+            <span>{f.problem}</span>
+            {f.fix && <span className="pl-edit-fix">→ {f.fix}</span>}
+          </button>
+          <button type="button" className="sk-btn sk-btn-sm" disabled={stage === 'fixing'} title={t('Claude makes this one fix, as a tracked change to accept or reject')} onClick={() => fixChapter(false, f.id)}>{f.ready !== undefined ? t('Apply') : t('Fix')}</button>
+        </div>
+      ))}
+    </section>
   )
 }
 
@@ -185,56 +322,6 @@ function Speakers({ text, scenes }: { text: string; scenes: { id: string; text: 
           <span className="sk-hint">{t('Lines are given to the name next to them, else to the last name before. Approximate.')}</span>
         </div>)}
     </section>
-  )
-}
-
-function ReportRow({ r, active }: { r: ReportResult; active: boolean }) {
-  const t = useT()
-  const unit = r.def.unit === 'per1000' ? t('/ 1,000 words') : '%'
-  const go = (dir: 1 | -1) => {
-    const v = getEditorView()
-    if (!v || !r.findings.length) return
-    const sel = v.state.selection.main
-    const list = r.findings.filter(f => f.to <= v.state.doc.length)
-    if (!list.length) return
-    const next = dir === 1 ? list.find(f => f.from > sel.head) ?? list[0] : [...list].reverse().find(f => f.from < sel.from) ?? list[list.length - 1]
-    v.dispatch({ selection: { anchor: next.from, head: next.to }, scrollIntoView: true })
-    v.focus()
-  }
-  return (
-    <div className={`pl-report ${active ? 'pl-report-on' : ''}`}>
-      <button type="button" className="pl-report-main" onClick={() => useReview.setState({ report: active ? null : r.def.id })} title={t(r.def.help)}>
-        <span className={`pl-dotstatus pl-${r.status}`} />
-        <span className="pl-grow">{t(r.def.label)}</span>
-        <span className="sk-num">{r.count}</span>
-      </button>
-      {active && (
-        <div className="pl-report-detail">
-          <p className="sk-hint">{t(r.def.help)}</p>
-          <div className="pl-row">
-            <span className="sk-num pl-grow">{n(r.rate, 1)} {unit} · {t(r.fromRef ? 'reference' : 'target')} ≤ {n(r.target, 1)} {unit}</span>
-            <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm sk-btn-icon" onClick={() => go(-1)} title={t('Previous')} disabled={!r.count}><ChevronLeft size={14} /></button>
-            <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm sk-btn-icon" onClick={() => go(1)} title={t('Next')} disabled={!r.count}><ChevronRight size={14} /></button>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-/** Sentence lengths in order: a flat line is a monotonous rhythm. */
-function Rhythm({ lengths }: { lengths: number[] }) {
-  const t = useT()
-  if (lengths.length < 3) return null
-  const max = Math.max(...lengths, 1)
-  const w = 240, h = 48, step = w / lengths.length
-  return (
-    <div>
-      <span className="sk-hint">{t('Sentence rhythm')}</span>
-      <svg viewBox={`0 0 ${w} ${h}`} className="pl-rhythm" preserveAspectRatio="none">
-        {lengths.map((l, i) => <rect key={i} x={i * step} y={h - (l / max) * h} width={Math.max(1, step - 1)} height={(l / max) * h} />)}
-      </svg>
-    </div>
   )
 }
 

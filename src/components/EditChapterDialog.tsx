@@ -4,7 +4,7 @@ import { FileCheck2 } from 'lucide-react'
 import { Dialog } from '../studio-kit/shell.js'
 import { useStore } from '../store'
 import { useT } from '../i18n'
-import { checkChapter, closeEdit, editCost, fixChapter, rewriteLoop, stopLoop, toggleAll, toggleFinding, useEdit, type Depth, type Severity } from '../edit'
+import { checkChapter, closeEdit, editCost, fixChapter, rewriteLoop, showInText, stopLoop, toggleAll, toggleFinding, useEdit, type Depth, type Severity } from '../edit'
 import { costText } from '../cost'
 
 const GROUPS: { id: Severity; label: string }[] = [
@@ -15,10 +15,10 @@ const GROUPS: { id: Severity; label: string }[] = [
 
 export default function EditChapterDialog() {
   const t = useT()
-  const { chapterId, depth, stage, findings, placed, loop } = useEdit()
+  const { chapterId, depth, stage, findings, placed, loop, hidden } = useEdit()
   const book = useStore(s => s.book)
   const c = book?.chapters.find(x => x.id === chapterId)
-  if (!book || !c) return null
+  if (!book || !c || hidden) return null
   const title = c.title || t('Chapter')
   const sceneTitle = (id: string) => c.scenes.find(s => s.id === id)?.title ?? ''
   const chosen = findings.filter(f => f.on).length
@@ -30,6 +30,7 @@ export default function EditChapterDialog() {
   const footer = stage === 'list'
     ? <>
       <button type="button" className="sk-btn sk-btn-ghost" onClick={closeEdit}>{t('Close')}</button>
+      <button type="button" className="sk-btn" disabled={!findings.length} title={t('Closes this list and shows each finding in the text, in Editing, with its fix')} onClick={showInText}>{t('Show in text')}</button>
       <button type="button" className="sk-btn sk-btn-primary" disabled={!chosen} onClick={() => fixChapter()}>{t('Fix the ticked ones ({n})', { n: chosen })}</button>
     </>
     : stage === 'done'

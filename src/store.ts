@@ -21,7 +21,7 @@ const steps = undoStack()
 export const rememberStep = (key: string, name: string, undo: () => unknown, redo: () => unknown) => steps.push(key, name, undo, redo)
 export const forgetStep = (step: Parameters<typeof steps.takeBack>[0]) => steps.takeBack(step)
 
-export type View = 'bible' | 'plan' | 'manuscript' | 'editing'
+export type View = 'bible' | 'plan' | 'manuscript'
 export type BibleTab = 'entry' | 'review' | 'aicheck' | 'table' | 'tracker' | 'map' | 'relations' | 'contradictions'
 /** Bible tabs grouped under "More". */
 export const MORE_TABS: BibleTab[] = ['table', 'tracker', 'map', 'relations', 'contradictions']
@@ -122,6 +122,10 @@ export interface Prefs {
   ltEnglish: string
   /** LanguageTool also while you write (off by default: sends the scene's text as you pause). */
   ltLive: boolean
+  /** Editing: the reports not shown in the text, saved selections of them, and whether LanguageTool's findings show there. */
+  edOff: string[]
+  edSets: { name: string; off: string[] }[]
+  edLT: boolean
   /** Typewriter scrolling: the line you write stays in the middle of the screen. */
   typewriter: boolean
   /** Capital letters as you type (sentence starts, English I); Ctrl+Z right after takes one back. */
@@ -203,12 +207,15 @@ export const DEFAULT_PREFS: Prefs = {
   rightTab: 'write',
   split: null,
   readVoice: '',
-  spell: 'windows',
+  spell: 'languagetool',
   ltServer: 'https://api.languagetool.org',
   ltUser: '',
   ltKey: '',
   ltEnglish: 'en-US',
-  ltLive: false,
+  ltLive: true,
+  edOff: [],
+  edSets: [],
+  edLT: true,
   typewriter: false,
   autoCapital: true,
   roles: DEFAULT_ROLES,
@@ -238,7 +245,7 @@ export const DEFAULT_PREFS: Prefs = {
   dualW: 520,
   commandNames: {},
   commandKeys: {},
-  v: 3,
+  v: 4,
 }
 
 /** Saved prefs, upgraded once: 0.2.3 pins both panes by default. */
@@ -254,7 +261,10 @@ function loadPrefs(): Prefs {
   // Read the version from what was saved, not from the defaults merged into it.
   if (saved && (saved.v ?? 0) < 2) return { ...p, pinLeft: true, pinRight: true, simple: false, v: 2 }
   // 0.51 rebuilt the simpler view around one way of working (brainstorm, bible, outline, write, edit): it is turned on once for everyone.
-  if (saved && (saved.v ?? 0) < 3) return { ...p, simple: true, v: 3 }
+  // 0.53: LanguageTool checks spelling and grammar everywhere by default (it was Windows' spellchecker, in Review only); a checker turned off stays off.
+  const lt = { spell: p.spell === 'off' ? 'off' as const : 'languagetool' as const, ltLive: true }
+  if (saved && (saved.v ?? 0) < 3) return { ...p, ...lt, simple: true, v: 4 }
+  if (saved && (saved.v ?? 0) < 4) return { ...p, ...lt, v: 4 }
   // Beginner mode is for new installs: people who already use Plume keep everything.
   if (saved && saved.simple === undefined) return { ...p, simple: false }
   return p
@@ -553,7 +563,7 @@ export const useStore = create<State>((set, get) => {
       const sceneId = back?.sceneId ?? book.chapters[0]?.scenes[0]?.id ?? null
       session = { root: book.root, words: bookCounts(book.chapters).words, start: Date.now() }
       steps.clear()
-      set({ book, recent, view: 'manuscript', sceneId, unlocked: [], jump: back ? { sceneId: back.sceneId, from: back.pos, to: back.pos } : null, entrySlug: null, freshSceneId: null, bibleTab: 'entry', planTab: 'outline' })
+      set({ book, recent, view: 'manuscript', prefs: { ...get().prefs, mode: 'write' }, sceneId, unlocked: [], jump: back ? { sceneId: back.sceneId, from: back.pos, to: back.pos } : null, entrySlug: null, freshSceneId: null, bibleTab: 'entry', planTab: 'outline' })
       // Changes and proposals kept for the scenes of the last book don't follow you into this one.
       import('./edit').then(m => m.useEdit.setState({ pending: {} }))
       import('./editor/actions').then(m => m.forgetProposals())

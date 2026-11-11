@@ -8,12 +8,11 @@ import BibleView from './BibleView'
 import PlanView from './PlanView'
 import WritingView from './WritingView'
 import { useT } from '../i18n'
-import EditingView from './EditingView'
 
-export const VIEW_NAMES: Record<View, string> = { bible: 'Bible', plan: 'Plan', manuscript: 'Manuscript', editing: 'Editing' }
+export const VIEW_NAMES: Record<View, string> = { bible: 'Bible', plan: 'Plan', manuscript: 'Manuscript' }
 
 export function ViewBody({ view }: { view: View }) {
-  return view === 'editing' ? <EditingView /> : view === 'bible' ? <BibleView /> : view === 'plan' ? <PlanView /> : <WritingView />
+  return view === 'bible' ? <BibleView /> : view === 'plan' ? <PlanView /> : <WritingView />
 }
 
 export default function DualView({ view, other }: { view: View; other: View }) {

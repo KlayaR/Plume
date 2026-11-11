@@ -49,16 +49,28 @@ interface EditState {
   placed: number
   /** Rewrite until it holds: the rounds so far, and how it ended. */
   loop: Loop | null
+  /** The list is closed but its findings stay: shown in the text and in the Editing panel. */
+  hidden: boolean
 }
 
 /** One round of the loop: what the editor found, and how many fixes the writer placed. */
 export interface LoopRound { errors: number; craft: number; polish: number; fixed: number }
 export interface Loop { rounds: LoopRound[]; running: boolean; verdict: 'pass' | 'limit' | 'stopped' | null }
 
-export const useEdit = create<EditState>(() => ({ chapterId: null, depth: 'deep', stage: 'start', findings: [], pending: {}, placed: 0, loop: null }))
+export const useEdit = create<EditState>(() => ({ chapterId: null, depth: 'deep', stage: 'start', findings: [], pending: {}, placed: 0, loop: null, hidden: false }))
 
-export const openEdit = (chapterId: string) => useEdit.setState({ chapterId, stage: 'start', findings: [], placed: 0, loop: null })
-export const closeEdit = () => useEdit.setState({ chapterId: null, stage: 'start', findings: [], loop: null })
+export const openEdit = (chapterId: string) => useEdit.setState({ chapterId, stage: 'start', findings: [], placed: 0, loop: null, hidden: false })
+export const closeEdit = () => useEdit.setState({ chapterId: null, stage: 'start', findings: [], loop: null, hidden: false })
+
+/** Closes the list but keeps its findings: they show in the text, in Editing, each with its fix. */
+export function showInText() {
+  const st = useStore.getState()
+  const first = useEdit.getState().findings[0]?.sceneId
+  useEdit.setState({ hidden: true })
+  st.setPrefs({ mode: 'review' })
+  st.setView('manuscript')
+  if (first) st.selectScene(first)
+}
 
 const SEVERITIES: Severity[] = ['error', 'craft', 'polish']
 const fr = (book: Book) => book.meta.language === 'fr'
@@ -182,12 +194,13 @@ export function locate(text: string, find: string, taken: { from: number; to: nu
  * a bigger one as a rewritten passage), placed in the text as tracked changes.
  * LanguageTool's corrections need no request. A snapshot is taken first.
  */
-export async function fixChapter(direct = false): Promise<number | undefined> {
+export async function fixChapter(direct = false, only?: string): Promise<number | undefined> {
   const st = useStore.getState()
   const book = st.book
   const { chapterId, findings } = useEdit.getState()
   const c = book?.chapters.find(x => x.id === chapterId)
-  const chosen = findings.filter(f => f.on)
+  // `only`: one finding, fixed from the text; the others stay listed.
+  const chosen = only ? findings.filter(f => f.id === only) : findings.filter(f => f.on)
   if (!book || !c || !chosen.length) return
   const F = fr(book)
   const n = book.chapters.indexOf(c) + 1
@@ -202,7 +215,7 @@ export async function fixChapter(direct = false): Promise<number | undefined> {
     if (at) list.push({ id: newId(), ...at, insert: fixTypography(insert, book.meta.language), why })
   }
   try {
-    if (!direct) await saveSnap(book.root, makeSnap(book, t('Before editing “{title}”', { title: c.title || t('Chapter') }), [c.id]))
+    if (!direct && !only) await saveSnap(book.root, makeSnap(book, t('Before editing “{title}”', { title: c.title || t('Chapter') }), [c.id]))
     for (const f of chosen.filter(x => x.ready !== undefined)) add(f.sceneId, f.quote, f.ready!, `${f.kind}: ${f.problem}`)
     const forClaude = chosen.filter(x => x.ready === undefined)
     if (forClaude.length) {
@@ -243,6 +256,11 @@ export async function fixChapter(direct = false): Promise<number | undefined> {
         useStore.getState().updateScene(sceneId, { text })
       }
       useEdit.setState({ stage: 'done', placed })
+      return placed
+    }
+    if (only) {
+      useEdit.setState(s => ({ stage: 'list', findings: s.findings.filter(f => f.id !== only), pending: { ...s.pending, ...byScene } }))
+      if (!placed) st.notify('warn', t('The words were not found in the text: nothing was changed.'))
       return placed
     }
     useEdit.setState(s => ({ stage: 'done', placed, pending: { ...s.pending, ...byScene } }))
@@ -360,7 +378,7 @@ export async function rewriteLoop(chapterId: string, max = 3) {
   await saveSnap(book.root, makeSnap(book, t('Before rewriting “{title}”', { title }), [c.id]))
   const rounds: LoopRound[] = []
   const show = (verdict: Loop['verdict'], running: boolean) => useEdit.setState({ loop: { rounds: rounds.map(r => ({ ...r })), running, verdict } })
-  useEdit.setState({ chapterId, stage: 'start', findings: [], placed: 0 })
+  useEdit.setState({ chapterId, stage: 'start', findings: [], placed: 0, hidden: false })
   show(null, true)
   let verdict: Loop['verdict'] = 'limit'
   for (let k = 1; k <= max; k++) {

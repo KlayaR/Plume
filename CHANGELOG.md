@@ -7,6 +7,16 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.53.0
+Editing in the text: everything the editor finds is highlighted where it is.
+- **Editing is the text, with the editor beside it.** The Editing button in the bottom bar now shows the Manuscript itself, with the editor's panel on the right (0.52's separate analysis screen is gone, and so is the Write / Review switch: the Manuscript button writes, the Editing button reads). You can still type there.
+- **Everything highlighted at once.** Every flagged passage of every report is underlined in its category's colour: pacing, dialogue, strong writing, word choice, repetition. Words are filled; flagged sentences and paragraphs get a dotted underline, so the page stays readable.
+- **Filters.** In the panel, tick the categories and the reports to show in the text. The list above them picks one category alone (Only: Repetition), and a report has Only this in the text. A selection of reports can be saved under a name and picked again later.
+- **A card on each highlight.** Hover one for the report's name and why it matters, with Ignore here (this passage is not flagged again), Ignore "word" everywhere (this word, for this report, in the whole book), Only this report and Hide this report. What you ignore is kept with the book and leaves the counts and the scores; Flag them again brings it all back.
+- **The panel reads the scene, the chapter or the whole book.** The score, one per category, Fix first, and under each report every passage in its sentence; a click shows it in the text, opening its scene if needed. The whole-book reading is kept until you ask to read it again.
+- **Claude's editor in the text.** In Edit the chapter, Show in text closes the list and keeps the findings: dotted in the text (hover for the problem and the fix) and listed in the panel, each with its own Fix button that makes that one change as a tracked change.
+- **LanguageTool everywhere, by default.** Spelling and grammar are now checked by LanguageTool while you write, in the Manuscript and in the text boxes of the Bible and the Plan, on its public server (the text you type is sent to api.languagetool.org; Settings → Writing sets your own server, Windows' checker, or none). A checker you had turned off stays off. In Editing, LanguageTool's underlines are one more tick in the panel.
+
 ## 0.52.0
 Editing that says what is wrong, where, and how much of it. Built from how AutoCrit and ProWritingAid lay out their reports.
 - **The Editing space.** A fourth space in the bottom bar analyses the whole book, or the chapter you pick on the left, with every report Plume has (pacing, dialogue, strong writing, word choice, repetition, readability). Nothing here calls Claude.
