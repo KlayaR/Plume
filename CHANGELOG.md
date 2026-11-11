@@ -7,6 +7,9 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.54.1
+- **Ready to write?** seemed to do nothing: its panel opened below the story foundation, out of sight. It now opens right under the outline's buttons and scrolls into view.
+
 ## 0.54.0
 Rephrase, and the reports that were missing.
 - **Rephrase.** Several rewordings of a passage to pick from, as in ProWritingAid, but in your voice and fitted to what comes before and after. Select a sentence or a short passage and press Rephrase in the bar above it (in the Manuscript or in Editing), or press Rephrase on the card of a highlight, for the sentence it is in. The first list is Smoother; Shorter, Longer, More sensory, More tension, Plainer, More formal and Less formal ask again another way. A click puts one in the text (Ctrl+Z brings the old one back). Each list is one request to Claude.

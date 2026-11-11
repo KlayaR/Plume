@@ -3,7 +3,7 @@
 // for editing, one at a time. Claude can detail or regenerate a chapter or a
 // scene and check the outline; what it proposes shows here first, beside what
 // is there, until you accept it.
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { create } from 'zustand'
 import { ask as askDialog } from '@tauri-apps/plugin-dialog'
 import { ArrowDown, ArrowUp, Check, CheckCheck, ChevronDown, ChevronRight, Combine, History, Lock, LockOpen, MessagesSquare, MoreHorizontal, PenLine, Plus, Scissors, Sparkles, Wand2, X } from 'lucide-react'
@@ -108,9 +108,9 @@ export default function OutlineView() {
         <button type="button" className="sk-btn sk-btn-sm sk-btn-ghost sk-btn-icon" onClick={more} aria-label={t('More')}><MoreHorizontal size={14} /></button>
       </div>
 
+      {readyOpen && <ReadyPanel book={book} />}
       {book.meta.series && <SeriesSection book={book} />}
       <StorySection book={book} />
-      {readyOpen && <ReadyPanel book={book} />}
       {revising && <RevisePanel book={book} />}
 
       {issues && (
@@ -639,6 +639,9 @@ function StorySection({ book }: { book: Book }) {
 
 /** Ready to write? What the outline and the bible still lack: found here for free, then by Claude. */
 function ReadyPanel({ book }: { book: Book }) {
+  const box = useRef<HTMLElement>(null)
+  // Opened from the bar above: brought into view, whatever was scrolled to before.
+  useEffect(() => { box.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }) }, [])
   const report = useFlow(s => s.marks.ready)
   const busy = useFlow(s => s.busy)
   const t = useT()
@@ -652,7 +655,7 @@ function ReadyPanel({ book }: { book: Book }) {
     novoice: t('{name} is in {k} scenes and has no voice card.', { name: g.name ?? '', k: g.count ?? 0 }),
   })[g.code]
   return (
-    <section className="pl-ol-issues">
+    <section className="pl-ol-issues" ref={box}>
       <div className="pl-row">
         <b className="pl-grow">{t('Ready to write?')}</b>
         <button type="button" className="sk-btn sk-btn-sm sk-btn-primary" disabled={!!busy} onClick={runReady}>{busy === 'ready' ? t('Checking…') : report ? t('Check again') : t('Check everything')}</button>
