@@ -18,14 +18,15 @@ import { proposalField, sceneExtensions, setNames, setProposal } from './cm'
 import { captureExt } from './captures'
 import { draftExt, useDraft } from './draft'
 import CommentColumn, { commentColumnExt } from './CommentColumn'
-import { accept, discard, fillPlaceholder, getEditorView, keepProposal, runAction, setEditorView, syncProposalState, takeProposal, useAI } from './actions'
+import { accept, discard, fillPlaceholder, getEditorView, keepProposal, openRephrase, runAction, setEditorView, syncProposalState, takeProposal, useAI } from './actions'
 import { changesField, inlineExt, marksExt, placeholderExt, setChanges, setHighlights, trackedChangesExt, unknownNamesExt, type Highlight } from './marks'
 import { takePending, useEdit } from '../edit'
 import type { Comment, EntryType } from '../lib/types'
 import { cutToDarlings } from '../writing'
 import { useReview } from '../review'
 import { edMarksExt, setEdMarks } from './edmarks'
-import { ignoreKey, sceneMarks } from '../lib/editing'
+import { contextOf, ignoreKey, sceneMarks } from '../lib/editing'
+import { senses, type Sense } from '../lib/analysis'
 import { occurrences, REPORTS } from '../lib/review'
 import { isLitRPG, isLocked, isSystemLine, maskSystem } from '../lib/serial'
 
@@ -60,6 +61,7 @@ function reviewHighlights(text: string, report: string | null, ai: { quote: stri
     }
     return out
   }
+  if (report.startsWith('sense:')) return (senses(text, book.meta.language)[report.slice(6) as Sense] ?? []).map(f => ({ ...f, cls: 'cm-review' }))
   if (report.startsWith('word:')) return occurrences(text, report.slice(5)).map(f => ({ ...f, cls: 'cm-review' }))
   const def = REPORTS.find(r => r.id === report)
   return def ? def.find(isLitRPG(book) ? maskSystem(text) : text, book.meta.language, book).map(f => ({ from: f.from, to: f.to, cls: `cm-review cm-review-${def.category}`, title: f.note })) : []
@@ -158,6 +160,7 @@ function selectionBar(state: EditorState): readonly Tooltip[] {
         b.addEventListener('mousedown', e => { e.preventDefault(); view.focus(); run() })
       }
       for (const [label, run] of BAR) add(t(label), () => run(view))
+      add(t('Rephrase'), () => { const m = view.state.selection.main; openRephrase(view, useStore.getState().sceneId ?? '', m.from, m.to) }, t('Several rewordings of this passage, to pick from'))
       const text = view.state.sliceDoc(view.state.selection.main.from, view.state.selection.main.to)
       if (text.length <= 60) add(t('Synonyms'), () => useStore.setState({ dialog: 'synonyms' }))
       add('…', () => {
@@ -191,6 +194,7 @@ function makeState(s: Scene, lang: Lang, locked: boolean) {
         ignoreHere: (m, hit) => { const st = useStore.getState(); st.updateMeta({ edIgnore: [...(st.book?.meta.edIgnore ?? []), { r: m.report, s: s.id, k: ignoreKey(hit, m.sentence) }] }) },
         ignoreWord: (m, hit) => { const st = useStore.getState(); st.updateMeta({ edIgnore: [...(st.book?.meta.edIgnore ?? []), { r: m.report, w: hit.trim().toLowerCase() }] }) },
         only: id => useReview.setState({ report: id }),
+        rephrase: (view, m) => { const c = contextOf(view.state.doc.toString(), m.from, m.to); const from = m.from - c.at; openRephrase(view, s.id, c.len ? from : m.from, c.len ? from + c.context.length : Math.min(m.to, m.from + 1500)) },
         hide: id => { const st = useStore.getState(); st.setPrefs({ edOff: [...new Set([...(st.prefs.edOff ?? []), id])] }); if (useReview.getState().report === id) useReview.setState({ report: null }) },
       }),
       spelling.of(spellingExt(windowsSpell())),
@@ -321,7 +325,7 @@ export default function Editor({ scene }: { scene: Scene }) {
   useEffect(() => {
     const timer = setTimeout(() => {
       const v = viewRef.current
-      if (v) v.dispatch({ effects: setHighlights.of({ key: 'review', list: reviewHighlights(v.state.doc.toString(), report === 'ai' || report?.startsWith('word:') ? report : null, aiFound) }) })
+      if (v) v.dispatch({ effects: setHighlights.of({ key: 'review', list: reviewHighlights(v.state.doc.toString(), report === 'ai' || report?.startsWith('word:') || report?.startsWith('sense:') ? report : null, aiFound) }) })
     }, report ? 300 : 0)
     return () => clearTimeout(timer)
   }, [report, aiFound, scene.text])
@@ -333,7 +337,7 @@ export default function Editor({ scene }: { scene: Scene }) {
       const v = viewRef.current
       const book = useStore.getState().book
       if (!v || !book) return
-      const on = mode === 'review' && report !== 'ai' && !report?.startsWith('word:')
+      const on = mode === 'review' && report !== 'ai' && !report?.startsWith('word:') && !report?.startsWith('sense:')
       v.dispatch({ effects: setEdMarks.of(on ? sceneMarks(v.state.doc.toString(), book, scene.id, edOff ?? [], edIgnore ?? [], report) : []) })
     }, 300)
     return () => clearTimeout(timer)

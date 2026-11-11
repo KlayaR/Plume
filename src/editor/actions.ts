@@ -11,7 +11,7 @@ import { movementsOf, nudgeMessage, readNudges, type Nudge } from '../lib/editor
 import type { ScenePart } from '../lib/prompts'
 import { diffWords, noteTaste } from '../writing'
 import { hunksOf } from '../lib/hunks'
-import { newId } from '../lib/text'
+import { lastWords, newId } from '../lib/text'
 import { changesField, setChanges } from './marks'
 import { canRun, cancelLLM, runLLM } from '../llm'
 import type { Effort, Model } from '../lib/types'
@@ -506,4 +506,62 @@ export async function retryFixing() {
   const system = systemPrompt(book, last.action, findScene(book, st.sceneId)?.number ?? 1)
   discardProposal(view)
   await stream(last.action, p.from, p.to, system, message)
+}
+
+// --- Rephrase: several rewordings of a passage, to pick from ----------------------------------
+
+export const REPHRASE_MODES = [
+  { id: 'fluent', label: 'Smoother', en: 'Make it read more smoothly and naturally.', fr: 'Rends-le plus fluide et plus naturel.' },
+  { id: 'shorter', label: 'Shorter', en: 'Make it clearly shorter: cut what the reader can do without.', fr: 'Rends-le nettement plus court : coupe ce dont le lecteur peut se passer.' },
+  { id: 'longer', label: 'Longer', en: 'Make it somewhat longer, with one concrete detail more, no padding.', fr: 'Rends-le un peu plus long, avec un détail concret de plus, sans remplissage.' },
+  { id: 'sensory', label: 'More sensory', en: 'Bring in a sense other than sight (a sound, a smell, a texture, a taste) that the moment allows.', fr: 'Fais entrer un autre sens que la vue (un son, une odeur, une texture, un goût) que le moment permet.' },
+  { id: 'tension', label: 'More tension', en: 'Tighten it: shorter clauses, the threat or the stake closer, nothing explained.', fr: 'Resserre-le : des propositions plus courtes, la menace ou l’enjeu plus proches, rien d’expliqué.' },
+  { id: 'plain', label: 'Plainer', en: 'Say it more plainly: common words, no image, no flourish.', fr: 'Dis-le plus simplement : des mots courants, pas d’image, pas d’effet.' },
+  { id: 'formal', label: 'More formal', en: 'Raise the register: more formal, more composed.', fr: 'Élève le registre : plus soutenu, plus posé.' },
+  { id: 'informal', label: 'Less formal', en: 'Lower the register: more casual, closer to speech.', fr: 'Baisse le registre : plus familier, plus proche de l’oral.' },
+] as const
+export type RephraseMode = typeof REPHRASE_MODES[number]['id']
+
+/** The passage Rephrase works on: in which editor, and where. */
+export interface RephraseTarget { view: EditorView; sceneId: string; from: number; to: number }
+let rephraseAt: RephraseTarget | null = null
+export const rephraseTarget = () => rephraseAt
+
+/** Opens Rephrase on a passage of an editor (its selection, or a flagged sentence). */
+export function openRephrase(v: EditorView, sceneId: string, from: number, to: number) {
+  if (to <= from || to - from > 1500) return useStore.getState().notify('warn', t('Select a sentence or a short passage to rephrase (up to about 250 words).'))
+  rephraseAt = { view: v, sceneId, from, to }
+  useStore.setState({ dialog: 'rephrase' })
+}
+
+/**
+ * Rewordings of a passage that keep what it says, in the author's voice (the same system
+ * prompt as when Claude writes: voice, style guide, prose samples), with what comes just
+ * before and after so each one fits where it goes. One request for the whole list.
+ */
+export async function rephrase(target: RephraseTarget, mode: RephraseMode, n = 5): Promise<string[]> {
+  const st = useStore.getState()
+  const book = st.book
+  const found = findScene(book, target.sceneId)
+  if (!book || !found) return []
+  if (!canRun()) throw new Error(t('The claude command line was not found. Set its path in Settings.'))
+  const fr = book.meta.language === 'fr'
+  const doc = target.view.state.doc.toString()
+  const how = REPHRASE_MODES.find(m => m.id === mode)!
+  const c = assistantChoice('rewrite')
+  const e = effective(c.model, c.effort)
+  const reply = await ask({
+    model: e.model, effort: e.effort, orModel: c.orModel,
+    system: systemPrompt(book, 'rewrite', found.number),
+    message: [
+      `<before>\n${lastWords(doc.slice(0, target.from), 150)}\n</before>`,
+      `<passage>\n${doc.slice(target.from, target.to)}\n</passage>`,
+      `<after>\n${doc.slice(target.to, target.to + 500)}\n</after>`,
+      `<task>\n${fr
+        ? `Donne ${n} reformulations de <passage>. Chacune dit exactement la même chose (mêmes faits, même personne qui parle ou agit, même temps, même personne grammaticale), dans la voix de l’auteur, et se distingue des autres par ses mots et son rythme, pas par son contenu. ${how.fr} Chacune remplace le passage tel quel et s’enchaîne avec <before> et <after>, qui ne changent pas. Sépare-les par une ligne qui ne contient que ===. Pas de numéro, pas de commentaire, pas de guillemets autour.`
+        : `Give ${n} rewordings of <passage>. Each says exactly the same thing (same facts, same person speaking or acting, same tense, same grammatical person), in the author's voice, and differs from the others in wording and rhythm, not in content. ${how.en} Each replaces the passage as it stands and runs on from <before> into <after>, which do not change. Separate them with a line holding only ===. No numbering, no comment, no quotation marks around them.`}\n</task>`,
+    ].join('\n\n'),
+  })
+  const was = doc.slice(target.from, target.to).trim()
+  return [...new Set(splitVersions(reply))].filter(x => x && x !== was).slice(0, n + 2)
 }

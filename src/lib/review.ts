@@ -6,7 +6,7 @@
 import type { Book, Lang } from './types'
 import {
   adverbs, CLICHES, CONJUNCTIONS, dialogue, echoes, FANCY_TAGS, FILLER_WORDS, FILTER_WORDS, paragraphs, passives,
-  PLAIN_TAGS, phrases, readability, repeatedPhrases, repeatedStarts, sentences, STOPWORDS, TELLING_WORDS, words, type Finding,
+  PLAIN_TAGS, phrases, pronounRuns, readability, repeatedPhrases, repeatedStarts, sameOpenings, sentences, spellingVariants, STOPWORDS, TELLING_WORDS, words, type Finding,
 } from './analysis'
 import { foldText } from './text'
 import { listWords, quoteAround, wordLists, type Check } from './voice'
@@ -134,6 +134,9 @@ export const REPORTS: ReportDef[] = [
       }
       return out
     } },
+  { id: 'openings', category: 'pacing', label: 'Sentences built the same way', unit: 'sentences', target: 5,
+    help: 'Several sentences in a row opening the same way (an article, a preposition, a conjunction, an -ing or -ly word): the rhythm goes flat. Start one of them differently.',
+    find: (text, lang) => sameOpenings(text, lang) },
   // Dialogue
   { id: 'tags', category: 'dialogue', loose: true, label: 'Showy dialogue tags', unit: 'tags', target: 25,
     help: 'Tags other than said / asked (murmured, retorted…). A few are fine; "said" disappears and lets the line speak.',
@@ -184,6 +187,9 @@ export const REPORTS: ReportDef[] = [
   { id: 'banned', category: 'choice', label: 'Your banned words', unit: 'per1000', target: 0,
     help: 'Words from the word lists in your bible.',
     find: (text, _l, book) => phrases(text, wordLists(book).flatMap(listWords)) },
+  { id: 'variants', category: 'choice', label: 'Names written two ways', unit: 'per1000', target: 0,
+    help: 'A name or a title written two ways in the same chapter: with and without an accent or a hyphen (Élise and Elise, Grand-Duc and Grand Duc). The rarer one is flagged.',
+    find: text => spellingVariants(text) },
   // Repetition
   { id: 'echoes', category: 'repetition', label: 'Echoes', unit: 'per1000', target: 12,
     help: 'The same word again within about 40 words.',
@@ -197,6 +203,9 @@ export const REPORTS: ReportDef[] = [
   { id: 'starts', category: 'repetition', label: 'Repeated sentence starts', unit: 'sentences', target: 6,
     help: 'Sentences opening with the same word as the one before.',
     find: text => repeatedStarts(text) },
+  { id: 'pronouns', category: 'repetition', label: 'Pronoun after pronoun', unit: 'sentences', target: 6,
+    help: 'Three sentences or more in a row opening on a pronoun (He… He… She…). Name someone, or start one of them another way.',
+    find: (text, lang) => pronounRuns(text, lang) },
 ]
 
 export type Status = 'good' | 'ok' | 'bad'

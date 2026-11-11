@@ -27,7 +27,7 @@ import { allowedKinds, chapterLabels, enterStartsScene } from './chapters'
 import { countSigns, textStats } from './stats'
 import type { Book, Entry, Scene } from './types'
 import { DEFAULT_AI, DEFAULT_VOICE, ENTRY_TYPES, FAMILIES, VOICE_TYPES, familyOf } from './types'
-import { adverbs, passives, echoes, sentences } from './analysis'
+import { adverbs, passives, echoes, openingKind, pronounRuns, sameOpenings, senses, sentences, spellingVariants } from './analysis'
 import { backupsToRemove, versionsToRemove } from './backups'
 import { bookRepeats } from './repeats'
 import { promiseList } from './promises'
@@ -2258,5 +2258,41 @@ describe('0.53: the reports in the text', () => {
     const one = editBook(b, 'c', null, [], 'z')
     expect(one.reports.find(r => r.def.id === 'adverbs')!.count).toBe(1)
     expect(one.words).toBe(3)
+  })
+})
+
+describe('0.54: senses, openings and names written two ways', () => {
+  it('counts the words of each sense, in English and in French', () => {
+    const en = senses('The room was dark. A whisper, then the smell of smoke. Her hands were cold on the bitter cup.', 'en')
+    expect(Object.fromEntries(Object.entries(en).map(([k, v]) => [k, v.length]))).toEqual({ sight: 1, sound: 1, touch: 1, smell: 2, taste: 1 })
+    const fr = senses('L’odeur du pain. Un murmure dans l’ombre, et le froid de la pierre.', 'fr')
+    expect([fr.smell.length, fr.sound.length, fr.sight.length, fr.touch.length, fr.taste.length]).toEqual([1, 1, 1, 1, 0])
+    // A short stem is a whole word: "sec" is not "secret".
+    expect(senses('Un secret bien gardé.', 'fr').touch).toHaveLength(0)
+  })
+  it('says how a sentence opens', () => {
+    expect(openingKind('He ran.', 'en')).toBe('pronoun')
+    expect(openingKind('— J’ai faim.', 'fr')).toBe('pronoun')
+    expect(openingKind('The door opened.', 'en')).toBe('article')
+    expect(openingKind('Dans la cour, rien.', 'fr')).toBe('preposition')
+    expect(openingKind('Running, she fell.', 'en')).toBe('participle')
+    expect(openingKind('Lentement, il se leva.', 'fr')).toBe('adverb')
+    expect(openingKind('Marc opened it.', 'en')).toBe('other')
+  })
+  it('flags the third sentence in a row opening on a pronoun, and runs built the same way', () => {
+    const text = 'He ran. She followed. He stopped. They waited. Marc spoke. He left.'
+    expect(pronounRuns(text, 'en').map(f => f.note)).toEqual(['he', 'they'])
+    const flat = 'In the hall, nothing. On the stairs, dust. Under the door, light. With care, she knocked. Marc opened.'
+    expect(sameOpenings(flat, 'en').map(f => f.note)).toEqual(['under', 'with'])
+    // Articles are the commonest opening: only the fourth in a row is flagged.
+    expect(sameOpenings('The cat sat. The dog ran. The bird flew.', 'en')).toHaveLength(0)
+    expect(sameOpenings('The cat sat. The dog ran. The bird flew. A man came.', 'en')).toHaveLength(1)
+  })
+  it('flags the rarer spelling of a name, and leaves ordinary words alone', () => {
+    const text = 'Élise entra. Élise parla au Grand-Duc. Elise sortit. Le Grand Duc resta. Le Grand-Duc sourit. Il passe, il est passé.'
+    const found = spellingVariants(text)
+    expect(found.map(f => text.slice(f.from, f.to))).toEqual(['Elise', 'Grand Duc'])
+    expect(found.map(f => f.note)).toEqual(['Élise', 'Grand-Duc'])
+    expect(spellingVariants('Marc Delorme entra. Marc sortit.')).toEqual([])
   })
 })

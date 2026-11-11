@@ -303,3 +303,127 @@ export function passageKind(text: string, lang: Lang): 'dialogue' | 'action' | '
   if (phrases(text, FILTER_WORDS[lang]).length + phrases(text, TELLING_WORDS[lang]).length > p.words / 60) return 'introspection'
   return 'description'
 }
+
+// --- The five senses ---------------------------------------------------------------------------
+
+export type Sense = 'sight' | 'sound' | 'touch' | 'smell' | 'taste'
+export const SENSES: Sense[] = ['sight', 'sound', 'touch', 'smell', 'taste']
+
+/** Word stems of each sense (a stem under four letters must be the whole word). Short lists on purpose: they show the balance, not every word. */
+const SENSE_STEMS: Record<Lang, Record<Sense, string[]>> = {
+  en: {
+    sight: ['glimmer', 'gleam', 'glow', 'shadow', 'shimmer', 'glint', 'bright', 'dark', 'pale', 'color', 'colour', 'flash', 'sparkl', 'shine', 'shone', 'dim', 'glare', 'blur', 'silhouette', 'flicker', 'crimson', 'scarlet', 'golden', 'silver', 'gloom'],
+    sound: ['whisper', 'murmur', 'echo', 'creak', 'rustl', 'thud', 'clang', 'hiss', 'roar', 'rumbl', 'silence', 'silent', 'quiet', 'loud', 'scream', 'shout', 'crack', 'click', 'hum', 'buzz', 'rang', 'howl', 'groan', 'clatter', 'thunder', 'sigh', 'sob', 'chime', 'crunch'],
+    touch: ['rough', 'smooth', 'cold', 'warm', 'hot', 'soft', 'damp', 'wet', 'dry', 'sticky', 'sharp', 'prickl', 'shiver', 'tingl', 'sting', 'stung', 'burn', 'chill', 'heat', 'rasp', 'slick', 'coarse', 'velvet', 'numb', 'ache', 'itch', 'grip'],
+    smell: ['smell', 'scent', 'stench', 'stink', 'stank', 'odor', 'odour', 'reek', 'perfume', 'aroma', 'fragran', 'musty', 'acrid', 'whiff', 'incense', 'smoke'],
+    taste: ['taste', 'flavor', 'flavour', 'bitter', 'sweet', 'sour', 'salty', 'salt', 'savor', 'savour', 'tang', 'spice', 'spicy', 'metallic', 'bland', 'honey'],
+  },
+  fr: {
+    sight: ['lueur', 'ombre', 'sombre', 'pâle', 'clair', 'brill', 'scintill', 'étincel', 'éclat', 'couleur', 'rouge', 'doré', 'argent', 'obscur', 'lumi', 'reflet', 'silhouette', 'terne', 'éblou', 'flou', 'pénombre', 'noir', 'blanc', 'miroit'],
+    sound: ['murmur', 'chuchot', 'écho', 'grinc', 'bruiss', 'fracas', 'siffl', 'rugi', 'grond', 'silence', 'silenci', 'bruit', 'cri', 'hurl', 'craqu', 'cliquet', 'bourdonn', 'tint', 'sonn', 'gémi', 'tonnerre', 'soupir', 'sanglot', 'claqu', 'résonn', 'vacarme'],
+    touch: ['rugueu', 'lisse', 'froid', 'chaud', 'tiède', 'doux', 'douce', 'humide', 'mouill', 'sec', 'sèche', 'collant', 'tranchant', 'piqu', 'frisson', 'brûl', 'glac', 'chaleur', 'râpeu', 'velours', 'engourd', 'douleur', 'démange', 'moite', 'rêche', 'caress'],
+    smell: ['odeur', 'parfum', 'puanteur', 'puait', 'empest', 'arôme', 'senteur', 'relent', 'encens', 'fumée', 'pourri', 'moisi', 'âcre', 'effluve', 'humait'],
+    taste: ['goût', 'saveur', 'amer', 'amère', 'sucré', 'acide', 'salé', 'sel', 'épic', 'métallique', 'fade', 'miel', 'aigre', 'savour'],
+  },
+}
+
+/** A word without its elided article or pronoun: l’odeur → odeur. */
+const bare = (w: string) => foldText(w).replace(/^[a-z]{1,2}[’']/, '')
+
+/** The words of each sense in a text: how a scene is balanced between what is seen, heard, touched, smelled and tasted. */
+export function senses(text: string, lang: Lang): Record<Sense, Finding[]> {
+  const out: Record<Sense, Finding[]> = { sight: [], sound: [], touch: [], smell: [], taste: [] }
+  const stems = SENSES.map(s => [s, SENSE_STEMS[lang][s].map(foldText)] as const)
+  for (const w of words(text)) {
+    const f = bare(w.w)
+    for (const [s, list] of stems) {
+      if (list.some(st => st.length < 4 ? f === st : f.startsWith(st) && f.length - st.length <= 6)) { out[s].push({ from: w.from, to: w.to }); break }
+    }
+  }
+  return out
+}
+
+// --- How sentences open ------------------------------------------------------------------------
+
+const PRONOUNS: Record<Lang, string[]> = {
+  en: ['he', 'she', 'they', 'it', 'i', 'we', 'you'],
+  fr: ['il', 'elle', 'ils', 'elles', 'je', 'j', 'tu', 'nous', 'vous', 'on'],
+}
+const ARTICLES: Record<Lang, string[]> = { en: ['the', 'a', 'an'], fr: ['le', 'la', 'les', 'l', 'un', 'une', 'des'] }
+const PREPOSITIONS: Record<Lang, string[]> = {
+  en: ['in', 'on', 'at', 'with', 'from', 'by', 'under', 'over', 'after', 'before', 'behind', 'through', 'across', 'beneath', 'into', 'above', 'below', 'beside', 'against', 'without'],
+  fr: ['dans', 'sur', 'sous', 'avec', 'sans', 'après', 'avant', 'derrière', 'devant', 'depuis', 'pendant', 'vers', 'chez', 'par', 'pour', 'contre', 'entre', 'dès'],
+}
+
+/** The first word of a sentence, folded, without opening dashes and quotes or an elision: "— J’ai" → "j". */
+const opener = (s: string) => foldText((s.replace(/^[—–«“"\s]+/, '').match(WORD) ?? [''])[0]).split(/[’']/)[0]
+
+export type Opening = 'pronoun' | 'article' | 'preposition' | 'conjunction' | 'participle' | 'adverb' | 'other'
+
+/** How a sentence opens, by its first word. */
+export function openingKind(sentence: string, lang: Lang): Opening {
+  const w = opener(sentence)
+  if (!w) return 'other'
+  if (PRONOUNS[lang].includes(w)) return 'pronoun'
+  if (ARTICLES[lang].includes(w)) return 'article'
+  if (PREPOSITIONS[lang].map(foldText).includes(w)) return 'preposition'
+  if (CONJUNCTIONS[lang].includes(w)) return 'conjunction'
+  if (w.length > 5 && (lang === 'fr' ? w.endsWith('ant') : w.endsWith('ing'))) return 'participle'
+  if (w.length > 5 && (lang === 'fr' ? w.endsWith('ment') : w.endsWith('ly'))) return 'adverb'
+  return 'other'
+}
+
+/** Runs of sentences opening the same way: from the `min`-th of a run on, each is flagged (its first words). */
+function runs(text: string, lang: Lang, want: (k: Opening) => boolean, min: (k: Opening) => number): Finding[] {
+  const out: Finding[] = []
+  let prev: Opening = 'other', len = 0
+  for (const s of sentences(text)) {
+    const k = openingKind(s.s, lang)
+    len = k === prev ? len + 1 : 1
+    prev = k
+    if (want(k) && len >= min(k)) out.push({ from: s.from, to: s.from + Math.min(s.s.length, 30), note: opener(s.s) })
+  }
+  return out
+}
+
+/** Three sentences or more in a row opening on a pronoun: the third and each one after. */
+export const pronounRuns = (text: string, lang: Lang) => runs(text, lang, k => k === 'pronoun', () => 3)
+
+/** Sentences in a row built the same way (article, preposition, conjunction, participle, adverb): the third of a run on (the fourth for articles, the commonest opening). */
+export const sameOpenings = (text: string, lang: Lang) => runs(text, lang, k => k !== 'pronoun' && k !== 'other', k => (k === 'article' ? 4 : 3))
+
+// --- Names and titles written two ways -----------------------------------------------------------
+
+/**
+ * A capitalised word or compound written two ways in the same text: with and without an
+ * accent or a hyphen ("Élise" and "Elise", "Grand-Duc" and "Grand Duc"). The rarer form is
+ * flagged, with the commoner one as its note. Words also met in lower case are left alone:
+ * there, an accent or a hyphen changes the word itself (passe, passé; peut-être, peut être).
+ */
+export function spellingVariants(text: string): Finding[] {
+  const ws = words(text)
+  const cap = (w: string) => w[0] !== w[0].toLowerCase()
+  const keyOf = (w: string) => foldText(w).replace(/[-’'\s]/g, '')
+  const groups = new Map<string, Map<string, Span[]>>()
+  const lower = new Set<string>()
+  const add = (key: string, form: string, span: Span) => {
+    const g = groups.get(key) ?? new Map<string, Span[]>()
+    g.set(form, [...(g.get(form) ?? []), span])
+    groups.set(key, g)
+  }
+  ws.forEach((x, i) => {
+    if (!cap(x.w)) { lower.add(keyOf(x.w)); return }
+    if (x.w.length >= 4) add(keyOf(x.w), x.w.toLowerCase(), { from: x.from, to: x.to })
+    // Two capitalised words side by side may be a compound written apart.
+    const next = ws[i + 1]
+    if (next && cap(next.w) && text.slice(x.to, next.from) === ' ') add(keyOf(x.w + next.w), `${x.w} ${next.w}`.toLowerCase(), { from: x.from, to: next.to })
+  })
+  const out: Finding[] = []
+  for (const [key, forms] of groups) {
+    if (forms.size < 2 || lower.has(key)) continue
+    const sorted = [...forms].sort((a, b) => b[1].length - a[1].length)
+    const main = text.slice(sorted[0][1][0].from, sorted[0][1][0].to)
+    for (const [, spans] of sorted.slice(1)) for (const sp of spans) out.push({ ...sp, note: main })
+  }
+  return out.sort((a, b) => a.from - b.from)
+}

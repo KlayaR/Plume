@@ -10,6 +10,7 @@ import { textStats, type TextStats } from '../lib/stats'
 import { CATEGORIES, reportsFor, type Category } from '../lib/review'
 import { editBook, fixFirst, type BookEdit, type Hit, type ReportSum } from '../lib/editing'
 import { askText } from '../contextMenu'
+import { senses, SENSES, type Sense } from '../lib/analysis'
 import { getEditorView, useAI } from '../editor/actions'
 import { betaCost, betaRead, continuityCheck, continuityCost, lineEdit, lineEditCost, loadVoices, PERSONAS, readAloud, stopReading, useReview, voiceCheck, voiceCheckCost, voicesFor } from '../review'
 import { refreshLT, useLT } from '../editor/lt'
@@ -23,6 +24,7 @@ import { costText } from '../cost'
 const n = (x: number, d = 0) => x.toLocaleString(numLocale(), { maximumFractionDigits: d, minimumFractionDigits: d })
 
 type Scope = 'scene' | 'chapter' | 'book'
+const SENSE_LABELS: Record<Sense, string> = { sight: 'Sight', sound: 'Sound', touch: 'Touch', smell: 'Smell', taste: 'Taste' }
 const PAGE = 30
 const NONE: never[] = []
 const tone = (score: number) => score >= 85 ? 'pl-good' : score >= 60 ? 'pl-ok' : 'pl-bad'
@@ -73,6 +75,11 @@ export default function ReviewPanel() {
   const text = scope === 'scene' ? scene.text : chapter.scenes.map(s => s.text).join('\n')
 
   const defs = useMemo(() => reportsFor(book), [book.meta.kind])
+  // The five senses, on the scene or the chapter (in the book reading, on the chapter you are in).
+  const settledText = useSettled(text, 500)
+  const felt = useMemo(() => senses(settledText, book.meta.language), [settledText, book.meta.language])
+  const feltMax = Math.max(1, ...SENSES.map(x => felt[x].length))
+  const missing = SENSES.filter(x => !felt[x].length)
   const setOff = (list: string[]) => useStore.getState().setPrefs({ edOff: list })
   const idsOf = (c: Category) => defs.filter(d => d.category === c).map(d => d.id)
   const toggle = (id: string) => setOff(off.includes(id) ? off.filter(x => x !== id) : [...off, id])
@@ -151,7 +158,7 @@ export default function ReviewPanel() {
               </label>
             )}
             {report && report !== 'ai' && (
-              <div className="pl-row"><span className="sk-hint pl-grow">{t('Only “{name}” is shown in the text.', { name: report.startsWith('word:') ? report.slice(5) : t(defs.find(d => d.id === report)?.label ?? report) })}</span><button type="button" className="sk-btn sk-btn-ghost sk-btn-sm" onClick={() => useReview.setState({ report: null })}>{t('Show all')}</button></div>
+              <div className="pl-row"><span className="sk-hint pl-grow">{t('Only “{name}” is shown in the text.', { name: report.startsWith('word:') ? report.slice(5) : report.startsWith('sense:') ? t(SENSE_LABELS[report.slice(6) as Sense] ?? report) : t(defs.find(d => d.id === report)?.label ?? report) })}</span><button type="button" className="sk-btn sk-btn-ghost sk-btn-sm" onClick={() => useReview.setState({ report: null })}>{t('Show all')}</button></div>
             )}
             {ignores.length > 0 && (
               <div className="pl-row"><span className="sk-hint pl-grow">{t('{n} passage(s) ignored in this book.', { n: ignores.length })}</span><button type="button" className="sk-btn sk-btn-ghost sk-btn-sm" onClick={() => useStore.getState().updateMeta({ edIgnore: [] })}>{t('Flag them again')}</button></div>
@@ -217,6 +224,18 @@ export default function ReviewPanel() {
               })}
             </section>
           ))}
+
+          <section className="pl-cat">
+            <div className="sk-label">{t('The five senses')}{scope === 'book' ? ` · ${label}` : ''}</div>
+            {SENSES.map(x => (
+              <button key={x} type="button" className="pl-ed-cat pl-ed-sense" aria-pressed={report === `sense:${x}`} title={t('Show these words in the text')} onClick={() => useReview.setState({ report: report === `sense:${x}` ? null : `sense:${x}` })}>
+                <span className="pl-ed-catname">{t(SENSE_LABELS[x])}</span>
+                <span className="pl-ed-bar"><i className={felt[x].length ? 'pl-good' : 'pl-bad'} style={{ width: `${(felt[x].length / feltMax) * 100}%` }} /></span>
+                <b>{felt[x].length}</b>
+              </button>
+            ))}
+            <span className="sk-hint">{missing.length ? t('Nothing for: {list}. A scene told through the eyes alone stays at a distance.', { list: missing.map(x => t(SENSE_LABELS[x]).toLowerCase()).join(', ') }) : t('Every sense is there. The counts come from a short list of words: they show the balance, not every word.')}</span>
+          </section>
 
           {scope === 'book' && e.chapters.length > 1 && (
             <section className="pl-cat">

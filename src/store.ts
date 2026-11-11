@@ -318,7 +318,7 @@ interface State {
   /** A place to go to in a scene: the editor selects it once the scene is open. */
   jump: { sceneId: string; from: number; to: number } | null
   /** The book's big dialogs, and the PDF print view. */
-  dialog: 'export' | 'agents' | 'trial' | 'tour' | 'find' | 'snapshots' | 'outline' | 'synonyms' | 'entry' | 'shortcuts' | 'jump' | 'help' | 'history' | null
+  dialog: 'export' | 'agents' | 'trial' | 'rephrase' | 'tour' | 'find' | 'snapshots' | 'outline' | 'synonyms' | 'entry' | 'shortcuts' | 'jump' | 'help' | 'history' | null
   /** What a dialog opens on, when something asks for it (the words to find, the action to set a shortcut for). */
   dialogArg: string | null
   printing: boolean

@@ -7,6 +7,14 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.54.0
+Rephrase, and the reports that were missing.
+- **Rephrase.** Several rewordings of a passage to pick from, as in ProWritingAid, but in your voice and fitted to what comes before and after. Select a sentence or a short passage and press Rephrase in the bar above it (in the Manuscript or in Editing), or press Rephrase on the card of a highlight, for the sentence it is in. The first list is Smoother; Shorter, Longer, More sensory, More tension, Plainer, More formal and Less formal ask again another way. A click puts one in the text (Ctrl+Z brings the old one back). Each list is one request to Claude.
+- **The five senses.** The Editing panel counts the words of sight, sound, touch, smell and taste in the scene or the chapter, says which sense is missing, and shows a sense's words in the text when you click it. The counts come from a short list of words: they show the balance, not every word.
+- **Pronoun after pronoun** (Repetition): three sentences or more in a row opening on a pronoun.
+- **Sentences built the same way** (Pacing): several sentences in a row opening on an article, a preposition, a conjunction, an -ing or -ly word.
+- **Names written two ways** (Word choice): a name or a title written with and without an accent or a hyphen in the same chapter ("Élise" and "Elise", "Grand-Duc" and "Grand Duc"); the rarer one is flagged. It needs no bible entry.
+
 ## 0.53.0
 Editing in the text: everything the editor finds is highlighted where it is.
 - **Editing is the text, with the editor beside it.** The Editing button in the bottom bar now shows the Manuscript itself, with the editor's panel on the right (0.52's separate analysis screen is gone, and so is the Write / Review switch: the Manuscript button writes, the Editing button reads). You can still type there.

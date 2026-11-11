@@ -33,6 +33,7 @@ import HelpDialog from './components/HelpDialog'
 import SnapshotsDialog from './components/SnapshotsDialog'
 import { EntryHistoryDialog } from './components/NotesPanel'
 import EditChapterDialog from './components/EditChapterDialog'
+import RephraseDialog from './components/RephraseDialog'
 
 /** Scroll positions per space and scrolling element, for this run of the app. */
 const scrolls = new Map<string, number>()
@@ -188,6 +189,7 @@ export default function App() {
       {book && dialog === 'find' && <FindDialog onClose={() => useStore.setState({ dialog: null })} />}
       {book && dialog === 'outline' && <OutlineDialog onClose={() => useStore.setState({ dialog: null })} />}
       {book && dialog === 'synonyms' && <SynonymDialog onClose={() => useStore.setState({ dialog: null })} />}
+      {book && dialog === 'rephrase' && <RephraseDialog onClose={() => useStore.setState({ dialog: null })} />}
       {book && dialog === 'snapshots' && <SnapshotsDialog onClose={() => useStore.setState({ dialog: null })} />}
       {book && dialog === 'history' && <EntryHistoryDialog onClose={() => useStore.setState({ dialog: null })} />}
       {book && dialog === 'entry' && <EntryFromText onClose={() => useStore.setState({ dialog: null })} />}
