@@ -7,6 +7,17 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.49.0
+Claude used better in every tab, and a way to find out which prompt writes your book best. Each of these was run with real Claude in the built app.
+- **Compare prompts, blind.** Settings → Voice → Compare prompts (or Ctrl+K) writes the scene you are in with two or three setups: the prompt, the model, and how much of your prose is sent. The texts appear side by side without their labels; you pick the one you would keep, Plume says which it was and keeps count, and **Use this setup** makes the winner write your book. It starts from an empty page and, for a long scene, writes only its first beats, so a trial stays short.
+- **A second fantasy prompt to try.** "Fantasy (short brief)" says the same as the Fantasy prompt in one paragraph of what to do, with no list of faults to avoid, and leans on your own prose. It is not the default: compare the two on your scenes first.
+- **More of your voice.** Up to 6,000 words of your own prose now go with each request (it was 1,500), spread over several passages; Settings → This book → Samples of your prose sets it. They are sent once, then read from the cache.
+- **Long scenes in several parts.** A scene whose card has six beats or more is written about three beats at a time, into one proposal: each part plays its beats in full and only the last one ends the scene. Settings → This book can turn it off. It takes one request per part.
+- **Each proposal is checked against the bible.** When Claude finishes writing, a small job compares the text with the bible entries that were sent and lists contradictions under the proposal, before you accept. Settings → Claude can turn it off.
+- **The bible keeps up with what you write.** When a scene joins the story memory, a small job notes what it establishes that the bible doesn't hold yet (a new fact about a character, a place named for the first time), with the words that say so. The drafts wait in Bible → To review; nothing changes without you. Settings → Claude can turn it off.
+- **Bible drafts read every mention.** A draft of an entry from the text was built on the first six passages that name it; it now reads all of them (an even sample across the book when there are too many).
+- **A chat that thinks harder.** The chat was fixed at the lowest effort; it now uses the effort set for editing and planning. Three buttons brainstorm in one click, on what you typed or on the conversation: **Ten options**, **What if…** and **Poke holes**.
+
 ## 0.48.1
 Fixes found by checking 0.45.1 to 0.48.0 again, this time in the installed app with real Claude.
 - **Claude's plans and drafts failed or came back empty (since 0.47.0).** Detail and Regenerate in the Outline, entry drafts, and the new whole-book reads asked the command line for an answer in a shape it returns as empty. They now ask for it in a shape that works, and an empty answer is asked again once. Lists (line edits, checks, suggestions) were not affected.
