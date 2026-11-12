@@ -4,7 +4,9 @@ import { waitingInBook } from './waiting'
 import { describe, expect, it } from 'vitest'
 import { locate } from '../edit'
 import { parseEntry, serializeEntry, parseScene, serializeScene, factApplies, parseFact } from './bible'
-import { buildContext, buildMatcher, findMentions, outlineLines, ownShare, proseSamples, sceneWords, systemPrompt } from './context'
+import { buildContext, buildMatcher, fairShares, findMentions, outlineLines, ownShare, proseSamples, sampleParts, sceneWords, systemPrompt, voiceIssues } from './context'
+import { MY_VOICE, promptFor } from './voice'
+import { FANTASY_STYLE } from './defaults'
 import { autoCapitalRule, fixTypography, loneI, typingRule } from './typography'
 import { pasteText, wrapMarks } from './paste'
 import { matterPages, FRONT, BACK } from './matter'
@@ -950,6 +952,35 @@ describe('quality per token', () => {
     expect(s[0]).toContain('claude')
     expect(s.join(' ')).toContain('draft')
     expect(s.join(' ')).not.toContain('mine')
+  })
+  it('shares the samples budget fairly, so a marked chapter goes whole when it fits', () => {
+    expect(fairShares([100, 5000, 300], 1000)).toEqual([100, 600, 300])
+    const words = (n: number, w: string) => Array.from({ length: n }, () => w).join(' ')
+    const marked = [scene('a', words(600, 'one'), { voiceRef: true }), scene('b', words(2000, 'two'), { voiceRef: true }), scene('c', words(900, 'three'), { voiceRef: true })]
+    const parts = sampleParts(bookOf(marked), 1, [])
+    expect(parts.map(p => p.sent)).toEqual([600, 2000, 900])
+    // One long marked scene is no longer cut to a third of the budget.
+    expect(sampleParts(bookOf([scene('d', words(3600, 'long'), { voiceRef: true })]), 1, [])[0].sent).toBe(3600)
+  })
+  it('sends the passages of your voice, once, beside the scenes of the book', () => {
+    const words = (n: number, w: string) => Array.from({ length: n }, () => w).join(' ')
+    const book = bookOf([scene('a', words(300, 'marked'), { voiceRef: true })])
+    const own = [{ name: 'Ch. 1', text: words(300, 'voice') }, { name: 'Again', text: words(300, 'marked') }]
+    const parts = sampleParts(book, 1, own)
+    expect(parts.map(p => p.kind)).toEqual(['marked', 'voice'])
+    expect(proseSamples(book, 1, own).join(' ')).toContain('voice')
+  })
+  it('flags what repeats or weakens your voice', () => {
+    const words = (n: number) => Array.from({ length: n }, () => 'mot').join(' ')
+    const style: Entry = { slug: 'style', type: 'style', path: 'bible/style.md', name: 'Guide', aliases: [], include: 'always', links: [], short: '', full: FANTASY_STYLE.fr, facts: [], extra: {} }
+    const book = bookOf([], [style], 'fr')
+    book.meta.voice = { ...DEFAULT_VOICE, prompt: MY_VOICE, sceneRules: ['hook'], description: 'Sec.', own: { prompt: 'Sobre.', samples: [] } }
+    expect(voiceIssues(book, 1).map(i => i.id)).toEqual(['fantasy-style', 'description', 'scene-rules', 'no-samples'])
+    const other = bookOf([scene('a', words(200), { voiceRef: true })], [], 'fr')
+    other.meta.voice = { ...DEFAULT_VOICE, prompt: 'preset-noir', own: { prompt: 'Sobre.', samples: [] } }
+    expect(voiceIssues(other, 1).map(i => i.id)).toEqual(['other-prompt'])
+    // The book's copy of your voice is its prompt when this computer has none.
+    expect(promptFor(book, 'continue')?.text).toBe('Sobre.')
   })
   it('marks the system prompt for caching on Claude models through OpenRouter', () => {
     const body = chatBody('anthropic/claude-sonnet-5.5', 'Rules', 'Hi')

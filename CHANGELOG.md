@@ -7,6 +7,15 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.56.0
+Your voice, one per language, and a leaner Voice screen.
+- **Your voice in French, your voice in English.** At the top of Settings → Voice: your instructions and passages of your own prose, written once per language and kept on this computer. Every book in that language can write with it; a new book starts with it alone (no fantasy prompt, an empty style guide, no scene rules). The book keeps a copy, so it writes the same on another computer.
+- **Write in my voice.** A book that still uses another prompt says so, and one click switches it: your voice as its prompt, scene rules off, the style guide emptied if it is still the fantasy one (yours is kept).
+- **Add the scenes marked in this book.** Copies the scenes you marked "Sample of my voice" into your voice, for your next books. The same passage is never sent twice.
+- **Marked scenes go whole.** A scene you marked as your voice was cut to its first 1,800 words or so. The passages you chose now share the samples budget fairly, so a chapter of 3,000 or 4,000 words goes in full with the default 6,000 words.
+- **What Claude receives.** Each part sent with every request (Plume's rules, your instructions, the style guide, your prose…) with its length and its text, and what repeats or weakens your voice, each with its fix: a fantasy style guide still there, "Your voice, in words" saying it again, scene rules, actions using another prompt, a passage cut short, no prose at all.
+- **A shorter screen.** Your voice, this book (tense, adult fiction), your rules and What Claude receives are on top. The fantasy defaults, other prompts, word lists and excerpts, scene rules, style profile and reference books are under Advanced.
+
 ## 0.55.0
 Ready to write? now fixes what it finds.
 - **Each line has its buttons.** Go to opens the chapter in the outline, or the entry in the Bible. Fix has Claude propose the fix. Done strikes a line off until the next check.

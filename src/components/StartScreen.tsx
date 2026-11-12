@@ -9,6 +9,7 @@ import { Dialog } from '../studio-kit/shell.js'
 import { loadSpots, useStore } from '../store'
 import { worthShowing } from '../lib/session'
 import { createBook, createExample, isBook } from '../lib/project'
+import { ownVoice } from '../lib/voice'
 import { exampleTitle } from '../lib/example'
 import type { BookKind, Lang } from '../lib/types'
 import { importManuscript, loadShelf, type ShelfBook } from '../library'
@@ -163,7 +164,7 @@ function NewBook({ onClose }: { onClose: () => void }) {
     setBusy(true)
     try {
       const root = await join(parent, folderName(title))
-      const book = await createBook(root, title.trim(), author.trim(), lang, kind)
+      const book = await createBook(root, title.trim(), author.trim(), lang, kind, !!ownVoice(lang))
       useStore.getState().setBook(book)
       // A premise, if given, is kept and offered as the start of an outline.
       if (premise.trim()) {

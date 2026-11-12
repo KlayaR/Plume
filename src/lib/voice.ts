@@ -47,8 +47,43 @@ export async function restorePrompts(): Promise<void> {
   } catch { if (loadPrompts().length) savePrompts(loadPrompts()) }
 }
 export const allPrompts = () => [...PRESETS, ...loadPrompts()]
-/** The prompts a book or an action can pick: all but the fragments. */
-export const choosablePrompts = () => allPrompts().filter(p => !p.fragment)
+/** The prompts a book or an action can pick: your voice, then all but the fragments. */
+export const choosablePrompts = (): PromptSet[] => [{ id: MY_VOICE, name: 'My voice', text: '', preset: true }, ...allPrompts().filter(p => !p.fragment)]
+
+// --- Your voice, one per language ----------------------------------------------
+// Kept on this computer for every book in that language: the instructions and
+// passages of your own prose. A book picks it as its prompt (MY_VOICE) and carries
+// a copy (voice.own), so it still writes in your voice on another computer.
+
+export interface Sample { name: string; text: string }
+export interface OwnVoice { prompt: string; samples: Sample[] }
+
+/** The prompt id that means "my voice for the book's language". */
+export const MY_VOICE = 'my-voice'
+const VOICES_KEY = 'plume.voices'
+
+export function loadVoices(): Partial<Record<Lang, OwnVoice>> {
+  try { const v = JSON.parse(localStorage.getItem(VOICES_KEY) ?? '{}'); return v && typeof v === 'object' && !Array.isArray(v) ? v : {} } catch { return {} }
+}
+export function saveVoices(v: Partial<Record<Lang, OwnVoice>>) {
+  try { localStorage.setItem(VOICES_KEY, JSON.stringify(v)) } catch { /* private mode */ }
+  invoke('app_write', { name: 'voices.json', content: JSON.stringify(v, null, 1) }).catch(() => {})
+}
+/** At start: if the data file has voices the browser copy lacks (a reinstall), bring them back. */
+export async function restoreVoices(): Promise<void> {
+  const here = () => Object.keys(loadVoices()).length > 0
+  try {
+    const file = JSON.parse(await invoke<string>('app_read', { name: 'voices.json' }))
+    if (file && typeof file === 'object' && Object.keys(file).length && !here()) localStorage.setItem(VOICES_KEY, JSON.stringify(file))
+    else if (!Object.keys(file ?? {}).length && here()) saveVoices(loadVoices())
+  } catch { if (here()) saveVoices(loadVoices()) }
+}
+
+const filled = (v: OwnVoice | undefined | null): v is OwnVoice => !!v && (!!v.prompt?.trim() || !!v.samples?.some(s => s.text.trim()))
+/** Your voice in this language on this computer, if you wrote one. */
+export const ownVoice = (lang: Lang): OwnVoice | null => { const v = loadVoices()[lang]; return filled(v) ? v : null }
+/** The voice a book writes with: this computer's for its language, else the copy the book carries. */
+export const bookOwnVoice = (book: Book): OwnVoice | null => ownVoice(book.meta.language) ?? (filled(book.meta.voice.own) ? book.meta.voice.own : null)
 
 const INCLUDE = /\{include\.([^}]+)\}/gi
 const sameName = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase()
@@ -85,6 +120,7 @@ export function promptFor(book: Book, action: ActionId): PromptSet | null {
   const v = book.meta.voice
   const id = v.actionPrompts[action] || v.prompt
   if (!id) return null
+  if (id === MY_VOICE) { const own = bookOwnVoice(book); return own?.prompt.trim() ? { id, name: 'My voice', text: own.prompt } : null }
   const found = allPrompts().find(p => p.id === id)
   if (found) return found
   const copy = v.snapshots?.[id]

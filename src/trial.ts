@@ -4,7 +4,7 @@
 import type { Book, Model, Scene } from './lib/types'
 import { buildContext } from './lib/context'
 import { movementsOf } from './lib/editorial'
-import { allPrompts } from './lib/voice'
+import { choosablePrompts } from './lib/voice'
 import { ask } from './ai'
 import { findScene, useStore } from './store'
 
@@ -54,7 +54,7 @@ export async function runTrial(variants: Variant[], onStep: (done: number) => vo
 
 /** A setup in words: "Fantasy · opus · 6,000 words of samples". */
 export function variantName(v: Variant, lang: 'en' | 'fr', words: string, say: (s: string) => string = s => s): string {
-  const p = allPrompts().find(x => x.id === v.prompt)
+  const p = choosablePrompts().find(x => x.id === v.prompt)
   return `${p ? (p.preset ? say(p.name) : p.name) : v.prompt} · ${v.model} · ${v.samples.toLocaleString(lang === 'fr' ? 'fr-FR' : 'en-US')} ${words}`
 }
 

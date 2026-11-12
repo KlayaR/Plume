@@ -11,7 +11,7 @@ import { volumeBook } from './lib/export'
 import { fromBase64, fromUtf8, makeZip, readZip, toBase64 } from './lib/zip'
 import { backupsToRemove } from './lib/backups'
 import { newId } from './lib/text'
-import { allPrompts, usedPromptIds } from './lib/voice'
+import { allPrompts, MY_VOICE, ownVoice, usedPromptIds } from './lib/voice'
 import { FANTASY_LISTS, FANTASY_STYLE, FANTASY_VERSION, fantasyVoice } from './lib/defaults'
 import { STOCK_STYLE } from './lib/project'
 import { DEFAULT_RULES } from './lib/types'
@@ -162,9 +162,24 @@ export function refreshSnapshots(book: Book) {
     if (p) snapshots[id] = { name: p.name, text: p.text, ...(p.model ? { model: p.model } : {}) }
     else if (old) snapshots[id] = old
   }
-  if (JSON.stringify(snapshots) !== JSON.stringify(book.meta.voice.snapshots ?? {})) {
-    useStore.getState().updateMeta({ voice: { ...book.meta.voice, snapshots } })
+  // And your voice for its language, as it is on this computer.
+  const own = ownVoice(book.meta.language) ?? book.meta.voice.own
+  if (JSON.stringify(snapshots) !== JSON.stringify(book.meta.voice.snapshots ?? {}) || JSON.stringify(own) !== JSON.stringify(book.meta.voice.own)) {
+    useStore.getState().updateMeta({ voice: { ...book.meta.voice, snapshots, ...(own ? { own } : {}) } })
   }
+}
+
+/**
+ * The book writes in your voice alone: your voice as its prompt, no scene rules, and
+ * the style guide emptied when it is still the fantasy one (yours is kept). Your rules,
+ * word lists, tense and the rest stay as they are.
+ */
+export function switchToMyVoice(book: Book) {
+  const st = useStore.getState()
+  st.updateMeta({ voice: { ...book.meta.voice, prompt: MY_VOICE, sceneRules: [], defaults: book.meta.voice.defaults ?? FANTASY_VERSION } })
+  const style = book.entries.find(e => e.type === 'style')
+  if (style && style.full.replace(/\s+/g, ' ').trim() === FANTASY_STYLE[book.meta.language].replace(/\s+/g, ' ').trim()) st.updateEntry(style.slug, { full: STOCK_STYLE[book.meta.language] })
+  refreshSnapshots(useStore.getState().book!)
 }
 
 // --- The fantasy defaults ------------------------------------------------------------
@@ -200,6 +215,8 @@ export function applyFantasyDefaults(book: Book, force = false): boolean {
   if (!force && (v.defaults || !pristine)) return false
   const st = useStore.getState()
   const lang = book.meta.language
+  // You wrote your voice for this language: a new book takes it instead of the fantasy one.
+  if (!force && ownVoice(lang)) { switchToMyVoice(book); return false }
   st.updateMeta({ voice: { ...fantasyVoice(lang), tense: v.tense, adult: v.adult, description: v.description, taste: v.taste, snapshots: v.snapshots } })
   for (const l of FANTASY_LISTS[lang]) {
     if (st.book!.entries.some(e => e.type === 'wordlist' && e.name === l.name)) continue
@@ -308,7 +325,7 @@ export async function importManuscript(path: string, parent: string, lang: Lang)
   const parsed = splitManuscript(paras, name)
   const folder = parsed.title.replace(/[<>:"/\\|?*\u0000-\u001f]/g, '').trim() || 'Import'
   const root = `${parent.replace(/[\\/]+$/, '')}\\${folder}`
-  const book = await createBook(root, parsed.title, '', lang)
+  const book = await createBook(root, parsed.title, '', lang, 'book', !!ownVoice(lang))
   // createBook made one empty chapter: the manuscript's chapters take its place.
   const empty = book.chapters[0]
   book.chapters = []

@@ -4,7 +4,8 @@ import { invoke } from '@tauri-apps/api/core'
 import type { Book, BookMeta, Chapter, Entry, EntryType, Lang, Scene } from './types'
 import type { BookKind } from './types'
 import { DEFAULT_AI, DEFAULT_RULES, DEFAULT_SERIAL, DEFAULT_VOICE, typeInfo } from './types'
-import { FANTASY_LISTS, FANTASY_STYLE, fantasyVoice } from './defaults'
+import { FANTASY_LISTS, FANTASY_STYLE, FANTASY_VERSION, fantasyVoice } from './defaults'
+import { MY_VOICE } from './voice'
 import { joinFrontmatter, parseEntry, parseScene, serializeEntry, serializeScene, splitFrontmatter } from './bible'
 import { newId, slugify } from './text'
 import { exampleFiles } from './example'
@@ -257,18 +258,25 @@ export function serialDefaults(meta: BookMeta): Partial<BookMeta> {
   return { kind: 'serial', serial: { ...DEFAULT_SERIAL, ...(meta.serial ?? {}) }, ai: { ...meta.ai, chapterWords: [2000, 3500] }, goal: { ...meta.goal, book: 0 }, sceneMode: meta.sceneMode ?? { kind: 'one' } }
 }
 
-export async function createBook(root: string, title: string, author: string, language: Lang, kind: BookKind = 'book'): Promise<Book> {
+/**
+ * `ownVoice`: you wrote your voice for this language (Settings → Voice). The book then
+ * starts with it alone: an empty style guide, no scene rules, only the AI-isms list.
+ * Otherwise it starts with the fantasy voice.
+ */
+export async function createBook(root: string, title: string, author: string, language: Lang, kind: BookKind = 'book', ownVoice = false): Promise<Book> {
   if (await isBook(root)) throw new Error('This folder already holds a book.')
   let meta = normalizeMeta({ title, author, language })
   if (kind === 'serial') meta = { ...meta, ...serialDefaults(meta) }
-  meta.voice = fantasyVoice(language) // new books start with the fantasy voice
-  const style: Entry = { slug: 'style', type: 'style', path: 'bible/style.md', name: language === 'fr' ? 'Guide de style' : 'Style guide', aliases: [], include: 'always', links: [], short: '', full: FANTASY_STYLE[language], facts: [], extra: {} }
+  meta.voice = ownVoice
+    ? { ...DEFAULT_VOICE, prompt: MY_VOICE, rules: { ...DEFAULT_RULES, dashDialogue: language === 'fr' }, defaults: FANTASY_VERSION }
+    : fantasyVoice(language)
+  const style: Entry = { slug: 'style', type: 'style', path: 'bible/style.md', name: language === 'fr' ? 'Guide de style' : 'Style guide', aliases: [], include: 'always', links: [], short: '', full: ownVoice ? STOCK_STYLE[language] : FANTASY_STYLE[language], facts: [], extra: {} }
   const book: Book = { root, meta, entries: [style], chapters: [] }
   const ch = makeChapter(book, language === 'fr' ? 'Chapitre 1' : 'Chapter 1')
   ch.scenes.push(makeScene(ch, language === 'fr' ? 'Scène 1' : 'Scene 1'))
   book.chapters.push(ch)
   await saveEntry(root, style)
-  for (const l of FANTASY_LISTS[language]) {
+  for (const l of FANTASY_LISTS[language].slice(0, ownVoice ? 1 : undefined)) {
     const e = { ...makeEntry(book, 'wordlist', l.name), full: l.full }
     book.entries.push(e)
     await saveEntry(root, e)

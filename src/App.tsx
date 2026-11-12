@@ -10,7 +10,7 @@ import { keysOf } from './lib/shortcuts'
 import { useAppVersion } from './lib/useAppVersion'
 import { applyPrefs } from './lib/fonts'
 import { setClaudeTranslator } from './lib/claude'
-import { restorePrompts } from './lib/voice'
+import { restorePrompts, restoreVoices } from './lib/voice'
 import { restoreReferences } from './lib/references'
 import { shellStrings, translate, useT } from './i18n'
 import StartScreen from './components/StartScreen'
@@ -55,7 +55,7 @@ export default function App() {
 
   // The old split view (before 0.18) becomes the second view with the Bible.
   useEffect(() => { const p = useStore.getState().prefs; if (p.split !== null && p.split !== undefined) useStore.getState().setPrefs({ split: null, dual: p.split.startsWith('entry:') ? 'bible' : p.dual }) }, [])
-  useEffect(() => { useStore.getState().detectClaude(); restorePrompts(); restoreReferences() }, [])
+  useEffect(() => { useStore.getState().detectClaude(); restorePrompts(); restoreVoices(); restoreReferences() }, [])
   // The first time a book opens there is only the tip card (three things worth knowing); the tour is in the ⋯ menu.
   useEffect(() => { applyPrefs(prefs, lang) }, [prefs, lang])
 

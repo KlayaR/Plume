@@ -8,7 +8,8 @@ import { fieldLines } from './fields'
 import { factApplies } from './bible'
 import { estimateTokens, fold, lastWords, firstWords } from './text'
 import { taskMessage, systemRules, type ScenePart, type ScenePlace } from './prompts'
-import { expandVariables, promptFor, promptText, resolveIncludes } from './voice'
+import { bookOwnVoice, expandVariables, MY_VOICE, promptFor, promptText, resolveIncludes, type Sample } from './voice'
+import { FANTASY_STYLE } from './defaults'
 import { aiBlocks } from './blocks'
 import { arcsOf, isLitRPG, isSerial, statsAt } from './serial'
 
@@ -158,57 +159,116 @@ const autoSample = (s: Scene) => s.status !== 'draft' && ownShare(s) <= OWN_SHAR
 /** Is this scene a sample of your voice: your choice first, else Plume's. */
 export const isVoiceSample = (s: Scene) => s.voiceRef ?? autoSample(s)
 
-/**
- * Samples of the author's own prose: the scenes you marked as your voice first
- * (whoever typed them: your approval is what counts), then your excerpts, then
- * passages of revised or done scenes Claude wrote little of, outside the chapter
- * being written (so the samples, and the cache, hold while you work on it).
- * Chosen the same way every time.
- */
-export function proseSamples(book: Book, chapter: number): string[] {
-  const out: string[] = []
-  const budget = Math.max(0, book.meta.ai.sampleWords ?? SAMPLE_WORDS)
-  let left = budget
-  // One scene never takes it all: several passages show the voice better than one long one.
-  const share = (part: number) => Math.max(350, Math.round(budget * part))
-  const take = (text: string, max: number) => {
-    const t = firstWords(text.trim(), Math.min(max, left))
-    const n = wordCount(t)
-    if (n < 60) return
-    out.push(t)
-    left -= n
-  }
-  const clean = (s: Scene) => s.text.replace(/⟦[^⟧]*⟧/g, '')
-  for (const s of book.chapters.flatMap(c => c.scenes).filter(s => s.voiceRef === true)) if (left >= 60) take(clean(s), share(0.3))
-  const excerpts = book.entries.filter(e => e.type === 'excerpt' && e.full.trim() && e.include !== 'never' && e.include !== 'secret').sort((a, b) => a.slug.localeCompare(b.slug))
-  for (const e of excerpts) if (left >= 60) take(e.full, share(0.15))
-  const own = book.chapters.flatMap((c, i) => (i + 1 === chapter ? [] : c.scenes))
-    .filter(s => s.voiceRef === undefined && autoSample(s))
-    .sort((a, b) => (a.status === 'done' ? 0 : 1) - (b.status === 'done' ? 0 : 1))
-  for (const s of own) if (left >= 60) take(clean(s), share(0.12))
+/** Splits a budget between parts: each gets what it needs, and the longest share what the others leave. */
+export function fairShares(sizes: number[], budget: number): number[] {
+  const out = sizes.map(() => 0)
+  let rest = Math.max(0, budget)
+  const order = sizes.map((_, i) => i).sort((a, b) => sizes[a] - sizes[b])
+  order.forEach((i, k) => { out[i] = Math.min(sizes[i], Math.floor(rest / (order.length - k))); rest -= out[i] })
   return out
 }
 
-/** The stable part of every request: rules, your prompt, your voice, your style guide, samples of your prose. */
-export function systemPrompt(book: Book, action: ActionId, chapter: number): string {
+/** One passage of your prose sent as your voice: where it comes from, how long it is, how much of it goes. */
+export interface SamplePart { kind: 'marked' | 'voice' | 'excerpt' | 'auto'; name: string; words: number; sent: number; text: string }
+
+/**
+ * Samples of the author's own prose. First what you chose: the scenes you marked
+ * as your voice (whoever typed them: your approval is what counts), the passages
+ * of your voice for this language, your excerpts. They share the budget fairly, so
+ * a marked chapter goes whole when it fits. Then, with what is left, passages of
+ * revised or done scenes Claude wrote little of, outside the chapter being written
+ * (so the samples, and the cache, hold while you work on it). Chosen the same way every time.
+ */
+export function sampleParts(book: Book, chapter: number, own: Sample[] = bookOwnVoice(book)?.samples ?? []): SamplePart[] {
+  const budget = Math.max(0, book.meta.ai.sampleWords ?? SAMPLE_WORDS)
+  const clean = (s: Scene) => s.text.replace(/⟦[^⟧]*⟧/g, '')
+  const norm = (s: string) => s.replace(/\s+/g, ' ').trim()
+  const marked = book.chapters.flatMap(c => c.scenes).filter(s => s.voiceRef === true && wordCount(clean(s)) >= 60)
+  const inBook = norm(marked.map(clean).join('\n'))
+  const chosen: Omit<SamplePart, 'sent'>[] = [
+    ...marked.map(s => ({ kind: 'marked' as const, name: s.title, text: clean(s).trim(), words: wordCount(clean(s)) })),
+    // Your voice's passages, unless this book already holds them as marked scenes.
+    ...own.filter(x => wordCount(x.text) >= 60 && !inBook.includes(norm(x.text).slice(0, 200)))
+      .map(x => ({ kind: 'voice' as const, name: x.name, text: x.text.trim(), words: wordCount(x.text) })),
+    ...book.entries.filter(e => e.type === 'excerpt' && wordCount(e.full) >= 60 && e.include !== 'never' && e.include !== 'secret').sort((a, b) => a.slug.localeCompare(b.slug))
+      .map(e => ({ kind: 'excerpt' as const, name: e.name, text: e.full.trim(), words: wordCount(e.full) })),
+  ]
+  const shares = fairShares(chosen.map(c => c.words), budget)
+  const out: SamplePart[] = chosen.map((c, i) => ({ ...c, sent: shares[i] >= 60 ? shares[i] : 0 }))
+  let left = budget - out.reduce((n, p) => n + p.sent, 0)
+  // One scene never takes all that is left: several passages show the voice better than one long one.
+  const share = Math.max(350, Math.round(budget * 0.12))
+  const auto = book.chapters.flatMap((c, i) => (i + 1 === chapter ? [] : c.scenes))
+    .filter(s => s.voiceRef === undefined && autoSample(s))
+    .sort((a, b) => (a.status === 'done' ? 0 : 1) - (b.status === 'done' ? 0 : 1))
+  for (const s of auto) {
+    const n = Math.min(share, left, wordCount(clean(s)))
+    if (n < 60) continue
+    out.push({ kind: 'auto', name: s.title, text: clean(s).trim(), words: wordCount(clean(s)), sent: n })
+    left -= n
+  }
+  return out.map(p => (p.sent < p.words ? { ...p, text: firstWords(p.text, p.sent) } : p))
+}
+
+/** The passages sent as your voice. */
+export const proseSamples = (book: Book, chapter: number, own?: Sample[]): string[] =>
+  sampleParts(book, chapter, own).filter(p => p.sent > 0).map(p => p.text.trim())
+
+/** The parts of the system prompt, in order; empty ones are left out. */
+export type SystemPartKey = 'rules' | 'instructions' | 'tone' | 'voice' | 'taste' | 'style' | 'prose'
+export interface SystemPart { key: SystemPartKey; text: string }
+
+/** The style guide as sent: its short and full text. */
+const styleText = (book: Book) => {
+  const style = book.entries.find(e => e.type === 'style')
+  return style ? [style.short, style.full].filter(s => s.trim()).join('\n\n').trim() : ''
+}
+
+/** The stable part of every request, part by part: rules, your prompt, your voice, your style guide, samples of your prose. */
+export function systemParts(book: Book, action: ActionId, chapter: number): SystemPart[] {
   const lang: Lang = book.meta.language
   const voice = book.meta.voice
   const prompt = promptFor(book, action)
   const body = prompt ? resolveIncludes(promptText(prompt, lang), book, lang) : ''
   // Scene details (POV, title, chapter) stay out, so the prompt doesn't change from scene to scene; they go with the task.
   const vars = { book, generic: true }
-  const style = book.entries.find(e => e.type === 'style')
-  const styleText = style ? [style.short, style.full].filter(s => s.trim()).join('\n\n').trim() : ''
+  const style = styleText(book)
   const samples = proseSamples(book, chapter)
-  return [
-    systemRules(lang, book.meta.title, { adult: voice.adult, sceneRules: voice.sceneRules, tense: body.includes('{book.tense}') ? '' : voice.tense, samples: samples.length > 0, serial: isSerial(book), litrpg: isLitRPG(book) }),
-    body ? `<author_instructions>\n${expandVariables(body, vars)}\n</author_instructions>` : '',
-    book.meta.foundation?.tone?.trim() ? `<tone>\n${book.meta.foundation.tone.trim()}\n</tone>` : '',
-    voice.description.trim() ? `<author_voice>\n${voice.description.trim()}\n</author_voice>` : '',
-    voice.taste.trim() ? `<author_taste>\n${voice.taste.trim()}\n</author_taste>` : '',
-    styleText ? `<style_guide>\n${expandVariables(styleText, vars)}\n</style_guide>` : '',
-    samples.length ? `<author_prose>\n${samples.map(x => `<sample>\n${x}\n</sample>`).join('\n')}\n</author_prose>` : '',
-  ].filter(Boolean).join('\n\n')
+  const parts: SystemPart[] = [
+    { key: 'rules', text: systemRules(lang, book.meta.title, { adult: voice.adult, sceneRules: voice.sceneRules, tense: body.includes('{book.tense}') ? '' : voice.tense, samples: samples.length > 0, serial: isSerial(book), litrpg: isLitRPG(book) }) },
+    { key: 'instructions', text: body ? `<author_instructions>\n${expandVariables(body, vars)}\n</author_instructions>` : '' },
+    { key: 'tone', text: book.meta.foundation?.tone?.trim() ? `<tone>\n${book.meta.foundation.tone.trim()}\n</tone>` : '' },
+    { key: 'voice', text: voice.description.trim() ? `<author_voice>\n${voice.description.trim()}\n</author_voice>` : '' },
+    { key: 'taste', text: voice.taste.trim() ? `<author_taste>\n${voice.taste.trim()}\n</author_taste>` : '' },
+    { key: 'style', text: style ? `<style_guide>\n${expandVariables(style, vars)}\n</style_guide>` : '' },
+    { key: 'prose', text: samples.length ? `<author_prose>\n${samples.map(x => `<sample>\n${x}\n</sample>`).join('\n')}\n</author_prose>` : '' },
+  ]
+  return parts.filter(p => p.text)
+}
+
+export const systemPrompt = (book: Book, action: ActionId, chapter: number): string =>
+  systemParts(book, action, chapter).map(p => p.text).join('\n\n')
+
+/** Something in the voice setup that repeats, contradicts or weakens your voice. */
+export type VoiceIssue =
+  | { id: 'other-prompt' } | { id: 'fantasy-style' } | { id: 'description' } | { id: 'scene-rules'; n: number }
+  | { id: 'action-prompts'; n: number } | { id: 'no-samples' } | { id: 'cut'; name: string; sent: number; words: number }
+
+/** What to tidy so the request carries your voice once, and whole. Zero tokens. */
+export function voiceIssues(book: Book, chapter: number): VoiceIssue[] {
+  const v = book.meta.voice
+  const out: VoiceIssue[] = []
+  const mine = v.prompt === MY_VOICE
+  if (!mine && bookOwnVoice(book)) out.push({ id: 'other-prompt' })
+  if (mine && styleText(book).replace(/\s+/g, ' ') === FANTASY_STYLE[book.meta.language].trim().replace(/\s+/g, ' ')) out.push({ id: 'fantasy-style' })
+  if (mine && v.description.trim()) out.push({ id: 'description' })
+  if (mine && v.sceneRules.length) out.push({ id: 'scene-rules', n: v.sceneRules.length })
+  const overrides = Object.values(v.actionPrompts).filter(id => id && id !== v.prompt).length
+  if (overrides) out.push({ id: 'action-prompts', n: overrides })
+  const parts = sampleParts(book, chapter)
+  if (!parts.some(p => p.sent > 0)) out.push({ id: 'no-samples' })
+  for (const p of parts) if (p.kind !== 'auto' && p.sent < p.words) out.push({ id: 'cut', name: p.name, sent: p.sent, words: p.words })
+  return out
 }
 
 /**
