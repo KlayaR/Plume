@@ -253,6 +253,13 @@ function ClaudeTab() {
       <SettingRow label={t('Check Claude’s text against the bible')} description={t('When Claude finishes a proposal, a small job compares it with the bible entries it was sent and lists contradictions under the proposal, before you accept.')}>
         <Switch checked={prefs.factCheck} onChange={v => setPrefs({ factCheck: v })} label={t('Check Claude’s text against the bible')} />
       </SettingRow>
+      <SettingRow label={t('Read each proposal over')} description={t('When Claude finishes writing, a second request reads it as an editor (the editing model) and fixes what your checks flag, the narrator explaining what was just shown, a sentence that needs a second reading, a gag played again. Only replacements, highlighted in the proposal, each one undoable. “When something is flagged” only runs it when your checks find something, so it misses what only a reader sees.')}>
+        <select className="sk-select" value={prefs.editPass ?? 'always'} onChange={e => setPrefs({ editPass: e.target.value as 'off' | 'flagged' | 'always' })}>
+          <option value="always">{t('Always')}</option>
+          <option value="flagged">{t('When something is flagged')}</option>
+          <option value="off">{t('Off')}</option>
+        </select>
+      </SettingRow>
     </SettingsSection>
     <ModelPresetsSection />
     </>

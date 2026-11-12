@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { locate } from '../edit'
 import { parseEntry, serializeEntry, parseScene, serializeScene, factApplies, parseFact } from './bible'
 import { buildContext, buildMatcher, fairShares, findMentions, outlineLines, ownShare, proseSamples, sampleParts, sceneWords, systemPrompt, voiceIssues } from './context'
-import { MY_VOICE, promptFor } from './voice'
+import { MY_VOICE, overusedPhrases, promptFor, repeatedGestures } from './voice'
 import { FANTASY_STYLE } from './defaults'
 import { autoCapitalRule, fixTypography, loneI, typingRule } from './typography'
 import { pasteText, wrapMarks } from './paste'
@@ -39,7 +39,7 @@ import { holds } from '../edit'
 import { chosenScenes, driftText, dropsOf, manuscriptText, movementsOf, nudgeMessage, readCurve, readNudges, readPitch } from './editorial'
 import { aiTells, checkRules, expandVariables, resolveIncludes, usedPromptIds } from './voice'
 import { review, reviewChecks, topProblems } from './review'
-import { applyFixes, fixGuard, fixRequest, placeFixes } from './fixes'
+import { applyFixes, applyMarked, editRequest, fixGuard, fixRequest, placeFixes, readEditReply } from './fixes'
 import { EditorState } from '@codemirror/state'
 import { changesField, setChanges } from '../editor/marks'
 import { parseStoryTime } from './structures'
@@ -981,6 +981,31 @@ describe('quality per token', () => {
     expect(voiceIssues(other, 1).map(i => i.id)).toEqual(['other-prompt'])
     // The book's copy of your voice is its prompt when this computer has none.
     expect(promptFor(book, 'continue')?.text).toBe('Sobre.')
+  })
+  it('reads a proposal over with replacements only, and highlights them', () => {
+    const msg = editRequest('Il rit. C’était pire.', [], { plan: 'Le colis de Croydon.', repeats: [{ phrase: 'plombier de Birkenhead', count: 4 }] }, 'fr')
+    expect(msg).toContain('<plan>\nLe colis de Croydon.\n</plan>')
+    expect(msg).toContain('« plombier de Birkenhead » (4 fois)')
+    expect(msg).toContain('{"note"')
+    const r = readEditReply([{ find: 'C’était pire.', replace: '', why: 'explique' }, { note: 'Le colis de Croydon est oublié.' }, { nothing: 1 }])
+    expect(r.notes).toEqual(['Le colis de Croydon est oublié.'])
+    const text = 'Elle le dit sans méchanceté. C’était pire. Il partit.'
+    const { fixes } = placeFixes(text, [...r.edits, { find: 'Il partit.', replace: 'Il sortit.', why: 'x' }], 'fr')
+    const out = applyMarked(text, fixes)
+    // A cut takes its space: no double space left.
+    expect(out.text).toBe('Elle le dit sans méchanceté. Il sortit.')
+    expect(out.marks.map(m => out.text.slice(m.from, m.to))).toEqual(['', 'Il sortit.'])
+  })
+  it('flags a running gag and a card gesture played again and again', () => {
+    const text = 'Un plombier de Birkenhead, dit-il. Elle rit. Encore ce plombier de Birkenhead. Il tapota la coque de son téléphone. Origine : un plombier de Birkenhead. Plus tard, il tapota encore la coque du téléphone.'
+    expect(overusedPhrases(text, 'fr').map(o => [o.count, o.phrase])).toEqual([[3, 'plombier de Birkenhead']])
+    const dez: Entry = { slug: 'dez', type: 'character', path: 'bible/characters/dez.md', name: 'Dez', aliases: [], include: 'auto', links: [], short: '', full: '', facts: [], extra: {}, voice: { ...EMPTY_VOICE, gesture: 'Tapote du doigt la coque de son vieux téléphone moldu. Frotte la brûlure de sa main gauche.' } }
+    const book = bookOf([], [dez], 'fr')
+    expect(repeatedGestures(text, book)).toEqual([{ name: 'Dez', quotes: expect.any(Array) }])
+    expect(repeatedGestures('Il tapota la coque de son téléphone. Il partit.', book)).toEqual([])
+    // The gesture's verb is needed: a dragon drawn by Kit is not Dez tapping his phone.
+    expect(repeatedGestures('Kit dessine un dragon sur le téléphone. Le soir, il dessine le téléphone.', book)).toEqual([])
+    expect(checkRules(text, book).filter(c => !c.ok).map(c => c.id)).toContain('gestures')
   })
   it('says once how to use voice cards, only when a character has one', () => {
     const plain: Entry = { slug: 'dez', type: 'character', path: 'bible/characters/dez.md', name: 'Dez', aliases: [], include: 'auto', links: [], short: '', full: '', facts: [], extra: {} }

@@ -67,7 +67,7 @@ export default function WritingView() {
       <ManuscriptToolbar />
       {hasProposal && (
         <div className="pl-propbar" role="group" aria-label={t('Proposal')}>
-          <span>{running ? t('Claude is writing…') : t('Proposal')}</span>
+          <span>{running === 'review' ? t('Claude is reading it over…') : running ? t('Claude is writing…') : t('Proposal')}</span>
           <button type="button" className="sk-btn sk-btn-sm sk-btn-primary" disabled={!!running} onClick={() => accept()}>{t('Accept')} <kbd>Tab</kbd></button>
           {proposalReplaces()
             ? <button type="button" className="sk-btn sk-btn-sm" disabled={!!running} onClick={proposalToChanges} title={t('Puts each change in the text, to accept or reject one by one')}>{t('Change by change')}</button>

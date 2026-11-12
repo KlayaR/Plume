@@ -1346,6 +1346,15 @@ const FR: Record<string, string> = {
   'Larger / smaller / default text': 'Texte plus grand / plus petit / par défaut',
   'Your excerpts are sent with every request as samples of your voice (about 1,100 words in all, with passages of your own revised scenes). Mix dialogue, action and description.': 'Vos extraits accompagnent chaque demande comme échantillons de votre voix (environ 1 100 mots en tout, avec des passages de vos propres scènes relues). Mélangez dialogue, action et description.',
   'Sample of my voice': 'Échantillon de ma voix',
+  // The read-over: Claude as an editor, right after it writes
+  'Repeated gestures': 'Gestes répétés', 'Claude is reading it over…': 'Claude relit…', 'Read over': 'Relecture',
+  'The read-over wanted to change too much of the text: its fixes were left out.': 'La relecture voulait changer trop de texte : ses corrections ont été écartées.',
+  '(cut)': '(coupé)', 'Undo the read-over': 'Annuler la relecture', 'Read each proposal over': 'Relire chaque proposition',
+  'When Claude finishes writing, a second request reads it as an editor (the editing model) and fixes what your checks flag, the narrator explaining what was just shown, a sentence that needs a second reading, a gag played again. Only replacements, highlighted in the proposal, each one undoable. “When something is flagged” only runs it when your checks find something, so it misses what only a reader sees.': 'Quand Claude a fini d’écrire, une deuxième demande relit le texte en éditeur (le modèle de révision) et corrige ce que vos contrôles signalent, le narrateur qui explique ce qu’on vient de montrer, une phrase qu’il faut relire, un gag joué une fois de trop. Seulement des remplacements, surlignés dans la proposition, chacun annulable. « Si quelque chose est signalé » ne la lance que si vos contrôles trouvent quelque chose : elle rate alors ce que seul un lecteur voit.',
+  'When something is flagged': 'Si quelque chose est signalé', 'Off': 'Désactivée',
+  'The read-over failed: {e}': 'La relecture a échoué : {e}', 'Reading “{title}” over…': 'Relecture de « {title} »…',
+  'The read-over left {n} note(s) on the chapter (a thread dropped, a contradiction): they are in Agent tasks.': 'La relecture a laissé {n} note(s) sur le chapitre (un fil abandonné, une contradiction) : elles sont dans les tâches des agents.',
+  'The read-over put {k} fix(es) in the text: ✓ to accept, ✕ to reject.': 'La relecture a mis {k} correction(s) dans le texte : ✓ pour accepter, ✕ pour refuser.',
   // Settings → Voice: your voice per language, and what Claude receives
   'My voice': 'Ma voix', '2. This book': '2. Ce livre', '3. Your rules': '3. Vos règles',
   'Banned words come from your word lists (Advanced).': 'Les mots interdits viennent de vos listes de mots (Avancé).',

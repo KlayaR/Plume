@@ -7,6 +7,15 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.57.0
+The read-over: Claude reads what it wrote, as an editor, before you see it.
+- **Each proposal is read over.** When Claude finishes writing, a second request (the editing model of Settings → Claude) reads the text as an editor and fixes what your checks flag, the narrator explaining a gesture or a feeling just shown, a sentence that needs a second reading, a gag or an image played once too often, a sample line or a gesture copied from a voice card. It sends replacements only, never a rewrite: a set of fixes that would change too much of the text is left out.
+- **Highlighted, each one undoable.** The fixes show highlighted in the proposal (a cut is a small ✂), with what each one fixed on hover. Under Read over, in the Claude panel, each fix has Undo and Put back, and Undo the read-over goes back to the text as Claude wrote it.
+- **Threads dropped, as notes.** The editor also reads the scene's plan and, for a scene that opens a chapter, the end of the previous one. A thread the text drops or contradicts (a case under way, an object, a promise) is noted under the proposal, not fixed: mending it takes a scene, not a sentence.
+- **Write the chapter too.** Each scene it writes is read over: the fixes wait in the text as tracked changes (✓ to accept, ✕ to reject) and the notes go to Agent tasks.
+- **Repeated gestures.** A new check, without the AI: a gesture from a voice card played in more than one sentence of a proposal ("Il tapota la coque…" three times) is flagged, and Retry fixing these handles it. Phrases that come back three times are found too and given to the read-over to judge, since a running gag and the name of a place look alike to a counter.
+- **Read each proposal over**, in Settings → Claude: Always (the default), When something is flagged (only when your checks find something, so it misses what only a reader sees), or Off. Each read-over is one request more per proposal, with the proposal and the book's system prompt.
+
 ## 0.56.1
 - **Voice cards are no longer ticked off like a list.** Claude used every gesture and tic of a card, several times a scene, wrote out the subtext meant to stay hidden, and could copy a sample line word for word. Plume now tells it once, with the rules: sample lines set the tone and are never reused, a gesture or tic serves at most once per character in a scene, and the subtext of a character who is not the point of view is never written.
 

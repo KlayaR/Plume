@@ -201,19 +201,35 @@ const typography = (lang: Lang): Extension => [
 
 // --- AI proposals -----------------------------------------------------------
 
-export interface Proposal { from: number; to: number; text: string; streaming: boolean }
+/** `marks`: the read-over's fixes in the proposal's text, highlighted (an empty one is a cut). */
+export interface Proposal { from: number; to: number; text: string; streaming: boolean; marks?: { from: number; to: number; why: string }[] }
 export const setProposal = StateEffect.define<Proposal | null>()
 export const appendProposal = StateEffect.define<string>()
 export const endStream = StateEffect.define<null>()
 const accepting = Annotation.define<boolean>()
 
 class ProposalWidget extends WidgetType {
-  constructor(readonly text: string, readonly streaming: boolean) { super() }
-  eq(o: ProposalWidget) { return o.text === this.text && o.streaming === this.streaming }
+  constructor(readonly text: string, readonly streaming: boolean, readonly marks: Proposal['marks'] = []) { super() }
+  eq(o: ProposalWidget) { return o.text === this.text && o.streaming === this.streaming && JSON.stringify(o.marks) === JSON.stringify(this.marks) }
   toDOM() {
     const span = document.createElement('span')
     span.className = 'cm-proposal' + (this.streaming ? ' cm-proposal-streaming' : '')
-    span.textContent = this.text || (this.streaming ? ' ' : '')
+    if (!this.marks?.length) {
+      span.textContent = this.text || (this.streaming ? ' ' : '')
+      return span
+    }
+    // The read-over's fixes, highlighted, with what each one fixed on hover.
+    let at = 0
+    for (const m of this.marks) {
+      if (m.from > at) span.append(this.text.slice(at, m.from))
+      const fix = document.createElement('span')
+      fix.className = m.to > m.from ? 'cm-proposal-fix' : 'cm-proposal-cut'
+      fix.title = m.why
+      fix.textContent = m.to > m.from ? this.text.slice(m.from, m.to) : '✂'
+      span.append(fix)
+      at = m.to
+    }
+    span.append(this.text.slice(at))
     return span
   }
   ignoreEvent() { return false }
@@ -233,7 +249,7 @@ export const proposalField = StateField.define<Proposal | null>({
     if (!p) return Decoration.none
     const ranges = []
     if (p.to > p.from) ranges.push(Decoration.mark({ class: 'cm-proposal-old' }).range(p.from, p.to))
-    ranges.push(Decoration.widget({ widget: new ProposalWidget(p.text, p.streaming), side: 1 }).range(p.to))
+    ranges.push(Decoration.widget({ widget: new ProposalWidget(p.text, p.streaming, p.marks), side: 1 }).range(p.to))
     return Decoration.set(ranges, true)
   }),
 })

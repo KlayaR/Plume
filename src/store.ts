@@ -138,6 +138,8 @@ export interface Prefs {
   bibleWatch: boolean
   /** Each proposal Claude writes is checked against the bible entries it was sent (quick model). */
   factCheck: boolean
+  /** Each proposal is read over by Claude as an editor (edit model), with replacements only: off, only when the local checks flag something, or always. */
+  editPass: 'off' | 'flagged' | 'always'
   /** Model presets (a named backend, model and effort), and when OpenRouter takes over from the claude command line. */
   presets: Preset[]
   fallback: Fallback
@@ -222,6 +224,7 @@ export const DEFAULT_PREFS: Prefs = {
   memory: true,
   bibleWatch: true,
   factCheck: true,
+  editPass: 'always',
   presets: DEFAULT_PRESETS,
   fallback: 'off',
   fallbackPreset: '',

@@ -886,6 +886,13 @@ body.pl-typing .pl-toolbar { opacity: 0.08; }
 .pl-showall:hover { color: var(--text); }
 .pl-allreports { display: flex; align-items: center; gap: 4px; margin-top: 6px; font-size: var(--fs-sm); color: var(--text-dim); }
 .pl-voiceadv, .pl-advconn { margin-top: 8px; }
+.cm-proposal-fix { background: color-mix(in srgb, var(--accent) 22%, transparent); border-radius: 2px; }
+.cm-proposal-cut { color: var(--accent); font-size: 0.75em; padding: 0 1px; vertical-align: super; }
+.pl-readfix { display: flex; align-items: flex-start; gap: 6px; font-size: var(--fs-sm); padding: 2px 0; }
+.pl-readfix del { opacity: 0.7; }
+.pl-readfix ins { text-decoration: none; background: color-mix(in srgb, var(--accent) 22%, transparent); }
+.pl-readfix.pl-off { opacity: 0.55; }
+.pl-readfix.pl-off ins { background: none; text-decoration: line-through; }
 .pl-voicenote { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-1); }
 .pl-voiceissues { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
 .pl-voiceissues .sk-btn { margin-left: 6px; }

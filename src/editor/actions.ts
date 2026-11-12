@@ -5,7 +5,8 @@ import type { EditorView } from '@codemirror/view'
 import { isRewrite, type ActionId, type Book, type Lang } from '../lib/types'
 import { buildContext, scenePlace, systemPrompt, type Built, type Override } from '../lib/context'
 import { reviewChecks } from '../lib/review'
-import { checkRules, fixable, fixDirection, promptFor, type Check } from '../lib/voice'
+import { checkRules, fixable, fixDirection, overusedPhrases, promptFor, type Check } from '../lib/voice'
+import { applyMarked, editRequest, fixGuard, placeFixes, readEditReply, type EditContext, type PlacedFix } from '../lib/fixes'
 import { ask, effective, isCheap, parseJSON, stopAsk } from '../ai'
 import { movementsOf, nudgeMessage, readNudges, type Nudge } from '../lib/editorial'
 import type { ScenePart } from '../lib/prompts'
@@ -16,7 +17,7 @@ import { changesField, setChanges } from './marks'
 import { canRun, cancelLLM, runLLM } from '../llm'
 import type { Effort, Model } from '../lib/types'
 import { findScene, useStore } from '../store'
-import { fixFlagged } from '../edit'
+import { fixFlagged, useEdit } from '../edit'
 import { t, translate } from '../i18n'
 import { ask as askDialog } from '@tauri-apps/plugin-dialog'
 import { makeSnap, saveSnap } from '../lib/snapshots'
@@ -38,13 +39,16 @@ interface AIState {
   changes: number
   /** What the proposal on screen contradicts in the bible entries it was sent; null while it is being checked. */
   facts: BibleSlip[] | null
+  /** The read-over of the proposal on screen: the text Claude wrote, the editor's fixes (those in `off` undone) and its notes. */
+  review: ReadOver | null
 }
 export interface BibleSlip { quote: string; problem: string }
-export const useAI = create<AIState>(() => ({ running: null, hasProposal: false, last: null, checks: [], changes: 0, facts: [] }))
+export interface ReadOver { original: string; fixes: PlacedFix[]; off: number[]; notes: string[]; rewrite: boolean }
+export const useAI = create<AIState>(() => ({ running: null, hasProposal: false, last: null, checks: [], changes: 0, facts: [], review: null }))
 
 export const syncProposalState = () => {
   const has = !!view?.state.field(proposalField, false)
-  if (useAI.getState().hasProposal !== has) useAI.setState({ hasProposal: has, ...(has ? {} : { checks: [], facts: [] }) })
+  if (useAI.getState().hasProposal !== has) useAI.setState({ hasProposal: has, ...(has ? {} : { checks: [], facts: [], review: null }) })
   const changes = view?.state.field(changesField, false)?.length ?? 0
   if (useAI.getState().changes !== changes) useAI.setState({ changes })
 }
@@ -206,19 +210,103 @@ async function checkAgainstBible(message: string, written: string, lang: Lang) {
   } catch { useAI.setState({ facts: [] }) }
 }
 
+// --- The read-over: Claude as an editor, right after it writes ------------------------------
+
+/** What the editor reads besides the passage: the scene's plan, what comes just before, the end of the previous chapter when the scene opens one. */
+function readOverContext(book: Book, sceneId: string | null | undefined, before: string, text: string): EditContext {
+  const found = findScene(book, sceneId ?? null)
+  const sc = found?.scene
+  const plan = found ? [found.chapter.notes?.trim(), sc?.note?.trim(), ...(sc?.beats ?? []).map(b => `- ${b}`)].filter(Boolean).join('\n') : ''
+  let previous = ''
+  if (found && found.index === 0 && wordCount(before) < 100) {
+    const prev = book.chapters[book.chapters.indexOf(found.chapter) - 1]
+    const last = prev?.scenes.filter(s => s.text.trim()).slice(-1)[0]
+    if (last) previous = lastWords(last.text, 300)
+  }
+  return { plan, before: lastWords(before, 250), previous, repeats: overusedPhrases(text, book.meta.language).map(({ phrase, count }) => ({ phrase, count })) }
+}
+
+/**
+ * Claude reads a passage over as an editor (the edit model, with the book's system prompt):
+ * what the checks flag, the narrator explaining, a sentence to read twice, a gag played again.
+ * Replacements only, placed in `text`; a set of them that amounts to a rewrite is dropped.
+ * Null when the read-over is off, or set to run only on flagged text and nothing is flagged.
+ */
+async function readOver(book: Book, action: ActionId, sceneId: string | null | undefined, text: string, before: string): Promise<{ fixes: PlacedFix[]; notes: string[]; rewrite: boolean } | null> {
+  const mode = useStore.getState().prefs.editPass ?? 'always'
+  if (mode === 'off' || wordCount(text) < 60) return null
+  const failed = fixable(scorecard(text, book))
+  if (mode === 'flagged' && !failed.length) return null
+  const lang = book.meta.language
+  const reply = await ask({ json: 'list', role: 'edit', system: systemPrompt(book, action, findScene(book, sceneId ?? null)?.number ?? 1), message: editRequest(text, failed, readOverContext(book, sceneId, before, text), lang) })
+  const { edits, notes } = readEditReply(parseJSON(reply))
+  const { fixes } = placeFixes(text, edits, lang)
+  if (fixes.length && !fixGuard(text, fixes).ok) return { fixes: [], notes, rewrite: true }
+  return { fixes, notes, rewrite: false }
+}
+
+/** Puts the read-over's fixes (all but those undone) in the proposal on screen, highlighted, and scores it again. */
+function showReview(v: EditorView | null = view) {
+  const r = useAI.getState().review
+  const p = v?.state.field(proposalField, false)
+  if (!v || !r || !p) return
+  const { text, marks } = applyMarked(r.original, r.fixes.filter((_, i) => !r.off.includes(i)))
+  v.dispatch({ effects: setProposal.of({ ...p, text, marks }) })
+  const b = useStore.getState().book
+  if (b) useAI.setState({ checks: scorecard(text, b) })
+}
+
+/** Undoes one of the read-over's fixes, or puts it back. */
+export function toggleReviewFix(i: number) {
+  const r = useAI.getState().review
+  if (!r) return
+  useAI.setState({ review: { ...r, off: r.off.includes(i) ? r.off.filter(x => x !== i) : [...r.off, i] } })
+  showReview()
+}
+
+/** Back to the text as Claude wrote it, before the read-over. */
+export function undoReview() {
+  const r = useAI.getState().review
+  if (!r) return
+  useAI.setState({ review: { ...r, off: r.fixes.map((_, i) => i) } })
+  showReview()
+}
+
+/** The read-over of a finished proposal, then (as before) its check against the bible. */
+async function afterWriting(v: EditorView, action: ActionId, message: string, sceneId: string | null | undefined, from: number, review: boolean) {
+  const book = useStore.getState().book
+  if (!book) return
+  const p = v.state.field(proposalField, false)
+  if (review && p) {
+    useAI.setState({ running: 'review', review: null })
+    try {
+      const r = await readOver(book, action, sceneId, p.text, v.state.doc.sliceString(0, from))
+      const still = v.state.field(proposalField, false)
+      // Only if it wasn't stopped and the same proposal is still on screen.
+      if (r && useAI.getState().running === 'review' && still && still.text === p.text) {
+        useAI.setState({ review: { original: p.text, fixes: r.fixes, off: [], notes: r.notes, rewrite: r.rewrite } })
+        showReview(v)
+      }
+    } catch (err) { useStore.getState().notify('warn', t('The read-over failed: {e}', { e: (err as Error).message })) }
+    finally { if (useAI.getState().running === 'review') useAI.setState({ running: null }) }
+  }
+  const now = v.state.field(proposalField, false)
+  if (now) checkAgainstBible(message, now.text.trim(), book.meta.language)
+}
+
 /**
  * Streams a reply into a proposal between from and to, then scores it. A long scene comes
  * in parts: `next` gives the request for part k from what is written so far (null: done),
- * and each part is appended to the same proposal.
+ * and each part is appended to the same proposal. `review`: Claude reads it over after (off for a fix).
  */
-async function stream(action: ActionId, from: number, to: number, system: string, message: string, sceneId?: string, next?: (written: string, k: number) => string | null) {
+async function stream(action: ActionId, from: number, to: number, system: string, message: string, sceneId?: string, next?: (written: string, k: number) => string | null, review = true) {
   if (!view) return
   const chosen = assistantChoice(action)
   const settings = effective(chosen.model, chosen.effort)
   const v = view
   const sid = sceneId ?? useStore.getState().sceneId
   v.dispatch({ effects: setProposal.of({ from, to, text: '', streaming: true }) })
-  useAI.setState({ hasProposal: true, running: 'starting', checks: [] })
+  useAI.setState({ hasProposal: true, running: 'starting', checks: [], review: null })
   const go = async (msg: string, k: number, earlier: string) => {
   const id = await runLLM(
     { model: settings.model, effort: settings.effort, orModel: chosen.orModel, system, message: msg },
@@ -244,7 +332,7 @@ async function stream(action: ActionId, from: number, to: number, system: string
         v.dispatch({ effects: endStream.of(null) })
         if (b) useAI.setState({ checks: scorecard(written, b) })
         if (b && sceneId && action === 'scene' && r.ok && !r.stopped) sayIfShort(b, sceneId, written)
-        if (b && r.ok && !r.stopped) checkAgainstBible(message, written, b.meta.language)
+        if (b && r.ok && !r.stopped) afterWriting(v, action, message, sid, from, review)
       } else discardProposal(v)
       syncProposalState()
     },
@@ -299,6 +387,8 @@ export async function writeChapter(chapterId: string) {
   let done = 0
   const toFix: string[] = []
   const slips: { title: string; detail: string; sceneId: string; where: string; quote?: string }[] = []
+  const notes: { title: string; detail: string; sceneId: string; where: string }[] = []
+  let reviewed = 0
   try {
     for (const s of todo) {
       const b2 = useStore.getState().book!
@@ -323,6 +413,18 @@ export async function writeChapter(chapterId: string) {
       if (!text || useAI.getState().running !== 'chapter') break
       text = fixTypography(text, b2.meta.language)
       useStore.getState().updateScene(s.id, { text, extra: { ...f.scene.extra, aiWords: wordCount(text) } })
+      // The read-over: its fixes go in the scene as tracked changes (✓ / ✕), its notes to Agent tasks.
+      try {
+        st.notify('ok', t('Reading “{title}” over…', { title: s.title }))
+        const prevScene = f.chapter.scenes[f.index - 1]
+        const r = await readOver(useStore.getState().book!, 'scene', s.id, text, prevScene?.text ?? '')
+        if (useAI.getState().running !== 'chapter') break
+        if (r?.fixes.length) {
+          useEdit.setState(x => ({ pending: { ...x.pending, [s.id]: r.fixes.map(c => ({ id: newId(), ...c, was: text.slice(c.from, c.to) })) } }))
+          reviewed += r.fixes.length
+        }
+        for (const note of r?.notes ?? []) notes.push({ title: note, detail: '', sceneId: s.id, where: `${chapter.title || '…'} · ${s.title}` })
+      } catch { /* the read-over is a bonus: the scene is written */ }
       if (fixable(scorecard(text, b2)).length) toFix.push(s.id)
       done++
       try {
@@ -335,14 +437,17 @@ export async function writeChapter(chapterId: string) {
     useAI.setState({ running: null })
   }
   if (!done) return
-  if (slips.length) {
+  if (slips.length || notes.length) {
     const { addFindings } = await import('../agents')
-    addFindings('written', slips, true)
-    useStore.getState().notify('warn', t('{n} passage(s) of the chapter contradict the bible: they are in Agent tasks.', { n: slips.length }), { label: t('Open'), run: () => useStore.setState({ dialog: 'agents' }) })
+    addFindings('written', [...slips, ...notes], true)
+    useStore.getState().notify('warn', slips.length
+      ? t('{n} passage(s) of the chapter contradict the bible: they are in Agent tasks.', { n: slips.length })
+      : t('The read-over left {n} note(s) on the chapter (a thread dropped, a contradiction): they are in Agent tasks.', { n: notes.length }), { label: t('Open'), run: () => useStore.setState({ dialog: 'agents' }) })
   }
+  const fixes = reviewed ? ' ' + t('The read-over put {k} fix(es) in the text: ✓ to accept, ✕ to reject.', { k: reviewed }) : ''
   if (toFix.length) {
-    useStore.getState().notify('warn', t('{n} scene(s) written; {k} miss some of your rules or targets. Snapshots can put the chapter back as it was.', { n: done, k: toFix.length }), { label: t('Fix them'), run: () => fixFlagged(toFix) })
-  } else useStore.getState().notify('ok', t('{n} scene(s) written. Snapshots can put the chapter back as it was.', { n: done }), { label: t('Read it'), run: () => useStore.getState().selectScene(todo[0].id) })
+    useStore.getState().notify('warn', t('{n} scene(s) written; {k} miss some of your rules or targets. Snapshots can put the chapter back as it was.', { n: done, k: toFix.length }) + fixes, { label: t('Fix them'), run: () => fixFlagged(toFix) })
+  } else useStore.getState().notify('ok', t('{n} scene(s) written. Snapshots can put the chapter back as it was.', { n: done }) + fixes, { label: t('Read it'), run: () => { if (reviewed) useStore.getState().setPrefs({ mode: 'review' }); useStore.getState().selectScene(todo[0].id) } })
 }
 
 /** Fill with AI: the placeholder ⟦note⟧ is replaced by a proposal written from its note. */
@@ -356,7 +461,7 @@ export function fillPlaceholder(v: EditorView, from: number, to: number, note: s
 export function stopAction() {
   const id = useAI.getState().running
   // Writing a chapter: stop after the scene being written is abandoned.
-  if (id === 'chapter' || id === 'suggest') { useAI.setState({ running: null }); stopAsk(); return }
+  if (id === 'chapter' || id === 'suggest' || id === 'review') { useAI.setState({ running: null }); stopAsk(); return }
   if (id && id !== 'starting') cancelLLM(id)
 }
 
@@ -486,7 +591,7 @@ export function pickAlternative(text: string, from: number, to: number) {
   view.dispatch({ effects: setProposal.of({ from, to, text, streaming: false }) })
   syncProposalState()
   const b = useStore.getState().book
-  if (b) useAI.setState({ checks: scorecard(text, b) })
+  if (b) useAI.setState({ checks: scorecard(text, b), review: null })
 }
 
 /**
@@ -505,7 +610,7 @@ export async function retryFixing() {
   // The same system prompt as the first request, so it comes from the cache.
   const system = systemPrompt(book, last.action, findScene(book, st.sceneId)?.number ?? 1)
   discardProposal(view)
-  await stream(last.action, p.from, p.to, system, message)
+  await stream(last.action, p.from, p.to, system, message, undefined, undefined, false)
 }
 
 // --- Rephrase: several rewordings of a passage, to pick from ----------------------------------

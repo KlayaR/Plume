@@ -4,7 +4,8 @@
 import { invoke } from '@tauri-apps/api/core'
 import type { ActionId, Book, Entry, Lang, Model, Rules, SceneRule } from './types'
 import { FANTASY_BRIEF, FANTASY_BRIEF_ID, FANTASY_ID, FANTASY_PROMPT } from './defaults'
-import { adverbs, dialogue, passives, phrases, sentences, words } from './analysis'
+import { adverbs, dialogue, passives, phrases, sentences, STOPWORDS, words } from './analysis'
+import { foldText } from './text'
 
 /**
  * `fr` is the French text of a preset; your own prompts have one text. A fragment is a piece
@@ -242,6 +243,11 @@ export function checkRules(text: string, book: Book): Check[] {
   out.push({ id: 'tells', label: 'AI tells', ok: tells.length === 0, detail: String(tells.length),
     fix: (fr ? 'Tournures qui sonnent comme une IA, à réécrire simplement :\n' : 'Phrasings that sound machine-written, to rewrite plainly:\n') + tells.map(x => `  - ${TELL_FIX[x.kind][lang]}${cited(x.quotes, lang)}`).join('\n') })
 
+  const gestures = repeatedGestures(text, book)
+  out.push({ id: 'gestures', label: 'Repeated gestures', ok: !gestures.length, detail: String(gestures.length),
+    fix: fr ? `Gestes de fiche de voix qui reviennent : ${gestures.map(g => `${g.name}${cited(g.quotes, lang)}`).join(' ; ')}. Garde-en un par personnage, coupe ou change les autres.`
+      : `Voice-card gestures that come back: ${gestures.map(g => `${g.name}${cited(g.quotes, lang)}`).join('; ')}. Keep one per character, cut or change the others.` })
+
   if (r.dashDialogue) {
     // Dialogue opens with an em dash at the start of the line; quotes or a hyphen fail.
     const badLines = text.split('\n').filter(l => /^\s*(?:[-–]|«|“|")/.test(l))
@@ -319,7 +325,60 @@ export function aiTells(text: string, lang: Lang): { kind: Tell; quotes: string[
  * (passive voice, adverbs) and the Review reports stay information for you: turned into
  * instructions, they push every sentence toward the same average.
  */
-export const FIXABLE = new Set(['banned', 'tells', 'dash', 'sentence', 'dialogue'])
+export const FIXABLE = new Set(['banned', 'tells', 'dash', 'sentence', 'dialogue', 'gestures'])
+
+// --- What one passage repeats -------------------------------------------------------
+// A running gag or a card's gesture is good once; Claude tends to play it again and again.
+
+/**
+ * Three-word phrases (two of them meaningful) used `min` times or more in the passage; overlapping
+ * ones count once. Not a rule: a running gag and the name of a place look alike here, so the list
+ * goes to the editor pass as a hint, to judge.
+ */
+export function overusedPhrases(text: string, lang: Lang, min = 3): { phrase: string; count: number; quotes: string[] }[] {
+  const ws = words(text)
+  const keys = ws.map(x => foldText(x.w))
+  const at = new Map<string, number[]>()
+  for (let i = 0; i + 3 <= ws.length; i++) {
+    const gram = keys.slice(i, i + 3)
+    if (gram.filter(w => !STOPWORDS[lang].has(w)).length < 2) continue
+    const k = gram.join(' ')
+    at.set(k, [...(at.get(k) ?? []), i])
+  }
+  const taken = new Set<number>()
+  const out: { phrase: string; count: number; quotes: string[] }[] = []
+  for (const l of [...at.values()].filter(l => l.length >= min).sort((a, b) => b.length - a.length)) {
+    if (l.some(i => taken.has(i) || taken.has(i + 1) || taken.has(i + 2))) continue
+    l.forEach(i => { taken.add(i); taken.add(i + 1); taken.add(i + 2) })
+    out.push({ phrase: text.slice(ws[l[0]].from, ws[l[0] + 2].to), count: l.length, quotes: l.map(i => quoteAround(text, ws[i].from, ws[i + 2].to)) })
+  }
+  return out
+}
+
+/** A word without its ending, so a verb is found whatever the tense ("tapote", "tapota", "pose", "posa"). */
+const stem = (w: string) => w.replace(/(?:aient|erent|ait|ent|ant|ons|ez|es|as|e|a|s)$/, '').slice(0, 5)
+const stemsOf = (s: string, lang: Lang) => [...new Set(words(s).map(x => foldText(x.w)).filter(w => w.length >= 4 && !STOPWORDS[lang].has(w)).map(stem).filter(w => w.length >= 3))]
+
+/**
+ * A gesture from a character's voice card (one per sentence of the card) played in more than
+ * one sentence of the passage: a sentence plays it when it has the gesture's verb (its first
+ * word) and one of the three words after it (what the gesture does: "l'ongle du pouce", "la coque").
+ */
+export function repeatedGestures(text: string, book: Book): { name: string; quotes: string[] }[] {
+  const lang = book.meta.language
+  const ss = sentences(text).map(s => ({ s, stems: new Set(words(s.s).map(x => stem(foldText(x.w)))) }))
+  const out: { name: string; quotes: string[] }[] = []
+  for (const e of book.entries) {
+    for (const one of (e.voice?.gesture ?? '').split(/(?<=[.;!?])\s+/)) {
+      const [verb, ...after] = stemsOf(one, lang)
+      const rest = after.slice(0, 3)
+      if (!verb || !rest.length) continue
+      const hits = ss.filter(x => x.stems.has(verb) && rest.some(k => x.stems.has(k)))
+      if (hits.length >= 2) out.push({ name: e.name, quotes: hits.map(h => startOf(text, h.s.from)) })
+    }
+  }
+  return out
+}
 export const fixable = (checks: Check[]) => checks.filter(c => !c.ok && FIXABLE.has(c.id))
 
 /** The direction for "Retry fixing these". */

@@ -6,7 +6,7 @@ import { Dialog } from '../studio-kit/shell.js'
 import { useStore } from '../store'
 import type { ActionId } from '../lib/types'
 import type { Override } from '../lib/context'
-import { alternatives, assistantChoice, currentContext, noteAtCursor, pickAlternative, retryFixing, runAction, stopAction, suggestNext, useAI } from '../editor/actions'
+import { alternatives, assistantChoice, currentContext, noteAtCursor, pickAlternative, retryFixing, runAction, stopAction, suggestNext, toggleReviewFix, undoReview, useAI } from '../editor/actions'
 import type { Nudge } from '../lib/editorial'
 import { diffWords, learnTaste, staleScenes, useNotes } from '../writing'
 import { getEditorView } from '../editor/actions'
@@ -51,6 +51,7 @@ export default function ContextPanel() {
   const hasProposal = useAI(s => s.hasProposal)
   const checks = useAI(s => s.checks)
   const facts = useAI(s => s.facts)
+  const review = useAI(s => s.review)
   const [action, setAction] = useState<Tab>('continue')
   const [text, setText] = useState<Record<Tab, string>>({ continue: '', rewrite: '', beats: '' })
   const [overrides, setOverrides] = useState<Record<string, Override>>({})
@@ -195,6 +196,36 @@ export default function ContextPanel() {
           ))}
           {fixable(checks).length > 0 && (
             <button type="button" className="sk-btn sk-btn-sm" onClick={retryFixing}><Wand2 size={14} /> {t('Retry fixing these')}</button>
+          )}
+        </section>
+      )}
+
+      {hasProposal && running === 'review' && <p className="sk-hint">{t('Claude is reading it over…')}</p>}
+      {hasProposal && !running && review && (review.fixes.length > 0 || review.notes.length > 0 || review.rewrite) && (
+        <section className="pl-scorecard pl-readover" aria-label={t('Read over')}>
+          <div className="pl-row">
+            <span className="sk-label">{t('Read over')}</span>
+            <span className="pl-grow" />
+            {review.fixes.length > 0 && <span className="sk-num">{review.fixes.length - review.off.length} / {review.fixes.length}</span>}
+          </div>
+          {review.notes.map((note, i) => (
+            <div key={`n${i}`} className="pl-check pl-bad"><CircleX size={13} /><span className="pl-grow">{note}</span></div>
+          ))}
+          {review.rewrite && <p className="sk-hint">{t('The read-over wanted to change too much of the text: its fixes were left out.')}</p>}
+          {review.fixes.map((f, i) => {
+            const off = review.off.includes(i)
+            return (
+              <div key={i} className={`pl-readfix ${off ? 'pl-off' : ''}`}>
+                <span className="pl-grow">
+                  <del>{review.original.slice(f.from, f.to).trim() || '—'}</del> → <ins>{f.insert.trim() || t('(cut)')}</ins>
+                  {f.why && <span className="sk-hint"> · {f.why}</span>}
+                </span>
+                <button type="button" className="sk-btn sk-btn-ghost sk-btn-sm" onClick={() => toggleReviewFix(i)}>{off ? t('Put back') : t('Undo')}</button>
+              </div>
+            )
+          })}
+          {review.fixes.length > 0 && review.off.length < review.fixes.length && (
+            <button type="button" className="sk-btn sk-btn-sm" onClick={undoReview}>{t('Undo the read-over')}</button>
           )}
         </section>
       )}
