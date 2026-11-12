@@ -235,7 +235,7 @@ export function systemParts(book: Book, action: ActionId, chapter: number): Syst
   const style = styleText(book)
   const samples = proseSamples(book, chapter)
   const parts: SystemPart[] = [
-    { key: 'rules', text: systemRules(lang, book.meta.title, { adult: voice.adult, sceneRules: voice.sceneRules, tense: body.includes('{book.tense}') ? '' : voice.tense, samples: samples.length > 0, serial: isSerial(book), litrpg: isLitRPG(book) }) },
+    { key: 'rules', text: systemRules(lang, book.meta.title, { adult: voice.adult, sceneRules: voice.sceneRules, tense: body.includes('{book.tense}') ? '' : voice.tense, samples: samples.length > 0, serial: isSerial(book), litrpg: isLitRPG(book), voiceCards: book.entries.some(e => Object.values(e.voice ?? {}).some(v => v?.trim())) }) },
     { key: 'instructions', text: body ? `<author_instructions>\n${expandVariables(body, vars)}\n</author_instructions>` : '' },
     { key: 'tone', text: book.meta.foundation?.tone?.trim() ? `<tone>\n${book.meta.foundation.tone.trim()}\n</tone>` : '' },
     { key: 'voice', text: voice.description.trim() ? `<author_voice>\n${voice.description.trim()}\n</author_voice>` : '' },

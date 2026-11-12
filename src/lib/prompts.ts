@@ -15,6 +15,12 @@ const SAMPLES: Record<Lang, string> = {
   en: '- <author_prose> holds passages the author wrote themselves. That is the voice to match: their rhythm, vocabulary, sentence length, paragraphing and the way they write dialogue. Never reuse their content.',
 }
 
+/** Said once when characters have voice cards: they describe a way of speaking, not a list to tick. */
+const VOICE_CARDS: Record<Lang, string> = {
+  fr: '- Les fiches <voice> des personnages décrivent leur façon de parler : ne les applique pas comme une liste. Les répliques types donnent le ton, n\'en reprends jamais une. Un geste ou un tic de fiche sert au plus une fois par personnage dans une scène, et pas dans chaque scène. Le sous-texte et la voix intérieure d\'un personnage qui n\'est pas le point de vue ne s\'écrivent jamais : ni le narrateur ni personne ne les remarque, le lecteur les devine.',
+  en: '- Characters\' <voice> cards describe how they speak: don\'t apply them like a checklist. Sample lines set the tone; never reuse one. A gesture or tic from a card is used at most once per character in a scene, and not in every scene. The subtext and inner voice of a character who is not the point of view are never written: neither the narrator nor anyone else points them out; the reader guesses them.',
+}
+
 /** A web novel: published chapters are canon, and it is read on phones. */
 const SERIAL: Record<Lang, string> = {
   fr: '- Ce livre est un web novel publié chapitre par chapitre. Les chapitres marqués (publié) ont été lus : ils font foi, ne les contredis jamais. Paragraphes courts, lisibles sur un téléphone.',
@@ -27,11 +33,12 @@ const LITRPG: Record<Lang, string> = {
   en: '- System windows, status screens and notifications are written as lines starting with "| ", one item per line (| Level: 12). Their numbers follow the stats in the bible at this point; a level-up or a stat gain shows in one of those windows.',
 }
 
-export function systemRules(lang: Lang, title: string, opts: { adult?: boolean; sceneRules?: SceneRule[]; tense?: string; samples?: boolean; serial?: boolean; litrpg?: boolean } = {}): string {
+export function systemRules(lang: Lang, title: string, opts: { adult?: boolean; sceneRules?: SceneRule[]; tense?: string; samples?: boolean; serial?: boolean; litrpg?: boolean; voiceCards?: boolean } = {}): string {
   const extra = [
     opts.serial ? SERIAL[lang] : '',
     opts.litrpg ? LITRPG[lang] : '',
     opts.samples ? SAMPLES[lang] : '',
+    opts.voiceCards ? VOICE_CARDS[lang] : '',
     opts.tense ? (lang === 'fr' ? `- Temps du récit : ${opts.tense}.` : `- Narrative tense: ${opts.tense}.`) : '',
     sceneRulesText(opts.sceneRules ?? [], lang),
     opts.adult ? `\n${ADULT[lang]}` : '',

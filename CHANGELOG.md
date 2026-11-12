@@ -7,6 +7,9 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.56.1
+- **Voice cards are no longer ticked off like a list.** Claude used every gesture and tic of a card, several times a scene, wrote out the subtext meant to stay hidden, and could copy a sample line word for word. Plume now tells it once, with the rules: sample lines set the tone and are never reused, a gesture or tic serves at most once per character in a scene, and the subtext of a character who is not the point of view is never written.
+
 ## 0.56.0
 Your voice, one per language, and a leaner Voice screen.
 - **Your voice in French, your voice in English.** At the top of Settings → Voice: your instructions and passages of your own prose, written once per language and kept on this computer. Every book in that language can write with it; a new book starts with it alone (no fantasy prompt, an empty style guide, no scene rules). The book keeps a copy, so it writes the same on another computer.

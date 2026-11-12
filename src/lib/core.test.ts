@@ -28,7 +28,7 @@ import { lastWords, locateQuote, slugify } from './text'
 import { allowedKinds, chapterLabels, enterStartsScene } from './chapters'
 import { countSigns, textStats } from './stats'
 import type { Book, Entry, Scene } from './types'
-import { DEFAULT_AI, DEFAULT_VOICE, ENTRY_TYPES, FAMILIES, VOICE_TYPES, familyOf } from './types'
+import { DEFAULT_AI, DEFAULT_VOICE, EMPTY_VOICE, ENTRY_TYPES, FAMILIES, VOICE_TYPES, familyOf } from './types'
 import { adverbs, passives, echoes, openingKind, pronounRuns, sameOpenings, senses, sentences, spellingVariants } from './analysis'
 import { backupsToRemove, versionsToRemove } from './backups'
 import { bookRepeats } from './repeats'
@@ -981,6 +981,14 @@ describe('quality per token', () => {
     expect(voiceIssues(other, 1).map(i => i.id)).toEqual(['other-prompt'])
     // The book's copy of your voice is its prompt when this computer has none.
     expect(promptFor(book, 'continue')?.text).toBe('Sobre.')
+  })
+  it('says once how to use voice cards, only when a character has one', () => {
+    const plain: Entry = { slug: 'dez', type: 'character', path: 'bible/characters/dez.md', name: 'Dez', aliases: [], include: 'auto', links: [], short: '', full: '', facts: [], extra: {} }
+    expect(systemPrompt(bookOf([], [plain], 'fr'), 'continue', 1)).not.toContain('<voice>')
+    const carded = { ...plain, voice: { ...EMPTY_VOICE, gesture: 'Tapote son téléphone.' } }
+    const sys = systemPrompt(bookOf([], [carded], 'fr'), 'continue', 1)
+    expect(sys).toContain('ne les applique pas comme une liste')
+    expect(sys).toContain('n\'en reprends jamais une')
   })
   it('marks the system prompt for caching on Claude models through OpenRouter', () => {
     const body = chatBody('anthropic/claude-sonnet-5.5', 'Rules', 'Hi')
