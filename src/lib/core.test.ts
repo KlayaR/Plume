@@ -4,7 +4,7 @@ import { waitingInBook } from './waiting'
 import { describe, expect, it } from 'vitest'
 import { locate } from '../edit'
 import { parseEntry, serializeEntry, parseScene, serializeScene, factApplies, parseFact } from './bible'
-import { buildContext, buildMatcher, fairShares, findMentions, outlineLines, ownShare, proseSamples, sampleParts, sceneWords, systemPrompt, voiceCards, voiceIssues } from './context'
+import { notYet, buildContext, buildMatcher, fairShares, findMentions, outlineLines, ownShare, proseSamples, sampleParts, sceneWords, systemPrompt, voiceCards, voiceIssues } from './context'
 import { comparisonBunches, comparisons, MY_VOICE, negationPairs, overusedPhrases, promptFor, repeatedGestures, sampleEchoes } from './voice'
 import { FANTASY_STYLE } from './defaults'
 import { autoCapitalRule, fixTypography, loneI, typingRule } from './typography'
@@ -39,6 +39,7 @@ import { holds } from '../edit'
 import { chosenScenes, driftText, dropsOf, manuscriptText, movementsOf, nudgeMessage, readCurve, readNudges, readPitch } from './editorial'
 import { aiTells, checkRules, expandVariables, resolveIncludes, usedPromptIds } from './voice'
 import { review, reviewChecks, topProblems } from './review'
+import { mergeBlocks, repeatedTitles } from './blocks'
 import { applyFixes, applyMarked, editRequest, fixGuard, fixRequest, placeFixes, readEditReply } from './fixes'
 import { EditorState } from '@codemirror/state'
 import { changesField, setChanges } from '../editor/marks'
@@ -1041,6 +1042,38 @@ describe('quality per token', () => {
     expect(ok?.ok).toBe(true)
     const many = checkRules(`${filler(300)} ${text} ${text}`, bookOf([], [], 'fr'), { samples: [sample] }).find(c => c.id === 'comparisons')
     expect(many?.ok).toBe(false)
+  })
+  it('merges an addition block by block, and folds repeated headings', () => {
+    const old = '### Rôle\nMentor d’Elias.\n\n### Secrets\nIl renseigne Silas.'
+    const add = '### Rôle\nMentor d’Elias.\n\nChef par intérim au ch 9.\n\n### Objectifs\nDonner la magie à Kit.'
+    const merged = mergeBlocks(old, add)
+    expect(merged.match(/### Rôle/g)).toHaveLength(1)
+    expect(merged).toContain('Mentor d’Elias.\n\nChef par intérim au ch 9.')
+    expect(merged).toContain('### Objectifs')
+    const doubled = old + '\n\n### Secrets\nIl renseigne Silas.\n\nIl a choisi le cottage.'
+    expect(repeatedTitles(doubled)).toEqual(['secrets'])
+    const folded = mergeBlocks('', doubled)
+    expect(repeatedTitles(folded)).toEqual([])
+    expect(folded.match(/Il renseigne Silas/g)).toHaveLength(1)
+    expect(folded).toContain('Il a choisi le cottage.')
+  })
+  it('keeps planning-only blocks and later knowledge out of the writing', () => {
+    const dez: Entry = { slug: 'dez', type: 'character', path: 'bible/characters/dez.md', name: 'Dez', aliases: [], include: 'auto', links: [], short: 'Auror.', full: '### Rôle\nMentor.\n\n### Secrets\nLa taupe.', sends: { Secrets: 'plan' }, facts: [], extra: {} }
+    expect(renderEntry(dez, 'full', 3, 'fr', 1, false, undefined, true)).not.toContain('La taupe.')
+    expect(renderEntry(dez, 'full', 3, 'fr', 1, false)).toContain('La taupe.')
+    const elias: Entry = { ...dez, slug: 'elias', name: 'Elias', full: '', sends: undefined, knows: 'Que Jess est sa sœur.\n[ch 18+] Que Dez est la taupe.' }
+    const at3 = renderEntry(elias, 'short', 3, 'fr', 1, true, undefined, true)
+    expect(at3).toContain('Que Jess est sa sœur.')
+    expect(at3).not.toContain('taupe')
+    expect(renderEntry(elias, 'short', 18, 'fr', 1, true, undefined, true)).toContain('Que Dez est la taupe.')
+    expect(parseEntry('bible/characters/dez.md', '---\ntype: character\nname: Dez\nsends:\n  Secrets: plan\n---\n\n## Short\nAuror.\n').sends).toEqual({ Secrets: 'plan' })
+  })
+  it('leaves out of the writing every sentence that speaks of a later chapter', () => {
+    expect(notYet('Auror de terrain. Il est la quatrième victime de Silas (ch 19). Il aime le thé.', 3)).toBe('Auror de terrain. Il aime le thé.')
+    expect(notYet('Suspendue au chapitre 8, elle enquête dans l’ombre.\nCheffe d’équipe.', 9)).toBe('Suspendue au chapitre 8, elle enquête dans l’ombre.\nCheffe d’équipe.')
+    const gideon: Entry = { slug: 'gideon', type: 'character', path: 'bible/characters/gideon.md', name: 'Gideon', aliases: [], include: 'auto', links: [], short: 'Acquitté de 1999. Quatrième victime (ch 19).', full: '', facts: [], extra: {} }
+    expect(renderEntry(gideon, 'short', 3, 'fr', 1, false, undefined, true)).not.toContain('victime')
+    expect(renderEntry(gideon, 'short', 3, 'fr', 1, false)).toContain('victime')
   })
   it('flags a running gag and a card gesture played again and again', () => {
     const text = 'Un plombier de Birkenhead, dit-il. Elle rit. Encore ce plombier de Birkenhead. Il tapota la coque de son téléphone. Origine : un plombier de Birkenhead. Plus tard, il tapota encore la coque du téléphone.'

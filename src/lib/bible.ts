@@ -87,7 +87,7 @@ export function parseEntry(path: string, text: string): Entry {
     unaware: str(data.unaware),
     later: str(data.later),
     notes: str(data.notes),
-    sends: data.sends && typeof data.sends === 'object' ? Object.fromEntries(Object.entries(data.sends as object).filter(([, v]) => v === 'always' || v === 'full' || v === 'never')) as Entry['sends'] : undefined,
+    sends: data.sends && typeof data.sends === 'object' ? Object.fromEntries(Object.entries(data.sends as object).filter(([, v]) => v === 'always' || v === 'full' || v === 'plan' || v === 'never')) as Entry['sends'] : undefined,
     detect: data.detect === false ? false : undefined,
     tags: data.tags ? asList(data.tags) : undefined,
     image: str(data.image),

@@ -6,7 +6,7 @@ import { create } from 'zustand'
 import { invoke } from '@tauri-apps/api/core'
 import type { Book, Effort, Entry, EntryType, Model, VoiceCard } from './lib/types'
 import { EMPTY_VOICE, ENTRY_TYPES, typeInfo } from './lib/types'
-import { aiBlocks, aiFull, toBlocks } from './lib/blocks'
+import { aiBlocks, aiFull, mergeBlocks, toBlocks } from './lib/blocks'
 import { parseFact } from './lib/bible'
 import { estimateTokens, newId } from './lib/text'
 import { buildMatcher, findMentions, renderEntry } from './lib/context'
@@ -566,7 +566,8 @@ export function acceptProposal(id: string) {
     const e = st.book.entries.find(x => x.slug === p.target)
     if (e) st.updateEntry(e.slug, {
       short: e.short.trim() ? e.short : p.short,
-      full: [e.full.trim(), p.full.trim()].filter(Boolean).join('\n\n'),
+      // Block by block: Claude often sends the whole entry back, and pasting it after the old one doubled every heading.
+      full: mergeBlocks(e.full, p.full),
       facts: [...e.facts, ...facts],
       aliases: [...new Set([...e.aliases, ...p.aliases])],
       // The voice card fills only what is still empty; knowledge adds up.

@@ -11,7 +11,7 @@ import { useT } from '../i18n'
 import { showMenu } from '../contextMenu'
 import LinkArea from './LinkArea'
 
-const SENDS: [Send, string][] = [['always', 'Always sent'], ['full', 'With the full entry'], ['never', 'Never sent']]
+const SENDS: [Send, string][] = [['always', 'Always sent'], ['full', 'With the full entry'], ['plan', 'Planning and editing only'], ['never', 'Never sent']]
 
 export default function BlocksEditor({ entry, update }: { entry: Entry; update: (patch: Partial<Entry>) => void }) {
   const lang = useStore(s => s.book!.meta.language)

@@ -819,6 +819,7 @@ body.pl-typing .pl-toolbar { opacity: 0.08; }
 .pl-blocks { display: flex; flex-direction: column; gap: 10px; }
 .pl-block { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; border: 1px solid var(--border); border-left: 4px solid var(--border); border-radius: 8px; }
 .pl-send-always { border-left-color: var(--accent); }
+.pl-send-plan { border-left-color: #7a8fb5; }
 .pl-send-never { border-left-color: #c0554a; opacity: 0.8; }
 .pl-block-title { background: transparent; border: 0; border-bottom: 1px dashed var(--border); color: inherit; font: inherit; font-weight: 600; padding: 2px 0; }
 

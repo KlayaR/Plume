@@ -7,6 +7,14 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.60.0
+The bible no longer tells Claude how the book ends, and no longer doubles itself.
+- **No later chapter in the writing.** When Claude writes chapter N, every sentence of the bible that speaks of a later chapter (“fourth victim of Silas (ch 19)”, “suspended at ch 8”) is left out of what it reads. A bible written by an author who knows the whole book stops giving its twists away to the prose. Planning, Edit the chapter and the read-over still read everything.
+- **Planning and editing only.** A block of an entry can now be set to “Planning and editing only”: Claude reads it when it plans or edits, never when it writes the story. For Secrets, Évolution and the like.
+- **Knows and Doesn’t know by chapter.** A line can start like a fact, “[ch 18+] Que Dez est la taupe”, and goes to the writing only from that chapter on.
+- **Additions merged, not pasted.** Accepting a bible addition from Claude pasted its whole text after the entry, so every heading came twice, three, four times, often with versions that disagree. Additions now go into the block of the same title, with only what it doesn’t hold yet.
+- **Repeated blocks found.** AI check in the Bible lists the entries whose block titles appear more than once, with Merge the repeated blocks.
+
 ## 0.59.0
 Fewer leaks from the voice cards, a chapter read for its logic, and comparisons measured on your prose.
 - **A character’s inner voice stays out of the writing.** The “Inner voice” of a voice card (what Dez hides, what Hester carries) went with every request, so Claude wrote it out: “he said it too fast”, “a second too long”. It now goes to the writing only for the point-of-view character; planning, Edit the chapter and the read-over still see it, so they can check it stays unsaid.

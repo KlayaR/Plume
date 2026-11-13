@@ -5,7 +5,7 @@
 // bible entries, the story and the task change and go in the message.
 import { isRewrite, type ActionId, type Book, type Entry, type FieldDef, type Lang, type Scene } from './types'
 import { fieldLines } from './fields'
-import { factApplies } from './bible'
+import { factApplies, parseFact } from './bible'
 import { estimateTokens, fold, lastWords, firstWords } from './text'
 import { taskMessage, systemRules, type ScenePart, type ScenePlace } from './prompts'
 import { bookOwnVoice, expandVariables, MY_VOICE, promptFor, promptText, resolveIncludes, type Sample } from './voice'
@@ -128,18 +128,37 @@ export function voiceCards(book: Book, text: string): string {
   return carded.filter(e => named.has(e.slug)).map(e => `<character name="${e.name}">\n${voiceBlock(e, book.meta.language)}\n</character>`).join('\n')
 }
 
-/** `prose`: the entry goes with a request where Claude writes the story (a character's inner voice then goes only for the point of view). */
+/** "ch 19", "chapitre 24", "au ch. 8": the chapters a sentence of the bible speaks of. */
+const CHAPTER_REF = /\b(?:ch(?:apitres?)?|chapters?)\.?\s*(\d+)/gi
+
+/**
+ * The text without the sentences that speak of a chapter after this one. A bible is
+ * written by an author who knows the whole book ("fourth victim of Silas (ch 19)");
+ * Claude writing chapter 3 must not know it, or it lets the reader guess.
+ */
+export function notYet(text: string, chapter: number): string {
+  if (!text) return text
+  return text.split('\n').map(line => line.split(/(?<=[.!?…])\s+/)
+    .filter(sentence => ![...sentence.matchAll(CHAPTER_REF)].some(m => Number(m[1]) > chapter)).join(' '))
+    .filter((line, i, all) => line.trim() || (all[i - 1] ?? '').trim()).join('\n').trim()
+}
+
+/** `prose`: the entry goes with a request where Claude writes the story: a character's inner voice goes only for the point of view, and no sentence speaks of a later chapter. */
 export function renderEntry(e: Entry, mode: Mode, chapter: number, lang: Lang, bookIndex = 1, pov = false, defs?: FieldDef[], prose = false): string {
   const aka = e.aliases.filter(a => a !== e.name).map(a => a.replace(/!$/, ''))
   const head = `<entry type="${e.type}" name="${e.name}"${aka.length ? ` aka="${aka.join(', ')}"` : ''}${pov ? ' pov="true"' : ''}>`
   // Blocks marked never are not sent; blocks marked always travel with the short version.
-  const blocks = aiBlocks(e)
-  const body = mode === 'full' && blocks.visible ? [e.short, blocks.visible].filter(s => s.trim()).join('\n\n') : ([e.short.trim(), blocks.always].filter(Boolean).join('\n\n') || blocks.first)
-  const facts = e.facts.filter(f => factApplies(f, chapter, bookIndex)).map(f => `- ${f.text}`)
+  const blocks = aiBlocks(e, prose)
+  const later = (s: string) => (prose ? notYet(s, chapter) : s)
+  const body = later(mode === 'full' && blocks.visible ? [e.short, blocks.visible].filter(s => s.trim()).join('\n\n') : ([e.short.trim(), blocks.always].filter(Boolean).join('\n\n') || blocks.first))
+  const facts = e.facts.filter(f => factApplies(f, chapter, bookIndex)).map(f => later(f.text)).filter(Boolean).map(t => `- ${t}`)
   const label = lang === 'fr' ? 'Faits à ce stade de l’histoire :' : 'Facts at this point of the story:'
   // POV awareness: what the point-of-view character knows and doesn't.
-  const knows = pov && e.knows?.trim() ? `${lang === 'fr' ? 'Sait' : 'Knows'} : ${e.knows.trim()}` : ''
-  const unaware = pov && e.unaware?.trim() ? `${lang === 'fr' ? 'Ignore (ne le pense ni ne le devine jamais)' : 'Does not know (never thinks or guesses it)'} : ${e.unaware.trim()}` : ''
+  // Knows / Doesn't know, line by line: a line can hold from a chapter on, like a fact ("[ch 18+] Que Dez…").
+  const inChapter = (s?: string) => (s ?? '').split('\n').map(parseFact).filter((f): f is NonNullable<typeof f> => !!f && factApplies(f, chapter, bookIndex)).map(f => f.text).join('\n')
+  const known = later(inChapter(e.knows)), unknown = later(inChapter(e.unaware))
+  const knows = pov && known ? `${lang === 'fr' ? 'Sait' : 'Knows'} : ${known}` : ''
+  const unaware = pov && unknown ? `${lang === 'fr' ? 'Ignore (ne le pense ni ne le devine jamais)' : 'Does not know (never thinks or guesses it)'} : ${unknown}` : ''
   // LitRPG: the numbers as they stand at this chapter, so status screens stay consistent.
   const now = statsAt(e.stats, chapter)
   const stats = now.length ? `${lang === 'fr' ? 'Statistiques à ce stade' : 'Stats at this point'} : ${now.map(s => `${s.name} ${s.value}`).join(', ')}` : ''
