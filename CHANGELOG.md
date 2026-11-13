@@ -7,6 +7,13 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.59.0
+Fewer leaks from the voice cards, a chapter read for its logic, and comparisons measured on your prose.
+- **A character’s inner voice stays out of the writing.** The “Inner voice” of a voice card (what Dez hides, what Hester carries) went with every request, so Claude wrote it out: “he said it too fast”, “a second too long”. It now goes to the writing only for the point-of-view character; planning, Edit the chapter and the read-over still see it, so they can check it stays unsaid.
+- **Edit the chapter checks the logic.** Its deep read now counts numbers, times and tallies again, checks who is where and who said what, that a character counted doesn’t vanish, that an order given isn’t ignored without consequence, and that an object or a rule of the world behaves as before. It reads the last 3,000 words of the previous chapter for that.
+- **After Write the chapter**, that deep read runs by itself (unless the read-over is off in Settings → Claude): its findings open in the Edit panel, each with its fix.
+- **Comparisons, against your own rate.** A new check counts every way of comparing (“comme un…”, “comme si…”, “on aurait dit”, “l’air de quelqu’un qui…”) per 1,000 words, against the rate of your voice samples, and flags three or more within a few lines. Told to avoid one way, a model finds another: counting them all doesn’t let it.
+
 ## 0.58.0
 The read-over checks more, and two new checks without the AI.
 - **The read-over sees the voice cards.** It was asked to catch a card's gesture or sample line without being shown the cards. It now gets the cards of the characters in the passage, and also fixes a line that goes against one ("cheffe" from a character whose card says "chef") and a subtext written out.

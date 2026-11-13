@@ -11,7 +11,7 @@ import { checkRules, fixable, type Check } from './lib/voice'
 import { applyFixes, fixGuard, fixRequest, placeFixes, placeOf, type FixEdit } from './lib/fixes'
 import { fixTypography } from './lib/typography'
 import { isLocked } from './lib/serial'
-import { newId } from './lib/text'
+import { lastWords, newId } from './lib/text'
 import { makeSnap, saveSnap } from './lib/snapshots'
 import { assistantChoice, useAI } from './editor/actions'
 import { checkWithLT } from './editor/Editor'
@@ -126,10 +126,14 @@ export async function checkChapter(depth: Depth) {
     const bible = depth === 'deep'
       ? named.filter(e => here.has(e.slug) || e.include === 'always').map(e => renderEntry(e, 'full', n, book.meta.language, book.meta.series?.index ?? 1, e.slug === pov, book.meta.fields?.[e.type])).join('\n\n')
       : ''
+    // The chapter before, to check the day, the hours, the people and the objects against.
+    const prevC = book.chapters[n - 2]
+    const previous = depth === 'deep' && prevC ? lastWords(scenesOf(prevC).map(s => s.text.trim()).join('\n\n'), 3000) : ''
     const plan = depth === 'deep' && c.scenes.some(s => s.note?.trim() || s.beats?.length) ? chapterText(book, c, n) : ''
     const what = depth === 'deep'
       ? (F ? `Lis ce chapitre comme un éditeur exigeant, au niveau des meilleurs romans du genre. Relève les vrais problèmes :
 - continuité : ce qui contredit <bible> (faits vrais à ce chapitre, noms, règles de la magie, ce que le personnage du point de vue sait ou ignore) ;
+- cohérence interne : recompte chiffres, heures, durées et décomptes ; vérifie qui est où et qui a dit quoi, qu’un personnage compté ou présent ne disparaît pas sans raison, qu’un ordre donné n’est pas ignoré sans suite, qu’un objet ou une règle du monde (un appareil, un sort) se comporte comme dans <chapitre_precedent> et la bible ;
 - voix : des répliques qui ne sonnent pas comme leur personnage (fiches de voix) ;
 - plan : ce que <plan> demande et que le chapitre ne fait pas (but, étapes, fin sur un tournant) ;
 - rythme : passages qui traînent, tension qui retombe, scène sans enjeu ;
@@ -138,6 +142,7 @@ export async function checkChapter(depth: Depth) {
 - langue : fautes, accords, ponctuation.`
         : `Read this chapter as a demanding editor, at the level of the genre's best novels. List the real problems:
 - continuity: what contradicts <bible> (facts true at this chapter, names, magic rules, what the point-of-view character knows or doesn't);
+- inner consistency: count numbers, times, durations and tallies again; check who is where and who said what, that a character counted or present doesn't vanish without a reason, that an order given isn't ignored without consequence, that an object or a rule of the world (a device, a spell) behaves as in <previous_chapter> and the bible;
 - voice: lines that don't sound like their speaker (voice cards);
 - plan: what <plan> asks for that the chapter doesn't do (goal, beats, ending on a turn);
 - pacing: passages that drag, tension that drops, a scene with nothing at stake;
@@ -152,6 +157,7 @@ export async function checkChapter(depth: Depth) {
       message: [
         bible ? `<bible chapter="${n}">\n${bible}\n</bible>` : '',
         plan ? `<plan>\n${plan}\n</plan>` : '',
+        previous ? `<${F ? 'chapitre_precedent' : 'previous_chapter'}>\n${previous}\n</${F ? 'chapitre_precedent' : 'previous_chapter'}>` : '',
         `<chapter n="${n}">\n${chapterBody(c)}\n</chapter>`,
         measured ? `<measured>\n${F ? 'Mesuré par Plume, passages à l’appui. Relèves-en les pires, sans qu’ils prennent la place des problèmes de fond :' : 'Measured by Plume, with the passages behind it. List the worst of them, without letting them crowd out the deeper problems:'}\n${measured}\n</measured>` : '',
         `<task>\n${what}\n${F

@@ -114,10 +114,10 @@ export const VOICE_LABELS: Record<Lang, Record<string, string>> = {
   en: { register: 'Register', sentences: 'Sentences', tic: 'Verbal tic', gesture: 'Signature gesture', never: 'Never says', inner: 'Inner voice', lines: 'Sample lines', address: 'Forms of address' },
 }
 
-/** A character's voice card: sent whenever the character is, in short or full. */
-function voiceBlock(e: Entry, lang: Lang): string {
+/** A character's voice card: sent whenever the character is, in short or full. `inner`: with the inner voice (left out when Claude writes and the character is not the point of view, or it writes their subtext out). */
+function voiceBlock(e: Entry, lang: Lang, inner = true): string {
   if (!e.voice) return ''
-  const rows = Object.entries(e.voice).filter(([, v]) => (v ?? '').trim()).map(([k, v]) => `${VOICE_LABELS[lang][k] ?? k} : ${v.trim()}`)
+  const rows = Object.entries(e.voice).filter(([k, v]) => (v ?? '').trim() && (inner || k !== 'inner')).map(([k, v]) => `${VOICE_LABELS[lang][k] ?? k} : ${v.trim()}`)
   return rows.length ? `<voice>\n${rows.join('\n')}\n</voice>` : ''
 }
 
@@ -128,7 +128,8 @@ export function voiceCards(book: Book, text: string): string {
   return carded.filter(e => named.has(e.slug)).map(e => `<character name="${e.name}">\n${voiceBlock(e, book.meta.language)}\n</character>`).join('\n')
 }
 
-export function renderEntry(e: Entry, mode: Mode, chapter: number, lang: Lang, bookIndex = 1, pov = false, defs?: FieldDef[]): string {
+/** `prose`: the entry goes with a request where Claude writes the story (a character's inner voice then goes only for the point of view). */
+export function renderEntry(e: Entry, mode: Mode, chapter: number, lang: Lang, bookIndex = 1, pov = false, defs?: FieldDef[], prose = false): string {
   const aka = e.aliases.filter(a => a !== e.name).map(a => a.replace(/!$/, ''))
   const head = `<entry type="${e.type}" name="${e.name}"${aka.length ? ` aka="${aka.join(', ')}"` : ''}${pov ? ' pov="true"' : ''}>`
   // Blocks marked never are not sent; blocks marked always travel with the short version.
@@ -142,7 +143,7 @@ export function renderEntry(e: Entry, mode: Mode, chapter: number, lang: Lang, b
   // LitRPG: the numbers as they stand at this chapter, so status screens stay consistent.
   const now = statsAt(e.stats, chapter)
   const stats = now.length ? `${lang === 'fr' ? 'Statistiques à ce stade' : 'Stats at this point'} : ${now.map(s => `${s.name} ${s.value}`).join(', ')}` : ''
-  return [head, ...fieldLines(e, defs, mode), body?.trim(), facts.length ? `${label}\n${facts.join('\n')}` : '', stats, knows, unaware, voiceBlock(e, lang), '</entry>'].filter(Boolean).join('\n')
+  return [head, ...fieldLines(e, defs, mode), body?.trim(), facts.length ? `${label}\n${facts.join('\n')}` : '', stats, knows, unaware, voiceBlock(e, lang, pov || !prose), '</entry>'].filter(Boolean).join('\n')
 }
 
 /** Samples of the author's prose, at most this many words in all (cached, so cheap after the first call). */
@@ -483,7 +484,7 @@ export function buildContext(input: ContextInput): Built {
   // Budget: drop linked entries first, then switch full versions to short, least-mentioned first.
   const list = [...picked.values()]
   const bookIndex = book.meta.series?.index ?? 1
-  const render = (p: Picked) => { const e = bySlug.get(p.slug)!; return renderEntry(e, p.mode, chapter, lang, bookIndex, p.slug === input.pov, book.meta.fields?.[e.type]) }
+  const render = (p: Picked) => { const e = bySlug.get(p.slug)!; return renderEntry(e, p.mode, chapter, lang, bookIndex, p.slug === input.pov, book.meta.fields?.[e.type], true) }
   const size = (p: Picked) => estimateTokens(render(p))
   const forced = (p: Picked) => p.slug in overrides
   for (const p of list) {

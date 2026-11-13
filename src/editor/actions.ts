@@ -17,7 +17,7 @@ import { changesField, setChanges } from './marks'
 import { canRun, cancelLLM, runLLM } from '../llm'
 import type { Effort, Model } from '../lib/types'
 import { findScene, useStore } from '../store'
-import { fixFlagged, useEdit } from '../edit'
+import { checkChapter, fixFlagged, openEdit, useEdit } from '../edit'
 import { t, translate } from '../i18n'
 import { ask as askDialog } from '@tauri-apps/plugin-dialog'
 import { makeSnap, saveSnap } from '../lib/snapshots'
@@ -450,6 +450,8 @@ export async function writeChapter(chapterId: string) {
   if (toFix.length) {
     useStore.getState().notify('warn', t('{n} scene(s) written; {k} miss some of your rules or targets. Snapshots can put the chapter back as it was.', { n: done, k: toFix.length }) + fixes, { label: t('Fix them'), run: () => fixFlagged(toFix) })
   } else useStore.getState().notify('ok', t('{n} scene(s) written. Snapshots can put the chapter back as it was.', { n: done }) + fixes, { label: t('Read it'), run: () => { if (reviewed) useStore.getState().setPrefs({ mode: 'review' }); useStore.getState().selectScene(todo[0].id) } })
+  // The whole chapter read over as an editor, against the bible and the chapter before: what no single scene's read-over can see.
+  if (useStore.getState().prefs.editPass !== 'off') { openEdit(chapter.id); checkChapter('deep') }
 }
 
 /** Fill with AI: the placeholder ⟦note⟧ is replaced by a proposal written from its note. */

@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { locate } from '../edit'
 import { parseEntry, serializeEntry, parseScene, serializeScene, factApplies, parseFact } from './bible'
 import { buildContext, buildMatcher, fairShares, findMentions, outlineLines, ownShare, proseSamples, sampleParts, sceneWords, systemPrompt, voiceCards, voiceIssues } from './context'
-import { MY_VOICE, negationPairs, overusedPhrases, promptFor, repeatedGestures, sampleEchoes } from './voice'
+import { comparisonBunches, comparisons, MY_VOICE, negationPairs, overusedPhrases, promptFor, repeatedGestures, sampleEchoes } from './voice'
 import { FANTASY_STYLE } from './defaults'
 import { autoCapitalRule, fixTypography, loneI, typingRule } from './typography'
 import { pasteText, wrapMarks } from './paste'
@@ -1021,6 +1021,26 @@ describe('quality per token', () => {
     expect(msg).toContain('<chapitre_precedent>\nMardi, 17 h 52.')
     expect(msg).toContain('recompte chaque chiffre')
     expect(editRequest('Il rit.', [], {}, 'fr')).not.toContain('fiches_de_voix')
+  })
+  it('sends a character’s inner voice to the writing only for the point of view', () => {
+    const dez: Entry = { slug: 'dez', type: 'character', path: 'bible/characters/dez.md', name: 'Dez', aliases: [], include: 'auto', links: [], short: 'Auror.', full: '', facts: [], extra: {}, voice: { ...EMPTY_VOICE, register: 'Familier.', inner: 'Il calcule.' } }
+    expect(renderEntry(dez, 'short', 1, 'fr', 1, false, undefined, true)).not.toContain('Il calcule.')
+    expect(renderEntry(dez, 'short', 1, 'fr', 1, false, undefined, true)).toContain('Familier.')
+    expect(renderEntry(dez, 'short', 1, 'fr', 1, true, undefined, true)).toContain('Il calcule.')
+    // Planning and editing still see it.
+    expect(renderEntry(dez, 'short', 1, 'fr', 1, false)).toContain('Il calcule.')
+  })
+  it('counts every way of comparing, against the author’s own rate, and bunches of them', () => {
+    const text = 'Il partit comme un voleur. On aurait dit un chien. Elle avait l’air de quelqu’un qui attend. Il rit comme si de rien n’était. Comme prévu, il plut.'
+    expect(comparisons(text, 'fr')).toHaveLength(4)
+    expect(comparisonBunches(text, 'fr')).toHaveLength(1)
+    const filler = (n: number) => Array.from({ length: n }, (_, i) => `Mot${i}`).join(' ')
+    expect(comparisonBunches(`Il partit comme un voleur. ${filler(200)} On aurait dit un chien. ${filler(200)} Il rit comme si de rien n’était.`, 'fr')).toEqual([])
+    const sample = filler(600) + ' Il partit comme un voleur.'
+    const ok = checkRules(`${filler(400)} Il partit comme un voleur.`, bookOf([], [], 'fr'), { samples: [sample] }).find(c => c.id === 'comparisons')
+    expect(ok?.ok).toBe(true)
+    const many = checkRules(`${filler(300)} ${text} ${text}`, bookOf([], [], 'fr'), { samples: [sample] }).find(c => c.id === 'comparisons')
+    expect(many?.ok).toBe(false)
   })
   it('flags a running gag and a card gesture played again and again', () => {
     const text = 'Un plombier de Birkenhead, dit-il. Elle rit. Encore ce plombier de Birkenhead. Il tapota la coque de son téléphone. Origine : un plombier de Birkenhead. Plus tard, il tapota encore la coque du téléphone.'

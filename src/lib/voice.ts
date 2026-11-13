@@ -243,6 +243,20 @@ export function checkRules(text: string, book: Book, opts: { samples?: string[];
   out.push({ id: 'tells', label: 'AI tells', ok: tells.length === 0, detail: String(tells.length),
     fix: (fr ? 'Tournures qui sonnent comme une IA, à réécrire simplement :\n' : 'Phrasings that sound machine-written, to rewrite plainly:\n') + tells.map(x => `  - ${TELL_FIX[x.kind][lang]}${cited(x.quotes, lang)}`).join('\n') })
 
+  // Comparisons, against your own prose: a model told to avoid one way of comparing finds another, so they are all counted.
+  const voice = (opts.samples ?? []).join('\n\n')
+  if (voice && ws >= 300) {
+    const base = words(voice).length >= 500 ? comparisonRate(voice, lang) : 3
+    const limit = Math.max(base * 1.5, base + 1.5)
+    const found = comparisons(text, lang)
+    const rate = found.length / ws * 1000
+    const bunches = comparisonBunches(text, lang)
+    out.push({ id: 'comparisons', label: 'Comparisons', ok: rate <= limit && !bunches.length, detail: `${rate.toFixed(1)} ≤ ${limit.toFixed(1)}${bunches.length ? ` · ${bunches.length} ×3` : ''}`,
+      fix: fr ? `Comparaisons : ${found.length}, soit ${rate.toFixed(1)} pour 1 000 mots ; la prose de l’auteur en a ${base.toFixed(1)}. Garde les plus justes, dis les autres simplement, et aucune dans l’action${cited(found.map(f => quoteAround(text, f.from, f.to)), lang)}.${bunches.length ? ` Trois comparaisons ou plus en quelques lignes : n’en garde qu’une par passage${cited(bunches, lang)}.` : ''}`
+        : `Comparisons: ${found.length}, ${rate.toFixed(1)} per 1,000 words; the author’s prose has ${base.toFixed(1)}. Keep the truest, say the others plainly, and none in action${cited(found.map(f => quoteAround(text, f.from, f.to)), lang)}.${bunches.length ? ` Three comparisons or more within a few lines: keep one per passage${cited(bunches, lang)}.` : ''}` })
+  }
+
+
   if (opts.samples?.length) {
     const echoes = sampleEchoes(text, opts.samples, lang, opts.ignore)
     out.push({ id: 'echo', label: 'Taken from your samples', ok: echoes.length < 2, detail: String(echoes.length),
@@ -362,7 +376,33 @@ export function aiTells(text: string, lang: Lang): { kind: Tell; quotes: string[
  * (passive voice, adverbs) and the Review reports stay information for you: turned into
  * instructions, they push every sentence toward the same average.
  */
-export const FIXABLE = new Set(['banned', 'tells', 'dash', 'sentence', 'dialogue', 'gestures', 'echo'])
+export const FIXABLE = new Set(['banned', 'tells', 'dash', 'sentence', 'dialogue', 'gestures', 'echo', 'comparisons'])
+
+const COMPARISON: Record<Lang, RegExp> = {
+  fr: /\b(?:comme\s+(?:si|s['’]ils?|on|quand|pour|un|une|des|le|la|les|l['’]|du|d['’])|on aurait dit|pareil(?:le)?s?\s+à|tel(?:le)?s?\s+(?:un|une|des)|(?:l['’]air|l['’]expression|la mine)\s+d(?:e\s+quelqu['’]un|['’]un(?:e)?)\b)/giu,
+  en: /\b(?:like\s+(?:a|an|the|someone|somebody)|as if|as though|the way (?:a|an|the|someone)|the (?:look|air) of (?:a|an|someone))\b/giu,
+}
+
+/** Every comparison of the passage: "comme un…", "comme si…", "comme on…", "on aurait dit", "l'air de quelqu'un qui…", "tel un…". */
+export const comparisons = (text: string, lang: Lang) => [...text.matchAll(COMPARISON[lang])].map(m => ({ from: m.index!, to: m.index! + m[0].length }))
+
+/** Comparisons bunched together: three or more within `span` words. Each bunch, quoted from its first to its last. */
+export function comparisonBunches(text: string, lang: Lang, span = 150): string[] {
+  const ws = words(text)
+  const at = comparisons(text, lang).map(c => ws.findIndex(w => w.to > c.from))
+  const out: string[] = []
+  for (let i = 0; i + 2 < at.length; i++) {
+    let j = i + 2
+    if (at[j] - at[i] > span) continue
+    while (j + 1 < at.length && at[j + 1] - at[i] <= span) j++
+    out.push(quoteAround(text, ws[at[i]].from, ws[Math.min(at[j] + 3, ws.length - 1)].to, 0))
+    i = j
+  }
+  return out
+}
+
+/** Comparisons per 1,000 words. */
+export const comparisonRate = (text: string, lang: Lang) => { const n = words(text).length; return n ? comparisons(text, lang).length / n * 1000 : 0 }
 
 // --- What one passage repeats -------------------------------------------------------
 // A running gag or a card's gesture is good once; Claude tends to play it again and again.
