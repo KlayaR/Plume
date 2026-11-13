@@ -375,8 +375,9 @@ html[data-theme="light"] .pl-shelf-books { box-shadow: 0 10px 14px -12px rgba(0,
 .pl-group-item > span:first-child { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pl-group-item:hover { background: var(--surface-2); }
 .pl-group-item.pl-active { border-left-color: var(--accent); color: var(--text); }
-.pl-fold { display: flex; align-items: center; gap: 4px; padding: 2px 0; color: var(--text-dim); }
-.pl-fold .sk-num { font-size: var(--fs-xs); opacity: 0.7; }
+/* The Bible's group fold button; the Claude panel's <details class="pl-fold"> must stay a block, or its open summary is squeezed into a column. */
+button.pl-fold { display: flex; align-items: center; gap: 4px; padding: 2px 0; color: var(--text-dim); }
+button.pl-fold .sk-num { font-size: var(--fs-xs); opacity: 0.7; }
 .pl-group-item .pl-type { flex: none; font-size: var(--fs-xs); opacity: 0.6; }
 .pl-subhead { display: flex; align-items: center; gap: 6px; padding: 8px 8px 2px 13px; font-size: var(--fs-xs); color: var(--text-muted); }
 .pl-subhead .sk-num { opacity: 0.7; }

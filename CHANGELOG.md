@@ -7,6 +7,9 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.60.1
+- **The Claude panel’s details opened as a column of letters.** Opening the line “Opus · My voice · ≈ 25,324 tokens · 11 entries” squeezed it into a narrow column on the left, one letter per line: a style meant for the Bible’s group fold button also applied to it. It now opens as a normal line above the details.
+
 ## 0.60.0
 The bible no longer tells Claude how the book ends, and no longer doubles itself.
 - **No later chapter in the writing.** When Claude writes chapter N, every sentence of the bible that speaks of a later chapter (“fourth victim of Silas (ch 19)”, “suspended at ch 8”) is left out of what it reads. A bible written by an author who knows the whole book stops giving its twists away to the prose. Planning, Edit the chapter and the read-over still read everything.
