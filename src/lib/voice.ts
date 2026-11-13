@@ -202,7 +202,7 @@ const cited = (quotes: string[], lang: Lang) => {
 }
 
 /** Scores a proposal against the book's measurable rules. Zero tokens. */
-export function checkRules(text: string, book: Book): Check[] {
+export function checkRules(text: string, book: Book, opts: { samples?: string[]; ignore?: string } = {}): Check[] {
   const lang = book.meta.language
   const r: Rules = book.meta.voice.rules
   const fr = lang === 'fr'
@@ -243,6 +243,13 @@ export function checkRules(text: string, book: Book): Check[] {
   out.push({ id: 'tells', label: 'AI tells', ok: tells.length === 0, detail: String(tells.length),
     fix: (fr ? 'Tournures qui sonnent comme une IA, à réécrire simplement :\n' : 'Phrasings that sound machine-written, to rewrite plainly:\n') + tells.map(x => `  - ${TELL_FIX[x.kind][lang]}${cited(x.quotes, lang)}`).join('\n') })
 
+  if (opts.samples?.length) {
+    const echoes = sampleEchoes(text, opts.samples, lang, opts.ignore)
+    out.push({ id: 'echo', label: 'Taken from your samples', ok: echoes.length < 2, detail: String(echoes.length),
+      fix: fr ? `Passages repris mot pour mot des échantillons de l’auteur${cited(echoes, lang)}. Dis-le autrement ; un seul rappel voulu d’un chapitre précédent peut rester.`
+        : `Passages taken word for word from the author’s samples${cited(echoes, lang)}. Say it another way; one deliberate echo of an earlier chapter can stay.` })
+  }
+
   const gestures = repeatedGestures(text, book)
   out.push({ id: 'gestures', label: 'Repeated gestures', ok: !gestures.length, detail: String(gestures.length),
     fix: fr ? `Gestes de fiche de voix qui reviennent : ${gestures.map(g => `${g.name}${cited(g.quotes, lang)}`).join(' ; ')}. Garde-en un par personnage, coupe ou change les autres.`
@@ -263,7 +270,7 @@ export function checkRules(text: string, book: Book): Check[] {
 // Constructions that make prose read as machine-written. Each is fine once in a
 // while in a human text; it's the habit that gives it away, hence the thresholds.
 
-type Tell = 'contrast' | 'dashes' | 'openers' | 'triads' | 'similes' | 'pronouns' | 'comparisons'
+type Tell = 'contrast' | 'dashes' | 'openers' | 'triads' | 'similes' | 'pronouns' | 'comparisons' | 'negation'
 const TELL_FIX: Record<Tell, Record<Lang, string>> = {
   contrast: { en: 'the "not X, but Y" / "It wasn\'t X. It was Y." contrast, used more than once: say the thing directly', fr: 'l\'opposition « ce n\'est pas X, c\'est Y » / « non pas X, mais Y », plus d\'une fois : dis la chose directement' },
   dashes: { en: 'too many em dashes inside sentences: use commas, full stops or nothing', fr: 'trop de tirets au milieu des phrases : mets des virgules, des points, ou rien' },
@@ -271,6 +278,7 @@ const TELL_FIX: Record<Tell, Record<Lang, string>> = {
   triads: { en: 'lists of three ("X, Y and Z") again and again: keep one, cut or merge the others', fr: 'des énumérations par trois (« X, Y et Z ») à répétition : garde-en une, coupe ou fonds les autres' },
   similes: { en: 'comparisons built the same way again and again ("the way…"): keep the best, say the others plainly or build them differently', fr: 'des comparaisons construites toujours pareil (« de la façon dont… », « comme si… ») : garde la meilleure, dis les autres simplement ou autrement' },
   pronouns: { en: 'the ", and he…" link again and again: when the subject stays the same, drop the comma and the pronoun', fr: 'la tournure « …, et il / et elle… » à répétition, calquée sur l\'anglais : quand le sujet ne change pas, enlève la virgule et le pronom (« Elle prit la feuille et la déchira »)' },
+  negation: { en: 'saying what happens through what does not ("He did not look at X. He looked at Y", "X did not come. It was Y"), again and again: say directly what happens', fr: 'dire ce qui se passe en passant par ce qui ne se passe pas (« Il ne regardait pas X. Il regardait Y », « X ne vint pas. Ce fut Y »), à répétition : dis directement ce qui se passe' },
   comparisons: { en: 'comparisons built with "as one does" again and again: keep the best, say the others plainly', fr: 'des comparaisons en « comme on… » à répétition : garde la meilleure, dis les autres simplement' },
 }
 
@@ -289,6 +297,33 @@ const SIMILE: Record<Lang, RegExp> = {
 const COMMA_PRONOUN = /[^,.;!?\n]{0,30},\s+et\s+(?:il|elle)s?\s+[\p{L}'’-]+/giu
 /** French only: "comme on…", a comparison a model falls back on. */
 const COMME_ON = /\bcomme\s+(?:quand\s+)?on\b/gi
+
+const NEGATED: Record<Lang, RegExp> = {
+  fr: /(?:\bne\s+|\bn['’])([\p{L}-]+)\s+(?:pas|rien|plus|jamais|personne)\b/iu,
+  en: /\b(?:did not|didn't|does not|doesn't|was not|wasn't|were not|weren't)\s+([\p{L}-]+)/iu,
+}
+const AUXILIARY = new Set(['a', 'ai', 'as', 'ont', 'avait', 'avaient', 'avais', 'eut', 'est', 'sont', 'etait', 'etaient', 'fut', 'furent', 'have', 'has', 'had', 'be', 'been'])
+const IT_WAS: Record<Lang, RegExp> = { fr: /^(?:ce fut|c['’]était|c['’]est)\b/i, en: /^(?:it was|it is)\b/i }
+
+/**
+ * A negated sentence, then one that affirms with the same verb or opens on "It was":
+ * "Il ne regardait pas le rugby. Il regardait le brouillard." Each pair, quoted.
+ */
+export function negationPairs(text: string, lang: Lang): string[] {
+  const ss = sentences(text)
+  const out: string[] = []
+  for (let i = 0; i + 1 < ss.length; i++) {
+    const verb = NEGATED[lang].exec(ss[i].s)?.[1]
+    // An auxiliary says nothing of what is done ("Il n'avait jamais vu… Il avait lu…").
+    if (!verb || AUXILIARY.has(foldText(verb))) continue
+    const next = ss[i + 1].s.replace(/^[—–\-«“"\s]+/, '')
+    if (NEGATED[lang].test(next)) continue
+    const v = foldText(verb)
+    const same = words(next).slice(0, 4).some(x => { const w = foldText(x.w); return w === v || (lang === 'en' && (w === v + 'ed' || w === v + 'd' || w === v + 's')) })
+    if (same || IT_WAS[lang].test(next)) out.push(quoteAround(text, ss[i].from, ss[i + 1].from + Math.min(ss[i + 1].s.length, 40), 0))
+  }
+  return out
+}
 
 /** AI tells in a passage, at most one of each kind, with a quote for each occurrence. Zero tokens. */
 export function aiTells(text: string, lang: Lang): { kind: Tell; quotes: string[] }[] {
@@ -309,6 +344,8 @@ export function aiTells(text: string, lang: Lang): { kind: Tell; quotes: string[
   if (triads.length >= 3) out.push({ kind: 'triads', quotes: quoted(triads) })
   const similes = [...text.matchAll(SIMILE[lang])]
   if (similes.length > Math.max(2, n / 300)) out.push({ kind: 'similes', quotes: quoted(similes) })
+  const neg = negationPairs(text, lang)
+  if (neg.length >= 2) out.push({ kind: 'negation', quotes: neg })
   if (lang === 'fr') {
     // A changed subject makes ", et il" correct, so only the habit counts.
     const linked = [...text.matchAll(COMMA_PRONOUN)]
@@ -325,7 +362,7 @@ export function aiTells(text: string, lang: Lang): { kind: Tell; quotes: string[
  * (passive voice, adverbs) and the Review reports stay information for you: turned into
  * instructions, they push every sentence toward the same average.
  */
-export const FIXABLE = new Set(['banned', 'tells', 'dash', 'sentence', 'dialogue', 'gestures'])
+export const FIXABLE = new Set(['banned', 'tells', 'dash', 'sentence', 'dialogue', 'gestures', 'echo'])
 
 // --- What one passage repeats -------------------------------------------------------
 // A running gag or a card's gesture is good once; Claude tends to play it again and again.
@@ -354,6 +391,42 @@ export function overusedPhrases(text: string, lang: Lang, min = 3): { phrase: st
   }
   return out
 }
+
+/**
+ * Passages of the text found word for word in the author's samples: runs of four or five
+ * words, three of them meaningful. The samples show a voice; their sentences are not to
+ * be used again. `ignore`: text whose own words don't count (the scene being rewritten).
+ */
+export function sampleEchoes(text: string, samples: string[], lang: Lang, ignore = ''): string[] {
+  const content = (w: string) => w.length >= 3 && !/['’]/.test(w) && !STOPWORDS[lang].has(w)
+  const grams = (s: string, into: Set<string>) => {
+    const ks = words(s).map(x => foldText(x.w))
+    for (const n of [4, 5]) for (let i = 0; i + n <= ks.length; i++) {
+      const g = ks.slice(i, i + n)
+      if (g.filter(content).length >= 3) into.add(g.join(' '))
+    }
+  }
+  const known = new Set<string>(), mine = new Set<string>()
+  samples.forEach(s => grams(s, known))
+  if (ignore) grams(ignore, mine)
+  const ws = words(text)
+  const ks = ws.map(x => foldText(x.w))
+  const hit = ks.map(() => false)
+  for (const n of [4, 5]) for (let i = 0; i + n <= ks.length; i++) {
+    const g = ks.slice(i, i + n).join(' ')
+    if (known.has(g) && !mine.has(g)) for (let k = i; k < i + n; k++) hit[k] = true
+  }
+  const out: string[] = []
+  for (let i = 0; i < hit.length; i++) {
+    if (!hit[i]) continue
+    let j = i
+    while (j + 1 < hit.length && hit[j + 1]) j++
+    out.push(text.slice(ws[i].from, ws[j].to))
+    i = j
+  }
+  return [...new Set(out)]
+}
+
 
 /** A word without its ending, so a verb is found whatever the tense ("tapote", "tapota", "pose", "posa"). */
 const stem = (w: string) => w.replace(/(?:aient|erent|ait|ent|ant|ons|ez|es|as|e|a|s)$/, '').slice(0, 5)

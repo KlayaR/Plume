@@ -3,7 +3,7 @@
 import { create } from 'zustand'
 import type { EditorView } from '@codemirror/view'
 import { isRewrite, type ActionId, type Book, type Lang } from '../lib/types'
-import { buildContext, scenePlace, systemPrompt, type Built, type Override } from '../lib/context'
+import { buildContext, proseSamples, scenePlace, systemPrompt, voiceCards, type Built, type Override } from '../lib/context'
 import { reviewChecks } from '../lib/review'
 import { checkRules, fixable, fixDirection, overusedPhrases, promptFor, type Check } from '../lib/voice'
 import { applyMarked, editRequest, fixGuard, placeFixes, readEditReply, type EditContext, type PlacedFix } from '../lib/fixes'
@@ -149,7 +149,12 @@ export async function runAction(action: ActionId, instruction: string, overrides
 const wordCount = (s: string) => (s.match(/\S+/g) ?? []).length
 
 /** Everything the scorecard checks: your rules, then the Review reports furthest from their target. */
-export const scorecard = (text: string, book: Book): Check[] => [...checkRules(text, book), ...reviewChecks(text, book, { say: s => translate(book.meta.language, s) })]
+export const scorecard = (text: string, book: Book, sceneId: string | null = useStore.getState().sceneId): Check[] => {
+  // Your samples, to find what the text copies from them; what the scene already holds is not a copy.
+  const found = findScene(book, sceneId)
+  return [...checkRules(text, book, { samples: proseSamples(book, found?.number ?? 1), ignore: found?.scene.text }), ...scoreReview(text, book)]
+}
+const scoreReview = (text: string, book: Book): Check[] => [...reviewChecks(text, book, { say: s => translate(book.meta.language, s) })]
 
 /** The request that fixes only what failed in a passage, keeping the rest word for word. */
 function fixMessage(text: string, failed: Check[], lang: Lang): string {
@@ -217,13 +222,10 @@ function readOverContext(book: Book, sceneId: string | null | undefined, before:
   const found = findScene(book, sceneId ?? null)
   const sc = found?.scene
   const plan = found ? [found.chapter.notes?.trim(), sc?.note?.trim(), ...(sc?.beats ?? []).map(b => `- ${b}`)].filter(Boolean).join('\n') : ''
-  let previous = ''
-  if (found && found.index === 0 && wordCount(before) < 100) {
-    const prev = book.chapters[book.chapters.indexOf(found.chapter) - 1]
-    const last = prev?.scenes.filter(s => s.text.trim()).slice(-1)[0]
-    if (last) previous = lastWords(last.text, 300)
-  }
-  return { plan, before: lastWords(before, 250), previous, repeats: overusedPhrases(text, book.meta.language).map(({ phrase, count }) => ({ phrase, count })) }
+  // The chapter before, to check the day, the hours and the threads against: its last 3,000 words.
+  const prev = found ? book.chapters[book.chapters.indexOf(found.chapter) - 1] : undefined
+  const previous = prev ? lastWords(prev.scenes.map(s => s.text.trim()).filter(Boolean).join('\n\n'), 3000) : ''
+  return { plan, before: lastWords(before, 250), previous, cards: voiceCards(book, text), repeats: overusedPhrases(text, book.meta.language).map(({ phrase, count }) => ({ phrase, count })) }
 }
 
 /**
@@ -425,7 +427,7 @@ export async function writeChapter(chapterId: string) {
         }
         for (const note of r?.notes ?? []) notes.push({ title: note, detail: '', sceneId: s.id, where: `${chapter.title || '…'} · ${s.title}` })
       } catch { /* the read-over is a bonus: the scene is written */ }
-      if (fixable(scorecard(text, b2)).length) toFix.push(s.id)
+      if (fixable(scorecard(text, b2, s.id)).length) toFix.push(s.id)
       done++
       try {
         for (const x of await bibleSlips(message, text, b2.meta.language)) slips.push({ title: x.problem, detail: x.quote ? `“${x.quote}”` : '', sceneId: s.id, where: `${chapter.title || '…'} · ${s.title}`, quote: x.quote || undefined })

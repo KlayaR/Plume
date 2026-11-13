@@ -7,6 +7,14 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.58.0
+The read-over checks more, and two new checks without the AI.
+- **The read-over sees the voice cards.** It was asked to catch a card's gesture or sample line without being shown the cards. It now gets the cards of the characters in the passage, and also fixes a line that goes against one ("cheffe" from a character whose card says "chef") and a subtext written out.
+- **The passage is checked against itself.** The editor counts every number, time, duration and tally again (a cycle of "seven minutes" whose hours add up to eleven, "she said your name four times" when it was twice), and checks who said what, where each one is, which door is which. It fixes what a replacement can fix and notes the rest.
+- **The chapter before.** The read-over gets the last 3,000 words of the previous chapter for every scene (it had the last 300, and only for a chapter's first scene), so a wrong day of the week or a thread dropped can be seen.
+- **Said through what doesn't happen.** A new AI tell, checked without the AI: "Il ne regardait pas le rugby. Il regardait le brouillard.", "Le froid ne vint pas. Ce fut une bouffée de chaleur." Twice or more in a proposal, it is flagged and fixed.
+- **Taken from your samples.** Passages of a proposal found word for word in your voice samples ("une chose idiote et légère") are listed; two or more are flagged. The samples show your voice: their sentences are not to be used again.
+
 ## 0.57.0
 The read-over: Claude reads what it wrote, as an editor, before you see it.
 - **Each proposal is read over.** When Claude finishes writing, a second request (the editing model of Settings → Claude) reads the text as an editor and fixes what your checks flag, the narrator explaining a gesture or a feeling just shown, a sentence that needs a second reading, a gag or an image played once too often, a sample line or a gesture copied from a voice card. It sends replacements only, never a rewrite: a set of fixes that would change too much of the text is left out.

@@ -4,8 +4,8 @@ import { waitingInBook } from './waiting'
 import { describe, expect, it } from 'vitest'
 import { locate } from '../edit'
 import { parseEntry, serializeEntry, parseScene, serializeScene, factApplies, parseFact } from './bible'
-import { buildContext, buildMatcher, fairShares, findMentions, outlineLines, ownShare, proseSamples, sampleParts, sceneWords, systemPrompt, voiceIssues } from './context'
-import { MY_VOICE, overusedPhrases, promptFor, repeatedGestures } from './voice'
+import { buildContext, buildMatcher, fairShares, findMentions, outlineLines, ownShare, proseSamples, sampleParts, sceneWords, systemPrompt, voiceCards, voiceIssues } from './context'
+import { MY_VOICE, negationPairs, overusedPhrases, promptFor, repeatedGestures, sampleEchoes } from './voice'
 import { FANTASY_STYLE } from './defaults'
 import { autoCapitalRule, fixTypography, loneI, typingRule } from './typography'
 import { pasteText, wrapMarks } from './paste'
@@ -995,6 +995,32 @@ describe('quality per token', () => {
     // A cut takes its space: no double space left.
     expect(out.text).toBe('Elle le dit sans méchanceté. Il sortit.')
     expect(out.marks.map(m => out.text.slice(m.from, m.to))).toEqual(['', 'Il sortit.'])
+  })
+  it('finds what is said through what does not happen, and what is copied from the samples', () => {
+    const text = 'Il ne regardait pas le rugby. Il regardait le brouillard. Le froid ne vint pas. Ce fut une bouffée de chaleur. Il n’avait jamais vu un œuf. Il avait lu le dossier. Il ne bougea pas. Dez se leva.'
+    expect(negationPairs(text, 'fr')).toHaveLength(2)
+    expect(aiTells(text, 'fr').map(x => x.kind)).toContain('negation')
+    expect(negationPairs('Il ne regardait pas le rugby. Il regardait le brouillard.', 'fr')).toHaveLength(1)
+    expect(aiTells('Il ne regardait pas le rugby. Il regardait le brouillard.', 'fr')).toEqual([])
+    const sample = 'Il avait dans la poitrine une chose idiote et légère, la même qu’à douze ans.'
+    expect(sampleEchoes('Il sentit la même chose idiote et légère lui remonter dans la poitrine.', [sample], 'fr')).toEqual(['chose idiote et légère'])
+    // What the scene already holds is not a copy.
+    expect(sampleEchoes(sample, [sample], 'fr', sample)).toEqual([])
+    const two = 'Une chose idiote et légère. Plus tard, il compta les carreaux noirs des ascenseurs.'
+    const ids = checkRules(two, bookOf([], [], 'fr'), { samples: [sample + ' Puis il compta les carreaux noirs des ascenseurs.'] }).filter(c => !c.ok).map(c => c.id)
+    expect(ids).toContain('echo')
+  })
+  it('gives the read-over the voice cards of who is in the passage, and has it check the passage against itself', () => {
+    const dez: Entry = { slug: 'dez', type: 'character', path: 'bible/characters/dez.md', name: 'Dez', aliases: [], include: 'auto', links: [], short: '', full: '', facts: [], extra: {}, voice: { ...EMPTY_VOICE, register: 'Dit « chef » à Hester.' } }
+    const hester: Entry = { ...dez, slug: 'hester', name: 'Hester', voice: { ...EMPTY_VOICE, register: 'Vouvoie tout le monde.' } }
+    const cards = voiceCards(bookOf([], [dez, hester], 'fr'), '— Oui, cheffe, dit Dez.')
+    expect(cards).toContain('<character name="Dez">')
+    expect(cards).not.toContain('<character name="Hester">')
+    const msg = editRequest('Il rit.', [], { cards, previous: 'Mardi, 17 h 52.' }, 'fr')
+    expect(msg).toContain('<fiches_de_voix>')
+    expect(msg).toContain('<chapitre_precedent>\nMardi, 17 h 52.')
+    expect(msg).toContain('recompte chaque chiffre')
+    expect(editRequest('Il rit.', [], {}, 'fr')).not.toContain('fiches_de_voix')
   })
   it('flags a running gag and a card gesture played again and again', () => {
     const text = 'Un plombier de Birkenhead, dit-il. Elle rit. Encore ce plombier de Birkenhead. Il tapota la coque de son téléphone. Origine : un plombier de Birkenhead. Plus tard, il tapota encore la coque du téléphone.'

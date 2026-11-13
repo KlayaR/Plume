@@ -121,6 +121,13 @@ function voiceBlock(e: Entry, lang: Lang): string {
   return rows.length ? `<voice>\n${rows.join('\n')}\n</voice>` : ''
 }
 
+/** The voice cards of the characters a passage names, for the read-over (which doesn't get the bible). */
+export function voiceCards(book: Book, text: string): string {
+  const carded = book.entries.filter(e => Object.values(e.voice ?? {}).some(v => v?.trim()))
+  const named = new Set(findMentions(text, buildMatcher(carded, true)).map(m => m.slug))
+  return carded.filter(e => named.has(e.slug)).map(e => `<character name="${e.name}">\n${voiceBlock(e, book.meta.language)}\n</character>`).join('\n')
+}
+
 export function renderEntry(e: Entry, mode: Mode, chapter: number, lang: Lang, bookIndex = 1, pov = false, defs?: FieldDef[]): string {
   const aka = e.aliases.filter(a => a !== e.name).map(a => a.replace(/!$/, ''))
   const head = `<entry type="${e.type}" name="${e.name}"${aka.length ? ` aka="${aka.join(', ')}"` : ''}${pov ? ' pov="true"' : ''}>`
