@@ -403,6 +403,8 @@ fn cancel_claude(runs: State<Runs>, id: String) {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        // Reopens the window at the size, place and maximized/full-screen state it was closed in.
+        .plugin(tauri_plugin_window_state::Builder::default().build())
         .plugin(tauri_plugin_dialog::init())
         .manage(Runs::default())
         .invoke_handler(tauri::generate_handler![
