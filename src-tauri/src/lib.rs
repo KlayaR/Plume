@@ -405,6 +405,7 @@ pub fn run() {
     tauri::Builder::default()
         // Reopens the window at the size, place and maximized/full-screen state it was closed in.
         .plugin(tauri_plugin_window_state::Builder::default().build())
+        .on_window_event(|window, event| keep_window_state(window, event, tauri_plugin_window_state::StateFlags::all()))
         .plugin(tauri_plugin_dialog::init())
         .manage(Runs::default())
         .invoke_handler(tauri::generate_handler![
@@ -432,4 +433,43 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running Plume");
+}
+
+/// Writes the window state to disk when the window is closed and half a second after it stops
+/// moving or resizing. The window-state plugin alone writes only on a clean exit, so a Windows
+/// shutdown, a crash or an installer closing the app used to lose the size and place.
+fn keep_window_state<R: tauri::Runtime>(
+    window: &tauri::Window<R>,
+    event: &tauri::WindowEvent,
+    flags: tauri_plugin_window_state::StateFlags,
+) {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Mutex;
+    use std::time::{Duration, Instant};
+    use tauri::Manager;
+    use tauri_plugin_window_state::AppHandleExt;
+    static LAST_CHANGE: Mutex<Option<Instant>> = Mutex::new(None);
+    static WAITING: AtomicBool = AtomicBool::new(false);
+    match event {
+        tauri::WindowEvent::CloseRequested { .. } => {
+            let _ = window.app_handle().save_window_state(flags);
+        }
+        tauri::WindowEvent::Moved(_) | tauri::WindowEvent::Resized(_) => {
+            *LAST_CHANGE.lock().unwrap() = Some(Instant::now());
+            if WAITING.swap(true, Ordering::SeqCst) {
+                return; // a saver thread is already waiting for the window to settle
+            }
+            let app = window.app_handle().clone();
+            std::thread::spawn(move || loop {
+                std::thread::sleep(Duration::from_millis(200));
+                let settled = LAST_CHANGE.lock().unwrap().map_or(true, |t| t.elapsed() >= Duration::from_millis(500));
+                if settled {
+                    WAITING.store(false, Ordering::SeqCst);
+                    let _ = app.save_window_state(flags);
+                    break;
+                }
+            });
+        }
+        _ => {}
+    }
 }

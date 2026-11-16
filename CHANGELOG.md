@@ -7,6 +7,9 @@ Plume stays below 1.0 until every feature works in daily use without known
 bugs (see ROADMAP.md, "Road to 1.0"). Versions 0.10.0 – 0.11.0 were first
 numbered 1.0.0 – 1.1.0 and renumbered on 2026-10-14.
 
+## 0.61.1
+- The window size and place are now also saved while you use the app, so they survive a Windows shutdown or an update, not only a normal close.
+
 ## 0.61.0
 - **Plume remembers its window.** It reopens at the size and place you closed it in, maximized or full screen included, instead of the default size.
 
